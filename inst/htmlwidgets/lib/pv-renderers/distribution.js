@@ -12,6 +12,12 @@
     return t - Math.floor(t);
   }
 
+  /* Resolve a TRUE/FALSE/"auto" option from R: "auto" (or a missing
+     value) takes the data-driven decision, anything else is forced. */
+  function opt(v, autoDecision) {
+    return v === "auto" || v == null ? autoDecision : !!v;
+  }
+
   /* ---------- histogram ---------- */
 
   pvRenderers.histogram = function (ctx) {
@@ -110,7 +116,12 @@
 
   pvRenderers.boxplot = function (ctx) {
     var boxes = ctx.x.boxes;
-    var raw = ctx.x.points || [];
+    /* "auto" keeps the jittered cloud only while it still reads as
+       individual dots: at most 600 raw values across all the groups.
+       (b.n counts every raw value, before the 400-per-group thinning.) */
+    var totalN = d3.sum(boxes, function (b) { return b.n; });
+    var raw = opt(ctx.x.showPoints, totalN <= 600) ?
+      (ctx.x.points || []) : [];
     var groups = boxes.map(function (b) { return b.group; });
     var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
 
@@ -139,8 +150,26 @@
     var y = d3.scaleLinear().domain([vmin, vmax]).nice().range([ih, 0]);
 
     pv.yGrid(g, y, iw, ctx.theme);
+    /* Narrow charts squeeze the bands together and the group labels
+       collide. First try thinning: every 2nd (or 3rd) label at full
+       length - "2020  2022  2024" reads far better than "2… 2… 2…".
+       Only when even the thinned budget cannot hold a label does
+       truncation kick in. The full name stays in the box's tooltip. */
+    var stepPx = xBand.step();
+    var needW = d3.max(groups, function (gg) {
+      return pv.textWidth(gg, 11); }) || 0;
+    var every = 1;
+    while (needW > stepPx * every - 6 && every < 3 &&
+           groups.length > 2 * (every + 1)) {
+      every++;
+    }
+    var tickChars = Math.max(2,
+      Math.floor((stepPx * every - 6) / pv.textWidth("M", 11)));
     g.append("g").attr("transform", "translate(0," + ih + ")")
-      .call(d3.axisBottom(xBand).tickSizeOuter(0))
+      .call(d3.axisBottom(xBand).tickSizeOuter(0)
+        .tickFormat(function (d, i) {
+          return i % every ? "" : pv.truncate(d, tickChars);
+        }))
       .call(function (s) { pv.styleAxis(s, ctx.theme, true); });
     g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
       .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
@@ -248,14 +277,26 @@
 
   pvRenderers.ridgeline = function (ctx) {
     var ridges = ctx.x.ridges;
-    /* Each ridge may rise 2.2 band-heights above its own baseline; that
-       overlap is what makes shifts between the distributions readable. */
-    var overlap = 2.2;
+    /* Each ridge may rise `overlap` band-heights above its own baseline;
+       that overlap is what makes shifts between the distributions
+       readable. Past 10 ridges it eases from 2.2 down toward 1.6, so
+       tall neighbours stop swallowing each other. */
+    var overlap = ridges.length > 10 ?
+      Math.max(1.6, 2.2 - (ridges.length - 10) * 0.1) : 2.2;
 
+    /* Group labels may claim at most 30% of the chart width - the ridges
+       keep the rest. Names that don't fit are truncated below; the full
+       text stays in the ridge's tooltip. An optional rotated y title
+       reserves its own 18px strip on the far left. */
+    var ylabPad = ctx.x.ylab ? 18 : 0;
     var longest = d3.max(ridges, function (r) {
-      return String(r.group).length; }) || 4;
+      return pv.textWidth(r.group, 12); }) || 30;
+    var labelW = Math.max(24,
+      Math.min(longest, 146, ctx.width * 0.30 - 14 - ylabPad));
+    var maxChars = Math.max(2,
+      Math.floor(labelW / pv.textWidth("M", 12)));
     var m = { top: 12, right: 24, bottom: 40,
-              left: Math.min(160, 24 + longest * 6.6) };
+              left: ylabPad + 14 + labelW };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -318,7 +359,7 @@
         .attr("text-anchor", "end")
         .attr("fill", ctx.theme.ink.secondary)
         .style("font-size", "12px")
-        .text(r.group);
+        .text(pv.truncate(r.group, maxChars));
 
       /* Ridges rise into place from slightly below, top to bottom. */
       grp.attr("opacity", 0)
@@ -353,7 +394,7 @@
       .call(d3.axisBottom(x).ticks(Math.min(8, Math.floor(iw / 80)))
         .tickFormat(pv.fmtTick).tickSizeOuter(0))
       .call(function (s) { pv.styleAxis(s, ctx.theme, true); });
-    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, null);
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
   };
 
 })();

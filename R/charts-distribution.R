@@ -36,6 +36,34 @@ sample_fixed <- function(x, size) {
   sample(x, size)
 }
 
+# Adaptive flags have three states: TRUE, FALSE, or "auto". "auto" defers
+# the decision to the JavaScript side, which sees the real data and pixel
+# sizes at render time and decides there.
+check_auto_flag <- function(value, name) {
+  ok <- isTRUE(value) || isFALSE(value) ||
+    (is.character(value) && length(value) == 1 && !is.na(value) &&
+       value == "auto")
+  if (!ok) {
+    rlang::abort(sprintf("`%s` must be TRUE, FALSE, or \"auto\".", name))
+  }
+}
+
+# Axis-title overrides share one rule: NULL keeps the default (usually the
+# column name), NA or "" suppresses the title entirely, and anything else
+# is used verbatim.
+resolve_lab <- function(override, default) {
+  if (is.null(override)) {
+    return(default)
+  }
+  if (length(override) != 1) {
+    rlang::abort("Axis titles must be a single string, NA, or NULL.")
+  }
+  if (is.na(override) || !nzchar(override)) {
+    return(NULL)
+  }
+  as.character(override)
+}
+
 #' Interactive D3 histogram
 #'
 #' The distribution of one numeric column as bars over equal-width bins,
@@ -50,6 +78,9 @@ sample_fixed <- function(x, size) {
 #' @param bins Number of equal-width bins, or `NULL` for R's Sturges
 #'   default.
 #' @param density Overlay a kernel density curve?
+#' @param xlab,ylab Axis titles. `NULL` (the default) uses the `x` column
+#'   name for x and `"count"` for y; `NA` or `""` suppresses the title;
+#'   any other string replaces it.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -59,6 +90,7 @@ sample_fixed <- function(x, size) {
 #'              title = "Tax resources per resident, 2025")
 #' @export
 pv_histogram <- function(data, x, bins = NULL, density = FALSE,
+                         xlab = NULL, ylab = NULL,
                          title = NULL, subtitle = NULL, mode = "auto",
                          duration = 500, source = NULL, width = NULL,
                          height = NULL, elementId = NULL) {
@@ -78,7 +110,8 @@ pv_histogram <- function(data, x, bins = NULL, density = FALSE,
     curve <- data.frame(x = kde$x, y = kde$y * length(vals) * binwidth)
   }
   pv_widget("histogram", c(list(
-    data = bars, density = curve, xlab = x, ylab = "count"
+    data = bars, density = curve,
+    xlab = resolve_lab(xlab, x), ylab = resolve_lab(ylab, "count")
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -96,21 +129,29 @@ pv_histogram <- function(data, x, bins = NULL, density = FALSE,
 #' @param group Optional name of a grouping column (one box per level,
 #'   max 8). Omit it for a single box.
 #' @param points Also show the raw values as jittered points behind each
-#'   box? Groups with more than 400 values are thinned to a sample of 400,
+#'   box? `TRUE` always draws them, `FALSE` never does, and `"auto"` (the
+#'   default) draws them only when the groups hold at most 600 values in
+#'   total — few enough that the cloud still reads as individual dots.
+#'   Groups with more than 400 values are thinned to a sample of 400,
 #'   drawn with a fixed seed so the same data always shows the same
 #'   points. The box statistics always use every value.
+#' @param xlab,ylab Axis titles. `NULL` (the default) uses the `group`
+#'   column name for x and the `value` column name for y; `NA` or `""`
+#'   suppresses the title; any other string replaces it.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
 #' pv_boxplot(pv_fiscal, value = "resource_per_capita", group = "year",
 #'            points = TRUE, title = "Municipal tax resources by year")
 #' @export
-pv_boxplot <- function(data, value, group = NULL, points = FALSE,
+pv_boxplot <- function(data, value, group = NULL, points = "auto",
+                       xlab = NULL, ylab = NULL,
                        title = NULL, subtitle = NULL, mode = "auto",
                        duration = 600, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(value, group))
   check_numeric_col(data, value)
+  check_auto_flag(points, "points")
   grp <- if (is.null(group)) {
     # No grouping: one box, labelled with the column it summarises.
     rep(value, nrow(data))
@@ -134,7 +175,11 @@ pv_boxplot <- function(data, value, group = NULL, points = FALSE,
          outliers = I(as.numeric(s$outliers)))
   })
   pts <- NULL
-  if (isTRUE(points)) {
+  # "auto" is resolved by the JavaScript side, but its rule (at most 600
+  # values in total) needs only the data, so when auto is certain to hide
+  # the points the sample is skipped here — no shipping invisible dots.
+  if (isTRUE(points) ||
+      (identical(points, "auto") && length(vals) <= 600)) {
     pts <- do.call(rbind, lapply(groups, function(gname) {
       v <- vals[grp == gname]
       if (length(v) > 400) v <- sample_fixed(v, 400)
@@ -142,7 +187,8 @@ pv_boxplot <- function(data, value, group = NULL, points = FALSE,
     }))
   }
   pv_widget("boxplot", c(list(
-    boxes = boxes, points = pts, xlab = group, ylab = value
+    boxes = boxes, points = pts, showPoints = points,
+    xlab = resolve_lab(xlab, group), ylab = resolve_lab(ylab, value)
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -158,13 +204,18 @@ pv_boxplot <- function(data, value, group = NULL, points = FALSE,
 #' @param value Name of the numeric column whose distribution is drawn.
 #' @param group Name of the grouping column (one ridge per level, max 8;
 #'   every level needs at least 2 non-missing values).
+#' @param xlab X-axis title. `NULL` (the default) uses the `value` column
+#'   name; `NA` or `""` suppresses it; any other string replaces it.
+#' @param ylab Optional rotated title beside the group labels. Ridges are
+#'   labelled directly, so `NULL` (the default) draws none, same as `NA`
+#'   or `""`; a string adds one.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
 #' pv_ridgeline(pv_fiscal, value = "resource_index", group = "year",
 #'              title = "Resource index across municipalities")
 #' @export
-pv_ridgeline <- function(data, value, group,
+pv_ridgeline <- function(data, value, group, xlab = NULL, ylab = NULL,
                          title = NULL, subtitle = NULL, mode = "auto",
                          duration = 600, source = NULL, width = NULL,
                          height = NULL, elementId = NULL) {
@@ -197,7 +248,8 @@ pv_ridgeline <- function(data, value, group,
          points = pv_kde(v))
   })
   pv_widget("ridgeline", c(list(
-    ridges = ridges, xlab = value
+    ridges = ridges,
+    xlab = resolve_lab(xlab, value), ylab = resolve_lab(ylab, NULL)
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

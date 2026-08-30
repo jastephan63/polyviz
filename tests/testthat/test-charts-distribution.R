@@ -56,6 +56,54 @@ test_that("boxplot points are capped at 400 with a fixed seed", {
   expect_equal(before, after)
 })
 
+test_that("boxplot points accepts auto and ships the sample accordingly", {
+  # "auto" with more than 600 values in total: no point payload at all -
+  # the JavaScript side would hide the dots anyway, so R skips the sample
+  w <- pv_boxplot(pv_fiscal, "resource_per_capita", group = "year")
+  expect_equal(w$x$showPoints, "auto")
+  expect_null(w$x$points)
+  # "auto" with at most 600 values: the sample ships, ready to draw
+  two <- subset(pv_fiscal, year %in% c(2024, 2025))
+  w2 <- pv_boxplot(two, "resource_per_capita", group = "year")
+  expect_equal(w2$x$showPoints, "auto")
+  expect_equal(nrow(w2$x$points), nrow(two))
+  # explicit TRUE/FALSE still behave exactly as before, flag passed as-is
+  w3 <- pv_boxplot(pv_fiscal, "resource_per_capita", points = TRUE)
+  expect_true(w3$x$showPoints)
+  expect_equal(nrow(w3$x$points), 400)
+  w4 <- pv_boxplot(two, "resource_per_capita", points = FALSE)
+  expect_false(w4$x$showPoints)
+  expect_null(w4$x$points)
+  # anything else is refused up front
+  expect_error(pv_boxplot(two, "resource_per_capita", points = "yes"),
+               "TRUE, FALSE, or \"auto\"")
+})
+
+test_that("axis titles: NULL keeps defaults, strings override, NA/\"\" drop", {
+  f25 <- subset(pv_fiscal, year == 2025)
+  w <- pv_histogram(f25, "resource_per_capita")
+  expect_equal(w$x$xlab, "resource_per_capita")
+  expect_equal(w$x$ylab, "count")
+  w2 <- pv_histogram(f25, "resource_per_capita",
+                     xlab = "CHF per resident", ylab = NA)
+  expect_equal(w2$x$xlab, "CHF per resident")
+  expect_null(w2$x$ylab)
+  w3 <- pv_boxplot(pv_fiscal, "resource_per_capita", group = "year",
+                   xlab = "", ylab = "CHF")
+  expect_null(w3$x$xlab)
+  expect_equal(w3$x$ylab, "CHF")
+  w4 <- pv_ridgeline(pv_fiscal, "resource_index", group = "year",
+                     xlab = "Index (average = 100)", ylab = "Year")
+  expect_equal(w4$x$xlab, "Index (average = 100)")
+  expect_equal(w4$x$ylab, "Year")
+  # ridgeline has no y title by default; ridges are labelled directly
+  w5 <- pv_ridgeline(pv_fiscal, "resource_index", group = "year")
+  expect_equal(w5$x$xlab, "resource_index")
+  expect_null(w5$x$ylab)
+  expect_error(pv_histogram(f25, "resource_per_capita",
+                            xlab = c("a", "b")), "single string")
+})
+
 test_that("boxplot refuses more groups than palette colours", {
   expect_error(pv_boxplot(pv_fiscal, "resource_per_capita",
                           group = "municipality"), "Other")

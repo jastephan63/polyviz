@@ -18,9 +18,10 @@ window.pv = (function () {
       .replace(/>/g, "&gt;");
   };
 
-  /* Compact tick labels: 6M instead of 6,000,000; plain numbers below 10k. */
+  /* Compact tick labels: 6M instead of 6,000,000; plain numbers below 10k.
+     No thousands separator under 10k - otherwise years render as "2,020". */
   pv.fmtTick = function (v) {
-    return Math.abs(v) >= 10000 ? d3.format("~s")(v) : d3.format(",")(v);
+    return Math.abs(v) >= 10000 ? d3.format("~s")(v) : String(v);
   };
 
   pv.uniq = function (arr) {

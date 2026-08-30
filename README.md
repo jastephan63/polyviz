@@ -1,5 +1,7 @@
 # polyviz
 
+[![R-CMD-check](https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml)
+
 **D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.**
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.

@@ -15,6 +15,32 @@ evolution_axis_values <- function(x) {
   }
 }
 
+# TRUE / FALSE / "auto" chart flags travel to JavaScript exactly as given:
+# the JavaScript side resolves "auto" at render time, when it can see the
+# real data and pixel sizes. Here we only check the shape.
+evolution_flag <- function(value, name) {
+  ok <- isTRUE(value) || isFALSE(value) ||
+    (is.character(value) && length(value) == 1 && !is.na(value) &&
+     value == "auto")
+  if (!ok) {
+    rlang::abort(sprintf("`%s` must be TRUE, FALSE, or \"auto\".", name))
+  }
+  value
+}
+
+# Axis-title overrides: NULL means "use the fallback" (a column name, or
+# nothing), NA or "" suppresses the title. The payload always carries a
+# string, because a NULL element would come out of the JSON as an empty
+# object rather than disappearing.
+evolution_axis_title <- function(value, fallback, name) {
+  if (is.null(value)) return(fallback)
+  if (length(value) != 1) {
+    rlang::abort(sprintf("`%s` must be a single string, NA, or NULL.", name))
+  }
+  if (is.na(value) || !nzchar(value)) return("")
+  as.character(value)
+}
+
 #' Interactive D3 area chart
 #'
 #' Stacked areas showing how a total and its parts move together over
@@ -34,6 +60,15 @@ evolution_axis_values <- function(x) {
 #'   At most 8 levels — beyond that, fold the small ones into an
 #'   `"Other"` level. Omit it for a single-series area.
 #' @param offset `"stacked"` (default), `"percent"`, or `"stream"`.
+#' @param legend `TRUE`, `FALSE`, or `"auto"` (default). `TRUE` always
+#'   draws the legend row (even for a single series), `FALSE` never draws
+#'   it, and `"auto"` draws it exactly when the chart has more than one
+#'   series.
+#' @param xlab,ylab Axis titles. `NULL` (default) uses the column names;
+#'   `NA` or `""` suppresses a title; any other string replaces it. The
+#'   default y title only appears on `offset = "stacked"` (a percent axis
+#'   explains itself), but an explicit `ylab` shows there too. Streams
+#'   have no y axis, so they never draw a y title.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -48,11 +83,13 @@ evolution_axis_values <- function(x) {
 #' @export
 pv_area <- function(data, x, y, series = NULL,
                     offset = c("stacked", "percent", "stream"),
+                    legend = "auto", xlab = NULL, ylab = NULL,
                     title = NULL, subtitle = NULL, mode = "auto",
                     duration = 600, source = NULL, width = NULL,
                     height = NULL, elementId = NULL) {
   check_columns(data, list(x, y, series))
   offset <- match.arg(offset)
+  legend <- evolution_flag(legend, "legend")
   ax <- evolution_axis_values(data[[x]])
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
@@ -79,9 +116,13 @@ pv_area <- function(data, x, y, series = NULL,
   }
   df <- df[ord, ]
   pv_widget("area", c(list(
-    data = df, xtype = ax$xtype, xlab = x, ylab = y,
-    series = series_names, offset = offset,
-    showLegend = !is.null(series)
+    data = df, xtype = ax$xtype,
+    xlab = evolution_axis_title(xlab, x, "xlab"),
+    # The default y title only makes sense against a raw-value axis, so it
+    # falls away for percent and stream offsets unless set explicitly.
+    ylab = evolution_axis_title(
+      ylab, if (offset == "stacked") y else "", "ylab"),
+    series = series_names, offset = offset, legend = legend
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -103,6 +144,20 @@ pv_area <- function(data, x, y, series = NULL,
 #' @param value Name of the numeric column mapped to colour.
 #' @param palette `"sequential"` (default, for magnitudes) or
 #'   `"diverging"` (for values spanning zero, centred there).
+#' @param cell_values `TRUE`, `FALSE`, or `"auto"` (default). Whether the
+#'   cells print their value. `"auto"` prints only when both cell
+#'   dimensions exceed 40px; `TRUE` always prints, shrinking the font to
+#'   9px when the smaller dimension is 24–40px (below 24px nothing fits at
+#'   any honest size, so nothing prints); `FALSE` never prints. The exact
+#'   value is always in the cell tooltip.
+#' @param truncate_labels Maximum length of an axis tick label, in
+#'   characters, before it is shortened with an ellipsis (default 24).
+#'   Narrow charts may shorten row labels further so the label margin
+#'   never eats more than 40% of the width; the tooltip always carries the
+#'   full x and y names.
+#' @param xlab,ylab Optional axis titles. The heatmap draws none by
+#'   default (`NULL`) — its axes are self-evident category lists — but a
+#'   string here adds one; `NA` or `""` is the same as `NULL`.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -115,11 +170,20 @@ pv_area <- function(data, x, y, series = NULL,
 #' @export
 pv_heatmap <- function(data, x, y, value,
                        palette = c("sequential", "diverging"),
+                       cell_values = "auto", truncate_labels = 24,
+                       xlab = NULL, ylab = NULL,
                        title = NULL, subtitle = NULL, mode = "auto",
                        duration = 500, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(x, y, value))
   palette <- match.arg(palette)
+  cell_values <- evolution_flag(cell_values, "cell_values")
+  if (!is.numeric(truncate_labels) || length(truncate_labels) != 1 ||
+      is.na(truncate_labels) || truncate_labels < 1) {
+    rlang::abort(
+      "`truncate_labels` must be a single positive number of characters.")
+  }
+  truncate_labels <- as.integer(truncate_labels)
   df <- data.frame(x = as.character(data[[x]]),
                    y = as.character(data[[y]]),
                    value = as.numeric(data[[value]]))
@@ -146,7 +210,13 @@ pv_heatmap <- function(data, x, y, value,
   if (domain[1] >= domain[2]) domain <- domain[1] + c(-1, 1)
   pv_widget("heatmap", c(list(
     data = df, xlab = x, ylab = y, vlab = value,
-    palette = palette, domain = domain
+    palette = palette, domain = domain,
+    cellValues = cell_values, truncateLabels = truncate_labels,
+    # Unlike the area chart, xlab/ylab here stay the column names (the
+    # tooltip contract); the drawn titles are their own fields and default
+    # to nothing.
+    xtitle = evolution_axis_title(xlab, "", "xlab"),
+    ytitle = evolution_axis_title(ylab, "", "ylab")
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

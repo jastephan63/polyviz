@@ -48,8 +48,45 @@ test_that("area understands offsets and x types", {
   w <- pv_area(dated, "d", "v")
   expect_equal(w$x$xtype, "date")
   expect_equal(w$x$data$x, c("2024-01-01", "2024-02-01"))
-  expect_false(w$x$showLegend)
+  expect_equal(w$x$legend, "auto")
   expect_equal(w$x$series, "value")
+})
+
+test_that("area sends the legend flag as-is and validates its shape", {
+  agglo <- subset(pv_city_population, city %in% c("Luzern", "Emmen"))
+  # "auto" travels unresolved: the JavaScript side decides at render time.
+  expect_equal(pv_area(agglo, "year", "population",
+                       series = "city")$x$legend, "auto")
+  expect_true(pv_area(agglo, "year", "population", series = "city",
+                      legend = TRUE)$x$legend)
+  expect_false(pv_area(agglo, "year", "population", series = "city",
+                       legend = FALSE)$x$legend)
+  expect_error(pv_area(agglo, "year", "population", legend = "yes"),
+               "TRUE, FALSE")
+  expect_error(pv_area(agglo, "year", "population", legend = NA),
+               "TRUE, FALSE")
+})
+
+test_that("area resolves axis-title overrides in the payload", {
+  agglo <- subset(pv_city_population, city %in% c("Luzern", "Emmen"))
+  w <- pv_area(agglo, "year", "population", series = "city")
+  expect_equal(w$x$xlab, "year")
+  expect_equal(w$x$ylab, "population")
+  # Percent and stream offsets drop the default y title (their y axes
+  # don't show raw values), but an explicit one survives.
+  expect_equal(pv_area(agglo, "year", "population", series = "city",
+                       offset = "percent")$x$ylab, "")
+  expect_equal(pv_area(agglo, "year", "population", series = "city",
+                       offset = "percent", ylab = "Share")$x$ylab, "Share")
+  # NA and "" both suppress; a string replaces the column name.
+  w2 <- pv_area(agglo, "year", "population", series = "city",
+                xlab = NA, ylab = "")
+  expect_equal(w2$x$xlab, "")
+  expect_equal(w2$x$ylab, "")
+  expect_equal(pv_area(agglo, "year", "population", series = "city",
+                       xlab = "Census year")$x$xlab, "Census year")
+  expect_error(pv_area(agglo, "year", "population", series = "city",
+                       xlab = c("a", "b")), "single string")
 })
 
 test_that("heatmap builds and picks its colour domain in R", {
@@ -78,4 +115,44 @@ test_that("heatmap validates cells and drops missing values", {
 test_that("heatmap widens an all-equal colour domain", {
   flat <- data.frame(a = c("p", "q"), b = c("r", "r"), v = c(3, 3))
   expect_equal(pv_heatmap(flat, "a", "b", "v")$x$domain, c(2, 4))
+})
+
+test_that("heatmap sends the cell-value flag as-is and validates its shape", {
+  emp <- subset(pv_city_sectors, city %in% c("Luzern", "Bern"))
+  expect_equal(pv_heatmap(emp, "city", "sector", "share")$x$cellValues,
+               "auto")
+  expect_true(pv_heatmap(emp, "city", "sector", "share",
+                         cell_values = TRUE)$x$cellValues)
+  expect_false(pv_heatmap(emp, "city", "sector", "share",
+                          cell_values = FALSE)$x$cellValues)
+  expect_error(pv_heatmap(emp, "city", "sector", "share",
+                          cell_values = "sometimes"), "TRUE, FALSE")
+})
+
+test_that("heatmap validates the label character budget", {
+  emp <- subset(pv_city_sectors, city %in% c("Luzern", "Bern"))
+  expect_equal(pv_heatmap(emp, "city", "sector", "share")$x$truncateLabels,
+               24L)
+  expect_equal(pv_heatmap(emp, "city", "sector", "share",
+                          truncate_labels = 12)$x$truncateLabels, 12L)
+  expect_error(pv_heatmap(emp, "city", "sector", "share",
+                          truncate_labels = 0), "positive")
+  expect_error(pv_heatmap(emp, "city", "sector", "share",
+                          truncate_labels = "lots"), "positive")
+})
+
+test_that("heatmap draws axis titles only when set explicitly", {
+  emp <- subset(pv_city_sectors, city %in% c("Luzern", "Bern"))
+  w <- pv_heatmap(emp, "city", "sector", "share")
+  expect_equal(w$x$xtitle, "")
+  expect_equal(w$x$ytitle, "")
+  # xlab/ylab keep carrying the column names — the tooltip contract.
+  expect_equal(w$x$xlab, "city")
+  expect_equal(w$x$ylab, "sector")
+  w2 <- pv_heatmap(emp, "city", "sector", "share",
+                   xlab = "City", ylab = "Economic sector")
+  expect_equal(w2$x$xtitle, "City")
+  expect_equal(w2$x$ytitle, "Economic sector")
+  expect_equal(pv_heatmap(emp, "city", "sector", "share",
+                          xlab = NA)$x$xtitle, "")
 })

@@ -4,6 +4,14 @@
  */
 (function () {
 
+  /* Resolve a TRUE/FALSE/"auto" flag sent from R. "auto" (or a missing
+     value, for payloads saved before the flag existed) takes the
+     data-driven decision worked out here, where the real pixel sizes are
+     known; anything else is the user's explicit choice. */
+  function opt(v, autoDecision) {
+    return v === "auto" || v == null ? autoDecision : !!v;
+  }
+
   /* ---------- area ---------- */
 
   pvRenderers.area = function (ctx) {
@@ -14,9 +22,13 @@
     var seriesNames = [].concat(ctx.x.series);
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
-    if (ctx.x.showLegend && seriesNames.length > 1) {
-      pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
-      ctx.height = Math.max(120, ctx.height - 26);
+    /* legend = "auto" shows the legend exactly when there is something to
+       tell apart; TRUE/FALSE from R override that. The row can wrap on
+       narrow charts, so measure what it really used instead of assuming
+       one line - otherwise the plot draws over the source credit. */
+    if (opt(ctx.x.legend, seriesNames.length > 1)) {
+      var legendRow = pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
+      ctx.height = Math.max(120, ctx.height - legendRow.offsetHeight - 7);
     }
 
     /* Pivot the long rows into one object per x position holding a value
@@ -49,9 +61,13 @@
     var layers = stack(pivot);
 
     /* A stream has no y axis (its heights are only meaningful relative to
-       each other), so it doesn't need room for one on the left. */
-    var m = { top: 12, right: 24, bottom: 52,
-              left: offset === "stream" ? 24 : 58 };
+       each other), so it doesn't need room for one on the left. Axis
+       titles the R side suppressed (empty strings) give their room back
+       to the plot. */
+    var yTitle = offset === "stream" ? "" : (ctx.x.ylab || "");
+    var m = { top: 12, right: 24,
+              bottom: ctx.x.xlab ? 52 : 36,
+              left: offset === "stream" ? 24 : (yTitle ? 58 : 46) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -115,8 +131,7 @@
           .tickFormat(offset === "percent" ? d3.format(".0%") : pv.fmtTick))
         .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
     }
-    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab,
-      offset === "stacked" ? ctx.x.ylab : null);
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, yTitle);
 
     var area = d3.area()
       .x(function (p) { return xScale(p.data.x); })
@@ -267,13 +282,26 @@
     scaleRow.appendChild(bar);
     scaleRow.appendChild(hi);
     ctx.header.appendChild(scaleRow);
-    ctx.height = Math.max(120, ctx.height - 26);
+    ctx.height = Math.max(120, ctx.height - scaleRow.offsetHeight - 7);
 
     var xCats = pv.uniq(data.map(function (d) { return d.x; }));
     var yCats = pv.uniq(data.map(function (d) { return d.y; }));
-    var longest = d3.max(yCats, function (d) { return d.length; }) || 4;
-    var m = { top: 8, right: 14, bottom: 34,
-              left: Math.min(190, 22 + longest * 6.6) };
+
+    /* Row labels get a margin sized to the longest label after the
+       character budget (truncate_labels in R) is applied - but never more
+       than 40% of the chart, because at phone widths the cells matter
+       more than full row names. Anything shortened keeps its full text in
+       the cell tooltip. Axis titles only exist when the R side sent them
+       (the user set xlab/ylab), and take their room here too. */
+    var truncN = ctx.x.truncateLabels == null ? 24 : ctx.x.truncateLabels;
+    var xTitle = ctx.x.xtitle || "";
+    var yTitle = ctx.x.ytitle || "";
+    var widest = d3.max(yCats, function (d) {
+      return pv.textWidth(pv.truncate(d, truncN), 11);
+    }) || 26;
+    var m = { top: 8, right: 14, bottom: xTitle ? 48 : 34,
+              left: Math.min(Math.round(ctx.width * 0.4), 190, 16 + widest) };
+    if (yTitle) { m.left += 16; }
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -291,15 +319,21 @@
       .call(d3.axisBottom(xb).tickSizeOuter(0)
         .tickValues(xCats.filter(function (d, i) { return i % step === 0; })));
     pv.styleAxis(xAxis, ctx.theme, true);
+    xAxis.selectAll("text").text(function (d) {
+      return pv.truncate(d, truncN);
+    });
 
     var yAxis = g.append("g").call(d3.axisLeft(yb).tickSize(0));
     pv.styleAxis(yAxis, ctx.theme, false);
-    /* Row labels that outgrow the margin get an ellipsis; the tooltip
-       carries the full name. */
-    var maxChars = Math.max(3, Math.floor((m.left - 14) / 6.2));
+    /* Row labels shorten to the character budget, and further to whatever
+       the (possibly width-capped) margin really fits; the tooltip carries
+       the full name. */
+    var fitChars = Math.max(3, Math.floor(
+      (m.left - (yTitle ? 16 : 0) - 12) / (11 * 0.62)));
     yAxis.selectAll("text").text(function (d) {
-      return d.length > maxChars ? d.slice(0, maxChars - 1) + "…" : d;
+      return pv.truncate(d, Math.min(truncN, fitChars));
     });
+    pv.axisLabels(svg, ctx, m, iw, ih, xTitle, yTitle);
 
     /* Pick whichever of the two ink extremes reads better on a given cell
        colour, by WCAG contrast ratio from relative luminance. */
@@ -349,8 +383,16 @@
       .ease(d3.easeCubicOut)
       .attr("opacity", 1);
 
-    /* Print values in the cells only when they genuinely fit. */
-    if (xb.bandwidth() > 40 && yb.bandwidth() > 40) {
+    /* Print values in the cells when there is room. "auto" keeps the
+       comfortable rule (both cell dimensions over 40px); cell_values =
+       TRUE squeezes down to a 9px font for 24-40px cells, but below 24px
+       nothing fits at any honest size, so even TRUE prints nothing.
+       FALSE never prints. */
+    var minBand = Math.min(xb.bandwidth(), yb.bandwidth());
+    var showVals = opt(ctx.x.cellValues,
+      xb.bandwidth() > 40 && yb.bandwidth() > 40);
+    if (showVals && minBand >= 24) {
+      var valPx = minBand > 40 ? 11 : 9;
       g.selectAll("text.cellval").data(data).enter().append("text")
         .attr("class", "cellval")
         .attr("x", function (d) { return xb(d.x) + xb.bandwidth() / 2; })
@@ -358,7 +400,7 @@
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
         .attr("fill", function (d) { return inkFor(colorOf(d.value)); })
-        .style("font-size", "11px")
+        .style("font-size", valPx + "px")
         .style("font-variant-numeric", "tabular-nums")
         .style("pointer-events", "none")
         .style("opacity", 0)

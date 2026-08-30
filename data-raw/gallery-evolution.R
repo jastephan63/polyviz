@@ -9,7 +9,11 @@
 #   did the growing". Hover anywhere for a crosshair that reads out every
 #   series (and the total) at that year, and hover a band to lift it out of the
 #   stack; offset = "percent" or "stream" re-renders the same data as
-#   composition-over-time or a streamgraph. Here the five biggest municipalities
+#   composition-over-time or a streamgraph. The legend appears whenever there is
+#   more than one series (force it either way with legend = TRUE/FALSE), and
+#   xlab/ylab override the column-name axis titles — NA or "" gives their room
+#   back to the plot, which helps on phone-width charts. Here the five biggest
+#   municipalities
 #   of the Lucerne agglomeration grew from about 72,000 people in 1930 to almost
 #   180,000 in 2024 — but the city of Luzern itself peaked around 1970, so the
 #   suburbs did nearly all the growing since: Emmen and Kriens quadrupled, and
@@ -29,7 +33,12 @@
 #   which makes a 200-cell table readable at a glance — use it when the pattern
 #   across the whole grid matters more than any single number. Darker cells mean
 #   a bigger share; hover any cell for the exact value and the full sector name,
-#   and the gradient bar under the title is the colour scale. Across the twelve
+#   and the gradient bar under the title is the colour scale. Cells print their
+#   value only when there is room (cell_values = TRUE forces it, shrinking the
+#   font for tight cells), and row labels shorten past truncate_labels
+#   characters — further still on narrow screens, where the label margin never
+#   takes more than 40% of the width, so the cells stay readable on a phone.
+#   Across the twelve
 #   most populous Swiss cities, health and social work is the biggest employer
 #   almost everywhere (24% of jobs in Lausanne), but each city keeps a
 #   signature: Bern and Bellinzona light up in public administration,

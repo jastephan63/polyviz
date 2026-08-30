@@ -41,6 +41,10 @@
       d3.max(bins, function (d) { return d.count; }) || 1,
       d3.max(curve, function (d) { return d.y; }) || 0);
     var y = d3.scaleLinear().domain([0, yMax]).nice().range([ih, 0]);
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). */
+    if (ctx.x.xlim) { x.domain(ctx.x.xlim); }
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
 
     pv.yGrid(g, y, iw, ctx.theme);
     g.append("g").attr("transform", "translate(0," + ih + ")")
@@ -50,6 +54,11 @@
     g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
       .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
     pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
+
+    /* Annotation bands go under the bars; gOver (reference lines and
+       labels) is appended after the bars, further down. Both ignore the
+       pointer so bin tooltips keep working. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
 
     var fill = ctx.theme.palette[0];
     /* Adjacent bins touch on the x scale, so inset each bar one pixel per
@@ -86,6 +95,9 @@
       .on("pointerleave", function () {
         bars.attr("opacity", 1);
         pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", { x0: d.x0, x1: d.x1, count: d.count });
       });
 
     /* The optional density curve, drawn in with the same stroke-dash trick
@@ -110,11 +122,20 @@
         .attr("stroke-dashoffset", 0)
         .on("end", function () { path.attr("stroke-dasharray", null); });
     }
+
+    /* Reference lines and annotation labels above the bars; the bands
+       went into gUnder earlier. Trend fits are skipped here - the y axis
+       counts observations, so a fitted trend has nothing to say. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, x, y, iw, ih);
   };
 
   /* ---------- boxplot ---------- */
 
   pvRenderers.boxplot = function (ctx) {
+    /* Annotations and trends are skipped on boxplots: the marks are
+       summaries of whole groups, not positioned data rows, so the shared
+       annotation vocabulary has nothing meaningful to point at. */
     var boxes = ctx.x.boxes;
     /* "auto" keeps the jittered cloud only while it still reads as
        individual dots: at most 600 raw values across all the groups.
@@ -269,6 +290,12 @@
         .on("pointerleave", function () {
           groupSel.forEach(function (other) { other.attr("opacity", 1); });
           pv.hideTip(ctx);
+        })
+        .on("click", function () {
+          ctx.emit("click", {
+            group: b.group, n: b.n, median: b.median,
+            q1: b.q1, q3: b.q3, lo: b.lo, hi: b.hi
+          });
         });
     });
   };
@@ -276,6 +303,8 @@
   /* ---------- violin ---------- */
 
   pvRenderers.violin = function (ctx) {
+    /* Annotations and trends are skipped on violins, for the same reason
+       as boxplots: the shapes summarise groups, not positioned rows. */
     var violins = ctx.x.violins;
     var groups = violins.map(function (v) { return v.group; });
     var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
@@ -430,6 +459,11 @@
         .on("pointerleave", function () {
           groupSel.forEach(function (other) { other.attr("opacity", 1); });
           pv.hideTip(ctx);
+        })
+        .on("click", function () {
+          ctx.emit("click", {
+            group: v.group, n: v.n, median: v.median, q1: v.q1, q3: v.q3
+          });
         });
     });
   };
@@ -437,6 +471,8 @@
   /* ---------- ridgeline ---------- */
 
   pvRenderers.ridgeline = function (ctx) {
+    /* Annotations and trends are skipped on ridgelines: every ridge has
+       its own shifted baseline, so one shared y position means nothing. */
     var ridges = ctx.x.ridges;
     /* Each ridge may rise `overlap` band-heights above its own baseline;
        that overlap is what makes shifts between the distributions
@@ -546,6 +582,9 @@
             other.attr("opacity", 1); });
           areaPath.attr("fill-opacity", 0.75);
           pv.hideTip(ctx);
+        })
+        .on("click", function () {
+          ctx.emit("click", { group: r.group, median: r.median, n: r.n });
         });
     });
 

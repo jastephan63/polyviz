@@ -24,6 +24,12 @@
       pv.uniq(data.map(function (d) { return d.group; })) : [];
     var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
 
+    /* Linked selection (pv_link): ctKeys is a row key per data row. Dots
+       a group-wide selection leaves out drop to a faint ghost opacity. */
+    var keys = ctx.x.ctKeys || null;
+    if (keys) { data.forEach(function (d, i) { d.key = String(keys[i]); }); }
+    function dotOp(d) { return keys ? pv.keyOpacity(ctx, d.key, 1) : 1; }
+
     /* Dot size adapts to the crowd: 5px up to 150 dots, shrinking
        linearly to 3px by 500. The R side refuses more than 800, so the
        radius never has to go below 3. */
@@ -72,6 +78,11 @@
           .text(pv.truncate(gname, maxChars));
       });
     }
+
+    /* Annotation bands go under the dots; gOver (reference lines and
+       labels) is appended after them, further down. Both ignore the
+       pointer so dot hovers keep working. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
 
     /* The value axis along the bottom: baseline and ticks only, no
        gridlines - a swarm's vertical spread carries no value to grid
@@ -139,6 +150,7 @@
       .attr("fill", function (nd) {
         return hasGroup ? color(nd.d.group) : ctx.theme.palette[0];
       })
+      .attr("opacity", function (nd) { return dotOp(nd.d); })
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1);
 
     /* Dots pop in with a tiny stagger. Instant mode skips the transition
@@ -174,7 +186,31 @@
       .on("pointerleave", function () {
         d3.select(this).attr("r", r).attr("stroke-width", 1);
         pv.hideTip(ctx);
+      })
+      .on("click", function (event, nd) {
+        var out = { value: nd.d.value };
+        if (hasGroup) { out.group = nd.d.group; }
+        if (nd.d.label !== undefined) { out.label = nd.d.label; }
+        if (keys) { out.key = nd.d.key; }
+        ctx.emit("click", out);
       });
+
+    /* Annotations on the beeswarm live on the value axis only: vertical
+       lines and vertical bands map straight onto the value scale, while
+       forms that need a y position (hline, label) mean nothing against
+       force-packed lanes and are dropped. The list is swapped out for
+       the filtered one just for the shared drawing call, and the y
+       accessor is a dummy that is never consulted by the kept forms. */
+    var anns = ctx.x.annotations;
+    if (anns && anns.length) {
+      var gOver = g.append("g").attr("pointer-events", "none");
+      ctx.x.annotations = anns.filter(function (a) {
+        return a.type === "vline" || (a.type === "band" && a.x0 != null);
+      });
+      pv.drawAnnotations(ctx, gUnder, gOver, x,
+        function () { return 0; }, iw, ih);
+      ctx.x.annotations = anns;
+    }
   };
 
 })();

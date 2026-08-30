@@ -35,6 +35,13 @@
     var grouped = data.length && data[0].series !== undefined;
     var cats = pv.uniq(data.map(function (d) { return d.x; }));
 
+    /* Linked selection (pv_link): ctKeys is a row key per data row. Tag
+       each bar's datum with its key, and let pv.keyOpacity dim the bars
+       whose key the group-wide selection leaves out. */
+    var keys = ctx.x.ctKeys || null;
+    if (keys) { data.forEach(function (d, i) { d.key = String(keys[i]); }); }
+    function baseOp(d) { return keys ? pv.keyOpacity(ctx, d.key, 1) : 1; }
+
     /* "auto" flips to horizontal bars when this is a single series whose
        category labels cannot sit side by side under vertical bars: their
        total width would overflow the plot, or one label alone is far
@@ -72,6 +79,10 @@
           seriesNames.length))) : null;
     var yMax = d3.max(data, function (d) { return d.y; }) || 1;
     var y = d3.scaleLinear().domain([0, yMax]).nice().range([ih, 0]);
+    /* An explicit ylim (the facet renderer sends one to share scales
+       across panels) replaces the computed domain verbatim - no nice().
+       The x axis is categorical, so there is no xlim to honour. */
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
 
     pv.yGrid(g, y, iw, ctx.theme);
     g.append("g").attr("transform", "translate(0," + ih + ")")
@@ -81,11 +92,18 @@
       .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
     pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
 
+    /* Annotation bands go under the bars, reference lines and labels over
+       them. Neither layer may steal the bars' pointer events, so both are
+       transparent to the pointer. gOver is appended after the bars exist,
+       further down. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
+
     /* Each bar starts at zero height and grows up to its value, with a
        small stagger from left to right so the chart builds across. */
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
       .attr("fill", function (d) { return color(grouped ? d.series : "value"); })
+      .attr("opacity", baseOp)
       .attr("d", function (d) {
         var bx = grouped ? x0(d.x) + x1(d.series) : x0(d.x);
         var bw = grouped ? x1.bandwidth() : x0.bandwidth();
@@ -130,10 +148,23 @@
         .style("opacity", 1);
     }
 
-    /* Hovering a bar dims the others and shows its exact value. */
+    /* A bar's datum as a plain object, for the Shiny round-trip. */
+    function barDatum(d) {
+      var out = { x: d.x, y: d.y };
+      if (grouped) { out.series = d.series; }
+      return out;
+    }
+
+    /* Hovering a bar dims the others and shows its exact value. Dimming
+       never lifts a bar above its linked-selection opacity. */
     bars
       .on("pointerenter pointermove", function (event, d) {
-        bars.attr("opacity", function (b) { return b === d ? 1 : 0.45; });
+        bars.attr("opacity", function (b) {
+          return b === d ? baseOp(b) : Math.min(0.45, baseOp(b));
+        });
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", barDatum(d));
+        }
         var head = grouped ?
           pv.esc(d.x) + " &middot; " + pv.esc(d.series) : pv.esc(d.x);
         pv.showTip(ctx, event, head + "<br>" +
@@ -141,9 +172,18 @@
                        ctx.x.ylab || "value", ctx.fmt(d.y)));
       })
       .on("pointerleave", function () {
-        bars.attr("opacity", 1);
+        bars.attr("opacity", baseOp);
         pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", barDatum(d));
       });
+
+    /* Reference lines and annotation labels sit above the bars; the
+       bands went into gUnder earlier. Trend fits are skipped here - a
+       categorical x axis has no numeric positions to fit along. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, x0, y, iw, ih);
   };
 
   /* Horizontal bars: the answer to long category names. Categories run
@@ -151,6 +191,11 @@
      zero baseline. Single-series only (the R side enforces it). */
   function renderBarH(ctx) {
     var data = ctx.x.data;
+    /* Linked selection works here exactly as on vertical bars: tag each
+       row with its ctKey and dim bars a selection leaves out. */
+    var keys = ctx.x.ctKeys || null;
+    if (keys) { data.forEach(function (d, i) { d.key = String(keys[i]); }); }
+    function baseOp(d) { return keys ? pv.keyOpacity(ctx, d.key, 1) : 1; }
     /* The label margin grows with the longest category name, but it must
        never eat the plot: cap it at 45% of the chart width - and tighter
        still where needed so the bars keep at least half the container -
@@ -174,6 +219,9 @@
     var x = d3.scaleLinear()
       .domain([0, d3.max(data, function (d) { return d.y; }) || 1])
       .nice().range([0, iw]);
+    /* Horizontal bars draw the value along x, so an explicit ylim (the
+       value limits) overrides this scale verbatim - no nice(). */
+    if (ctx.x.ylim) { x.domain(ctx.x.ylim); }
 
     var xAxis = g.append("g").attr("transform", "translate(0," + ih + ")")
       .call(d3.axisBottom(x).ticks(Math.min(6, Math.floor(iw / 80)))
@@ -183,9 +231,13 @@
       .tickFormat(function (d) { return pv.truncate(d, maxChars); }));
     pv.styleAxis(yAxis, ctx.theme, false);
 
+    /* Annotations are skipped on horizontal bars: the axes are swapped
+       relative to every other cartesian chart, so a shared hline/vline
+       vocabulary would land on the wrong axis and mislead. */
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
       .attr("fill", ctx.theme.palette[0])
+      .attr("opacity", baseOp)
       .attr("d", function (d) {
         return pv.rightRoundedBar(0, yBand(d.x), 0, yBand.bandwidth(), 4);
       });
@@ -221,14 +273,22 @@
 
     bars
       .on("pointerenter pointermove", function (event, d) {
-        bars.attr("opacity", function (b) { return b === d ? 1 : 0.45; });
+        bars.attr("opacity", function (b) {
+          return b === d ? baseOp(b) : Math.min(0.45, baseOp(b));
+        });
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", { x: d.x, y: d.y });
+        }
         pv.showTip(ctx, event, pv.esc(d.x) + "<br>" +
           pv.swatchRow(ctx.theme.palette[0], ctx.x.ylab || "value",
                        ctx.fmt(d.y)));
       })
       .on("pointerleave", function () {
-        bars.attr("opacity", 1);
+        bars.attr("opacity", baseOp);
         pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", { x: d.x, y: d.y });
       });
   }
 
@@ -237,12 +297,16 @@
   pvRenderers.line = function (ctx) {
     var xtype = ctx.x.xtype;
     var parse = xtype === "date" ? d3.timeParse("%Y-%m-%d") : null;
+    /* xkey keeps the value exactly as R sent it (dates become Date
+       objects in x), so interaction payloads can report the original. */
     var data = ctx.x.data.map(function (d) {
       return {
         x: xtype === "date" ? parse(d.x) : d.x,
-        y: d.y, series: d.series
+        xkey: d.x, y: d.y, series: d.series
       };
     });
+    /* Linked selection is skipped on lines: a path has no per-row
+       identity, so there is nothing for a row-keyed selection to dim. */
     var seriesNames = pv.uniq(data.map(function (d) { return d.series; }));
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
@@ -280,6 +344,14 @@
       .domain([Math.min(0, d3.min(data, function (d) { return d.y; })),
                d3.max(data, function (d) { return d.y; })])
       .nice().range([ih, 0]);
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). Dates
+       arrive as ISO strings and go through the same parser as the data. */
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
+    if (ctx.x.xlim && xtype !== "category") {
+      xScale.domain(xtype === "date" ?
+        ctx.x.xlim.map(function (v) { return parse(v); }) : ctx.x.xlim);
+    }
 
     pv.yGrid(g, y, iw, ctx.theme);
     var xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
@@ -302,6 +374,11 @@
     g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
       .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
     pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
+
+    /* Annotation bands go under the lines; gOver (reference lines,
+       labels, trend fits) is appended once the lines exist, further
+       down. Both ignore the pointer so the crosshair keeps working. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
 
     var bySeries = seriesNames.map(function (nm) {
       return { name: nm, points: data.filter(function (d) {
@@ -361,6 +438,24 @@
       });
     }
 
+    /* Reference lines and annotation labels sit above the lines. Trend
+       fits (pv_trend) go into the same pointer-transparent group, so the
+       confidence ribbon can never swallow pointer events - and only on a
+       truly numeric x axis, because R fits over numbers; category and
+       date axes have no numeric positions for the fitted points. The
+       trend layer is clipped to the plot: a wide ribbon would otherwise
+       spill past the axes at the chart's edges. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
+    if (xtype === "number") {
+      var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);
+      svg.append("clipPath").attr("id", clipId)
+        .append("rect").attr("width", iw).attr("height", ih);
+      pv.drawTrends(ctx,
+        gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
+        xScale, y);
+    }
+
     /* The crosshair: an invisible rectangle covers the plot and tracks the
        pointer. On every move we find the nearest x position, drop a dashed
        vertical line there, mark each series with a dot, and list all their
@@ -373,18 +468,24 @@
     var xVals = pv.uniq(data.map(function (d) { return +xScale(d.x); }))
       .sort(function (a, b) { return a - b; });
 
+    /* Every point whose x position is nearest the pointer - the same
+       lookup feeds the crosshair tooltip and the click payload. */
+    function hitsAt(px) {
+      var nearest = xVals.reduce(function (a, b) {
+        return Math.abs(b - px) < Math.abs(a - px) ? b : a;
+      });
+      return data.filter(function (d) {
+        return Math.abs(xScale(d.x) - nearest) < 0.5;
+      });
+    }
+
     g.append("rect")
       .attr("width", iw).attr("height", ih)
       .attr("fill", "transparent")
       .on("pointermove", function (event) {
-        var px = d3.pointer(event, this)[0];
-        var nearest = xVals.reduce(function (a, b) {
-          return Math.abs(b - px) < Math.abs(a - px) ? b : a;
-        });
-        var hits = data.filter(function (d) {
-          return Math.abs(xScale(d.x) - nearest) < 0.5;
-        });
+        var hits = hitsAt(d3.pointer(event, this)[0]);
         if (!hits.length) return;
+        var nearest = xScale(hits[0].x);
         cross.attr("x1", nearest).attr("x2", nearest).attr("opacity", 1);
         var sel = dots.selectAll("circle").data(hits);
         sel.enter().append("circle").attr("r", 4)
@@ -406,6 +507,18 @@
         cross.attr("opacity", 0);
         dots.selectAll("circle").remove();
         pv.hideTip(ctx);
+      })
+      .on("click", function (event) {
+        /* A click reports the crosshair position: the x value under the
+           pointer and every series' value there. */
+        var hits = hitsAt(d3.pointer(event, this)[0]);
+        if (!hits.length) return;
+        ctx.emit("click", {
+          x: hits[0].xkey,
+          values: hits.map(function (d) {
+            return { series: d.series, y: d.y };
+          })
+        });
       });
   };
 
@@ -433,6 +546,14 @@
     var baseOpacity = data.length <= 150 ? 0.62 :
       Math.max(0.3, 0.62 * Math.sqrt(150 / data.length));
 
+    /* Linked selection (pv_link): ctKeys is a row key per point. Points a
+       group-wide selection leaves out drop to a faint ghost opacity. */
+    var keys = ctx.x.ctKeys || null;
+    if (keys) { data.forEach(function (d, i) { d.key = String(keys[i]); }); }
+    function ptOp(d) {
+      return keys ? pv.keyOpacity(ctx, d.key, baseOpacity) : baseOpacity;
+    }
+
     var m = { top: 12, right: 24, bottom: 52, left: 58 };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
@@ -446,6 +567,10 @@
     var y = d3.scaleLinear()
       .domain(d3.extent(data, function (d) { return d.y; })).nice()
       .range([ih, 0]);
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). */
+    if (ctx.x.xlim) { xScale.domain(ctx.x.xlim); }
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
     var r = hasSize ?
       d3.scaleSqrt()
         .domain(d3.extent(data, function (d) { return d.size; }))
@@ -461,6 +586,33 @@
       .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
     pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
 
+    /* Annotation bands go under the points; gOver (reference lines,
+       labels, trend fits) is appended after the points, further down. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
+
+    /* Drag-to-select, when the chart carries row keys: the brush layer
+       goes in BEFORE the points, so the points stay on top and keep
+       their hover events, while drags started on empty plot still reach
+       the brush surface underneath. */
+    if (keys) {
+      var brush = d3.brush().extent([[0, 0], [iw, ih]])
+        .on("end", function (event) {
+          /* A click (or an emptied brush) clears the selection. */
+          if (!event.selection) { ctx.select([]); return; }
+          var s = event.selection;
+          var inside = [];
+          data.forEach(function (d) {
+            var px = xScale(d.x), py = y(d.y);
+            if (px >= s[0][0] && px <= s[1][0] &&
+                py >= s[0][1] && py <= s[1][1]) {
+              inside.push(d.key);
+            }
+          });
+          ctx.select(inside);
+        });
+      g.append("g").attr("class", "brush").call(brush);
+    }
+
     var pts = g.selectAll("circle.pt").data(data).enter().append("circle")
       .attr("class", "pt")
       .attr("cx", function (d) { return xScale(d.x); })
@@ -469,12 +621,22 @@
       .attr("fill", function (d) {
         return hasSeries ? color(d.series) : ctx.theme.palette[0];
       })
-      .attr("fill-opacity", baseOpacity)
+      .attr("fill-opacity", ptOp)
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1);
 
     pts.transition().duration(ctx.duration)
       .delay(function (d, i) { return Math.min(i * 6, 400); })
       .attr("r", function (d) { return hasSize ? r(d.size) : r(); });
+
+    /* A point's datum as a plain object, for the Shiny round-trip. */
+    function ptDatum(d) {
+      var out = { x: d.x, y: d.y };
+      if (hasSeries) { out.series = d.series; }
+      if (hasSize) { out.size = d.size; }
+      if (d.label !== undefined) { out.label = d.label; }
+      if (keys) { out.key = d.key; }
+      return out;
+    }
 
     pts
       .on("pointerenter pointermove", function (event, d) {
@@ -484,6 +646,9 @@
           .attr("fill-opacity", 1)
           .attr("stroke-width", 2)
           .attr("r", (hasSize ? r(d.size) : r()) * 1.35);
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", ptDatum(d));
+        }
         var rows = [];
         if (d.label !== undefined) rows.push("<b>" + pv.esc(d.label) + "</b>");
         if (hasSeries) {
@@ -499,11 +664,29 @@
       })
       .on("pointerleave", function (event, d) {
         d3.select(this)
-          .attr("fill-opacity", baseOpacity)
+          .attr("fill-opacity", ptOp(d))
           .attr("stroke-width", 1)
           .attr("r", hasSize ? r(d.size) : r());
         pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", ptDatum(d));
       });
+
+    /* Reference lines and annotation labels above the points, and trend
+       fits (pv_trend) into the same pointer-transparent group so the
+       confidence ribbon can never swallow point hovers. Both scatter
+       axes are numeric, so trends always apply here. The trend layer is
+       clipped to the plot: a wide ribbon would otherwise spill past the
+       axes at the chart's edges. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
+    var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);
+    svg.append("clipPath").attr("id", clipId)
+      .append("rect").attr("width", iw).attr("height", ih);
+    pv.drawTrends(ctx,
+      gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
+      xScale, y);
   };
 
 })();

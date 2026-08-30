@@ -103,6 +103,14 @@
       y.domain([0, d3.max(layers, function (l) {
         return d3.max(l, function (p) { return p[1]; }); }) || 1]).nice();
     }
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). Dates
+       arrive as ISO strings and go through the same parser as the data. */
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
+    if (ctx.x.xlim && xtype !== "category") {
+      xScale.domain(xtype === "date" ?
+        ctx.x.xlim.map(function (v) { return parse(v); }) : ctx.x.xlim);
+    }
 
     if (offset !== "stream") { pv.yGrid(g, y, iw, ctx.theme); }
     var xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
@@ -134,6 +142,11 @@
     }
     pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, yTitle);
 
+    /* Annotation bands go under the layers; gOver (reference lines and
+       labels) is appended after them, further down. Both ignore the
+       pointer so the crosshair overlay keeps working. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
+
     var area = d3.area()
       .x(function (p) { return xScale(p.data.x); })
       .y0(function (p) { return y(p[0]); })
@@ -158,6 +171,13 @@
       .ease(d3.easeCubicOut)
       .attr("opacity", 1);
 
+    /* Reference lines and annotation labels sit above the layers; the
+       bands went into gUnder earlier. Trend fits are skipped here - the
+       layers are stacked, so a trend fitted to the raw values would
+       float free of what the eye actually sees. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
+
     /* The crosshair: an invisible rectangle covers the plot, finds the
        nearest x position under the pointer, and reads every series out in
        one tooltip. The band under the pointer is lifted out of the stack;
@@ -169,25 +189,36 @@
     var dots = g.append("g");
     var xPos = pivot.map(function (r) { return xScale(r.x); });
 
+    /* Which pivot row sits nearest the pointer's x, and which layer the
+       pointer is inside vertically - shared by hover and click. */
+    function nearestIdx(px) {
+      var idx = 0, best = Infinity;
+      xPos.forEach(function (xp, i) {
+        var dd = Math.abs(xp - px);
+        if (dd < best) { best = dd; idx = i; }
+      });
+      return idx;
+    }
+    function layerUnder(py, idx) {
+      var found = null;
+      layers.forEach(function (l) {
+        var top = y(l[idx][1]), bot = y(l[idx][0]);
+        if (py >= Math.min(top, bot) && py <= Math.max(top, bot)) {
+          found = l.key;
+        }
+      });
+      return found;
+    }
+
     g.append("rect")
       .attr("width", iw).attr("height", ih)
       .attr("fill", "transparent")
       .on("pointermove", function (event) {
         var p = d3.pointer(event, this);
-        var idx = 0, best = Infinity;
-        xPos.forEach(function (px, i) {
-          var dd = Math.abs(px - p[0]);
-          if (dd < best) { best = dd; idx = i; }
-        });
+        var idx = nearestIdx(p[0]);
         cross.attr("x1", xPos[idx]).attr("x2", xPos[idx]).attr("opacity", 1);
 
-        var hoverKey = null;
-        layers.forEach(function (l) {
-          var top = y(l[idx][1]), bot = y(l[idx][0]);
-          if (p[1] >= Math.min(top, bot) && p[1] <= Math.max(top, bot)) {
-            hoverKey = l.key;
-          }
-        });
+        var hoverKey = layerUnder(p[1], idx);
         paths.attr("fill-opacity", function (l) {
           if (hoverKey === null) return 0.85;
           return l.key === hoverKey ? 1 : 0.35;
@@ -228,12 +259,27 @@
         dots.selectAll("circle").remove();
         paths.attr("fill-opacity", 0.85);
         pv.hideTip(ctx);
+      })
+      .on("click", function (event) {
+        /* A click reports the x position under the pointer and, when the
+           pointer sits inside a layer, that layer and its value there. */
+        var p = d3.pointer(event, this);
+        var idx = nearestIdx(p[0]);
+        var key = layerUnder(p[1], idx);
+        var payload = { x: pivot[idx].key };
+        if (key !== null) {
+          payload.series = key;
+          payload.y = pivot[idx][key];
+        }
+        ctx.emit("click", payload);
       });
   };
 
   /* ---------- heatmap ---------- */
 
   pvRenderers.heatmap = function (ctx) {
+    /* Annotations and trends are skipped on heatmaps: both axes are
+       categorical bands, so lines and fits have no position to live at. */
     var data = ctx.x.data;
     var domain = ctx.x.domain;
     var diverging = ctx.x.palette === "diverging";
@@ -429,6 +475,8 @@
   /* ---------- calendar ---------- */
 
   pvRenderers.calendar = function (ctx) {
+    /* Annotations and trends are skipped on calendars: the grid layout
+       has no continuous axes for a line or band to attach to. */
     /* A single year arrives from R as a bare number, not an array. */
     var years = [].concat(ctx.x.years);
     var domain = ctx.x.domain;

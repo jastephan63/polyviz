@@ -1,5 +1,5 @@
 # The evolution-and-matrix chart family: pv_area (stacked, percent, and
-# stream areas) and pv_heatmap. Rendered by
+# stream areas), pv_heatmap, and pv_calendar. Rendered by
 # inst/htmlwidgets/lib/pv-renderers/evolution.js.
 
 # Local copy of the axis logic in widgets.R so this family stands alone:
@@ -217,6 +217,115 @@ pv_heatmap <- function(data, x, y, value,
     # to nothing.
     xtitle = evolution_axis_title(xlab, "", "xlab"),
     ytitle = evolution_axis_title(ylab, "", "ylab")
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Interactive D3 calendar heatmap
+#'
+#' The GitHub-style calendar: one horizontal block per year (its label on
+#' the left), weeks as columns and weekdays as rows with Monday at the
+#' top, each day a small rounded cell coloured by its value on the
+#' theme's single-hue sequential ramp over the observed value range. The
+#' form for daily data with a weekly rhythm — a whole year of weather,
+#' commits, or sales reads at a glance, and weekday/weekend stripes jump
+#' out. Month initials run along the top of each block, and a compact
+#' gradient legend in the header shows the colour scale. Days that fall
+#' inside a shown year but have no row in the data keep a faint
+#' grid-coloured cell, so gaps are visibly absent rather than silently
+#' painted as zero. Hovering a day rings it and shows the full formatted
+#' date with the exact value ("no data" for the faint cells).
+#'
+#' Cells shrink with the chart — 53 week columns always fit, so on a
+#' phone-width chart they get tiny but the year labels and legend stay
+#' clear. A diverging variant (for values spanning zero, pinned to a
+#' neutral midpoint) is future work; today the ramp is always sequential.
+#'
+#' @param data A data frame with at most one row per day.
+#' @param date Name of the date column — `Date`, or anything
+#'   `as.Date()` understands (e.g. `"2024-01-31"` strings).
+#' @param value Name of the numeric column mapped to colour. Days whose
+#'   value is missing are treated as absent.
+#' @param years `NULL` (default) shows every year present in the data;
+#'   an integer vector (e.g. `years = 2023:2025`) picks specific years
+#'   instead. Either way at most 6 year blocks are drawn — beyond that
+#'   the blocks would shrink past legibility, so the function stops and
+#'   asks for a window.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' pv_calendar(pv_weather, date = "date", value = "temp_max",
+#'             years = 2023:2025,
+#'             title = "Three summers, getting hotter",
+#'             source = "Source: MeteoSwiss")
+#' @export
+pv_calendar <- function(data, date, value, years = NULL,
+                        title = NULL, subtitle = NULL, mode = "auto",
+                        duration = 500, source = NULL, width = NULL,
+                        height = NULL, elementId = NULL) {
+  check_columns(data, list(date, value))
+  d <- data[[date]]
+  # The calendar needs real dates. Coerce anything as.Date() understands
+  # (ISO strings, POSIXct); refuse with a plain message if that fails or
+  # quietly turns values into NA. Bare numbers are refused too - modern R
+  # would silently read them as days since 1970, which is never what a
+  # column of plain numbers means.
+  if (!inherits(d, "Date")) {
+    coerced <- if (is.numeric(d)) NULL else {
+      tryCatch(as.Date(d), error = function(e) NULL)
+    }
+    if (is.null(coerced) || any(is.na(coerced) & !is.na(d))) {
+      rlang::abort(sprintf(
+        "`%s` must be a Date column, or coercible with `as.Date()` (e.g. \"2024-01-31\" strings).",
+        date))
+    }
+    d <- coerced
+  }
+  df <- data.frame(date = d, value = as.numeric(data[[value]]))
+  # A day with a missing value is the same as a day with no row: both
+  # render as the faint "absent" cell, so drop them here.
+  df <- df[!is.na(df$date) & !is.na(df$value), , drop = FALSE]
+  if (nrow(df) == 0) {
+    rlang::abort("`value` has no non-missing values; nothing to draw.")
+  }
+  if (!is.null(years)) {
+    ok <- is.numeric(years) && length(years) >= 1 && !anyNA(years) &&
+      all(years == trunc(years))
+    if (!ok) {
+      rlang::abort(
+        "`years` must be whole calendar years, e.g. `years = c(2023, 2024)`.")
+    }
+    years <- sort(unique(as.integer(years)))
+    keep <- as.integer(format(df$date, "%Y")) %in% years
+    if (!any(keep)) {
+      rlang::abort(sprintf(
+        "No data in the requested years; `%s` runs %s to %s.",
+        date, format(min(df$date)), format(max(df$date))))
+    }
+    df <- df[keep, , drop = FALSE]
+  }
+  # The blocks to draw: the requested years as given (a requested year
+  # with no data still renders, all faint - deliberate, visible absence),
+  # or every year the data touches.
+  show_years <- years %||% sort(unique(as.integer(format(df$date, "%Y"))))
+  if (length(show_years) > 6) {
+    rlang::abort(sprintf(
+      "%d year blocks is more than one calendar can hold legibly (max 6). Pick a window with `years =`, e.g. `years = %d:%d` for the most recent six.",
+      length(show_years), max(show_years) - 5L, max(show_years)))
+  }
+  # Two rows for the same day would silently overpaint each other's cell,
+  # so refuse them here where the message can say what to do about it.
+  if (anyDuplicated(df$date)) {
+    rlang::abort("`data` has more than one row per day; aggregate it first.")
+  }
+  # The colour domain is a statistic, so it is decided here: the observed
+  # range of what is actually shown. All-equal values would collapse the
+  # scale; give it a token width.
+  domain <- range(df$value)
+  if (domain[1] >= domain[2]) domain <- domain[1] + c(-1, 1)
+  pv_widget("calendar", c(list(
+    data = data.frame(date = format(df$date, "%Y-%m-%d"), value = df$value),
+    years = show_years, vlab = value, domain = domain
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

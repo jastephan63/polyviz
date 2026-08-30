@@ -1,4 +1,5 @@
-# Gallery examples for the evolution & matrix family (pv_area, pv_heatmap).
+# Gallery examples for the evolution & matrix family (pv_area, pv_heatmap,
+# pv_calendar).
 # One block per chart; each block is a single self-contained expression that
 # builds a widget from a bundled dataset.
 
@@ -53,4 +54,25 @@
              title = "Where Swiss city jobs are",
              subtitle = "Employees by economic sector, % of each city's total",
              source = "Source: Bundesamt für Statistik")
+}
+
+## calendar
+# explain: The GitHub-style calendar heatmap lays every day of a year out as one
+#   horizontal block — weeks as columns, weekdays as rows — and colours each day
+#   by its value, which is the form for daily data with a rhythm: seasons,
+#   weekday/weekend cycles, streaks and gaps all surface at a glance. Hover any
+#   day for its full date and exact value, read the colour scale off the
+#   gradient in the header, and note that days with no data stay faint grey
+#   instead of being painted as zero; years = picks which year blocks to show
+#   (at most six). Here three years of Lucerne daily maximums glow brightest in
+#   high summer: 2023 was the fiercest of the three, with 18 days at or above
+#   30 °C and the peak of 35.5 °C on 11 July, 2024 eased off to 13 such days,
+#   and 2025 climbed back to 17 — its hottest stretch arriving only in
+#   mid-August, later than either summer before it.
+{
+  pv_calendar(pv_weather, date = "date", value = "temp_max",
+              years = 2023:2025,
+              title = "Three summers, getting hotter",
+              subtitle = "Daily maximum temperature in Lucerne, °C",
+              source = "Source: MeteoSwiss")
 }

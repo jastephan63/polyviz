@@ -156,3 +156,73 @@ test_that("heatmap draws axis titles only when set explicitly", {
   expect_equal(pv_heatmap(emp, "city", "sector", "share",
                           xlab = NA)$x$xtitle, "")
 })
+
+test_that("calendar builds from real data with ISO dates and an R-side domain", {
+  w <- expect_pvchart(
+    pv_calendar(pv_weather, "date", "temp_max", years = 2023:2025),
+    "calendar")
+  expect_equal(w$x$years, 2023:2025)
+  expect_equal(w$x$vlab, "temp_max")
+  # Dates travel as ISO strings for d3 to re-parse.
+  expect_true(all(grepl("^\\d{4}-\\d{2}-\\d{2}$", w$x$data$date)))
+  # Three full years of daily rows, none dropped.
+  expect_equal(nrow(w$x$data), 365 + 366 + 365)
+  # The colour domain is the observed range of what is shown.
+  shown <- pv_weather[format(pv_weather$date, "%Y") %in% 2023:2025, ]
+  expect_equal(w$x$domain, range(shown$temp_max))
+  expect_error(pv_calendar(pv_weather, "nope", "temp_max"), "not in `data`")
+})
+
+test_that("calendar coerces coercible dates and refuses the rest", {
+  chr <- data.frame(day = c("2024-01-01", "2024-01-02"), v = 1:2)
+  w <- pv_calendar(chr, "day", "v")
+  expect_equal(w$x$data$date, chr$day)
+  expect_equal(w$x$years, 2024L)
+  bad <- data.frame(day = c("first of March", "2024-01-02"), v = 1:2)
+  expect_error(pv_calendar(bad, "day", "v"), "as.Date")
+  expect_error(pv_calendar(data.frame(day = 1:2, v = 1:2), "day", "v"),
+               "as.Date")
+})
+
+test_that("calendar filters by years and validates them", {
+  w <- pv_calendar(pv_weather, "date", "temp_max", years = c(2024, 2022))
+  # The years vector is sorted, and only their rows survive.
+  expect_equal(w$x$years, c(2022L, 2024L))
+  expect_equal(nrow(w$x$data), 365 + 366)
+  expect_true(all(substr(w$x$data$date, 1, 4) %in% c("2022", "2024")))
+  expect_error(pv_calendar(pv_weather, "date", "temp_max", years = 2023.5),
+               "whole calendar years")
+  expect_error(pv_calendar(pv_weather, "date", "temp_max", years = "2023"),
+               "whole calendar years")
+  expect_error(pv_calendar(pv_weather, "date", "temp_max", years = 1999),
+               "runs 2020-01-01 to 2025-12-31")
+})
+
+test_that("calendar caps the span at 6 year blocks with advice", {
+  # The bundled six years pass exactly at the cap.
+  expect_pvchart(pv_calendar(pv_weather, "date", "temp_max"), "calendar")
+  seven <- data.frame(day = seq(as.Date("2019-06-01"), by = "1 year",
+                                length.out = 7), v = 1:7)
+  expect_error(pv_calendar(seven, "day", "v"), "years = 2020:2025")
+  expect_error(pv_calendar(seven, "day", "v", years = 2019:2025), "max 6")
+})
+
+test_that("calendar drops missing values and refuses duplicate days", {
+  df <- data.frame(day = as.Date("2024-01-01") + 0:2, v = c(1, NA, 3))
+  w <- pv_calendar(df, "day", "v")
+  expect_equal(nrow(w$x$data), 2)
+  expect_false("2024-01-02" %in% w$x$data$date)
+  all_na <- data.frame(day = as.Date("2024-01-01") + 0:1, v = NA_real_)
+  expect_error(pv_calendar(all_na, "day", "v"), "non-missing")
+  dup <- data.frame(day = as.Date(c("2024-01-01", "2024-01-01")), v = 1:2)
+  expect_error(pv_calendar(dup, "day", "v"), "aggregate")
+  # Duplicates outside the requested years don't matter - they never draw.
+  spread <- data.frame(day = as.Date(c("2023-05-01", "2023-05-01",
+                                       "2024-05-01")), v = 1:3)
+  expect_pvchart(pv_calendar(spread, "day", "v", years = 2024), "calendar")
+})
+
+test_that("calendar widens an all-equal colour domain", {
+  flat <- data.frame(day = as.Date("2024-01-01") + 0:1, v = c(7, 7))
+  expect_equal(pv_calendar(flat, "day", "v")$x$domain, c(6, 8))
+})

@@ -1,6 +1,7 @@
 /*
  * Evolution and matrix renderers: the area chart family (stacked, percent,
- * stream) and the categorical heatmap. See basic.js for the ctx contract.
+ * stream), the categorical heatmap, and the calendar heatmap. See basic.js
+ * for the ctx contract.
  */
 (function () {
 
@@ -423,6 +424,202 @@
         d3.select(this).attr("stroke", ctx.theme.ink.surface);
         pv.hideTip(ctx);
       });
+  };
+
+  /* ---------- calendar ---------- */
+
+  pvRenderers.calendar = function (ctx) {
+    /* A single year arrives from R as a bare number, not an array. */
+    var years = [].concat(ctx.x.years);
+    var domain = ctx.x.domain;
+
+    /* Day colours glide through the theme's 11-step sequential ramp over
+       the observed [min, max] the R side sent. (A diverging variant, for
+       values spanning zero, is future work.) */
+    var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
+    var t = d3.scaleLinear().domain(domain).range([0, 1]).clamp(true);
+    var colorOf = function (v) { return ramp(t(v)); };
+
+    /* Compact numbers for the legend ends: SI units past 10k, at most
+       two decimals below - same as the heatmap. */
+    var legFmt = function (v) {
+      return Math.abs(v) >= 10000 ?
+        d3.format("~s")(v) : d3.format(",.2~f")(v);
+    };
+
+    /* The calendar's legend is its colour scale: a small gradient bar in
+       the header with the domain ends labelled. */
+    var scaleRow = document.createElement("div");
+    scaleRow.style.cssText =
+      "display:flex;align-items:center;gap:7px;margin-top:7px;" +
+      "font-size:11px;font-variant-numeric:tabular-nums;color:" +
+      ctx.theme.ink.muted + ";";
+    var stops = [];
+    for (var i = 0; i <= 10; i++) {
+      stops.push(colorOf(domain[0] + (domain[1] - domain[0]) * i / 10) +
+        " " + (i * 10) + "%");
+    }
+    var bar = document.createElement("span");
+    bar.style.cssText = "width:140px;height:8px;border-radius:4px;" +
+      "background:linear-gradient(90deg," + stops.join(",") + ");";
+    var lo = document.createElement("span");
+    lo.textContent = legFmt(domain[0]);
+    var hi = document.createElement("span");
+    hi.textContent = legFmt(domain[1]);
+    scaleRow.appendChild(lo);
+    scaleRow.appendChild(bar);
+    scaleRow.appendChild(hi);
+    ctx.header.appendChild(scaleRow);
+    ctx.height = Math.max(120, ctx.height - scaleRow.offsetHeight - 7);
+
+    var valueOf = {};
+    ctx.x.data.forEach(function (d) { valueOf[d.date] = d.value; });
+    var iso = d3.timeFormat("%Y-%m-%d");
+
+    /* Every day of every shown year becomes a cell, whether the data has
+       a row for it or not - absence should be visible, not skipped.
+       Columns are Monday-started weeks counted from Jan 1; rows are
+       weekdays with Monday on top. */
+    var blocks = years.map(function (y) {
+      var start = new Date(y, 0, 1);
+      var days = d3.timeDays(start, new Date(y + 1, 0, 1)).map(function (day) {
+        var key = iso(day);
+        return {
+          date: day,
+          col: d3.timeMonday.count(start, day),
+          row: (day.getDay() + 6) % 7,
+          value: valueOf.hasOwnProperty(key) ? valueOf[key] : null
+        };
+      });
+      return { year: y, start: start, days: days,
+               cols: days[days.length - 1].col + 1 };
+    });
+    /* 53 columns is the usual year; a leap year starting on Sunday needs
+       54. Size the grid for whichever these years actually need. */
+    var cols = Math.max(53, d3.max(blocks, function (b) { return b.cols; }));
+
+    /* The cell step (cell + gap) is whatever lets all the columns fit the
+       width AND all the year blocks fit the height, capped so one lone
+       year on a huge canvas doesn't balloon. Weekday hints next to the
+       first column only appear when the cells are big enough to line up
+       with 9px type - so try with their margin first, and reclaim it for
+       the cells if they won't be shown. */
+    var n = blocks.length;
+    var padL = 8, padR = 10, monthH = 14, gapY = 16;
+    var yearW = Math.ceil(pv.textWidth(String(d3.max(years)), 12)) + 10;
+    function fit(wdW) {
+      var availW = ctx.width - padL - yearW - wdW - padR;
+      var availH = ctx.height - n * monthH - (n - 1) * gapY - 12;
+      return Math.max(3, Math.min(17,
+        Math.floor(availW / cols), Math.floor(availH / (7 * n))));
+    }
+    var step = fit(16);
+    var showWd = step >= 9;
+    if (!showWd) { step = fit(0); }
+    var wdW = showWd ? 16 : 0;
+    /* Tiny cells trade their 2px gap for a 1px one - at phone widths the
+       gap would otherwise eat more pixels than the cell. */
+    var gap = step >= 6 ? 2 : 1;
+    var cell = step - gap;
+    var rad = Math.min(2, cell / 2);
+    /* When the height (not the width) decided the cell size, the grid
+       won't reach the right edge - shift the whole composition, labels
+       and all, to centre it rather than leave all the slack on one side. */
+    var offX = Math.max(0, Math.floor(
+      (ctx.width - padR - padL - yearW - wdW - cols * step) / 2));
+    var gridX = padL + offX + yearW + wdW;
+    var blockH = monthH + 7 * step;
+    var totalH = n * blockH + (n - 1) * gapY;
+    /* Calendars are wide and shallow; centre the blocks vertically so a
+       tall container doesn't leave them huddled at the top. */
+    var offY = Math.max(6, (ctx.height - totalH) / 2);
+
+    var svg = pv.baseSvg(ctx);
+    var fmtDate = d3.timeFormat("%A, %b %e, %Y");
+    var monthInitials = "JFMAMJJASOND";
+
+    blocks.forEach(function (b, bi) {
+      var top = offY + bi * (blockH + gapY);
+      var g = svg.append("g").attr("transform",
+        "translate(" + gridX + "," + (top + monthH) + ")");
+
+      /* The year, left of its block, centred on the 7 weekday rows. */
+      svg.append("text")
+        .attr("x", padL + offX).attr("y", top + monthH + 3.5 * step)
+        .attr("dominant-baseline", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", "12px").style("font-weight", 600)
+        .text(b.year);
+
+      /* Month initials along the top, each over its first week. */
+      for (var mi = 0; mi < 12; mi++) {
+        g.append("text")
+          .attr("x", d3.timeMonday.count(b.start, new Date(b.year, mi, 1)) *
+            step)
+          .attr("y", -4)
+          .attr("fill", ctx.theme.ink.muted)
+          .style("font-size", "9.5px")
+          .text(monthInitials.charAt(mi));
+      }
+
+      /* Weekday hints on alternate rows, when the cells can carry them. */
+      if (showWd) {
+        ["M", "W", "F"].forEach(function (wd, wi) {
+          g.append("text")
+            .attr("x", -5).attr("y", wi * 2 * step + cell / 2)
+            .attr("text-anchor", "end")
+            .attr("dominant-baseline", "middle")
+            .attr("fill", ctx.theme.ink.muted)
+            .style("font-size", "9px")
+            .text(wd);
+        });
+      }
+
+      /* The day cells. Days the data never mentions keep a faint
+         grid-coloured cell - visibly absent, not painted as zero. */
+      var cells = g.selectAll("rect.day").data(b.days).enter()
+        .append("rect")
+        .attr("class", "day")
+        .attr("x", function (d) { return d.col * step; })
+        .attr("y", function (d) { return d.row * step; })
+        .attr("width", cell).attr("height", cell)
+        .attr("rx", rad).attr("ry", rad)
+        .attr("fill", function (d) {
+          return d.value == null ? ctx.theme.ink.grid : colorOf(d.value);
+        });
+
+      /* Cells fade in week by week, left to right, all blocks together.
+         With duration 0 they are simply drawn - no transition is even
+         scheduled, so the final state exists synchronously. */
+      if (ctx.duration > 0) {
+        cells.attr("opacity", 0)
+          .transition().duration(Math.max(180, ctx.duration * 0.4))
+          .delay(function (d) {
+            return Math.min(d.col * ctx.duration / 70, ctx.duration * 0.7);
+          })
+          .ease(d3.easeCubicOut)
+          .attr("opacity", 1);
+      }
+
+      /* Hovering rings the day in primary ink (raised so the ring isn't
+         clipped by its neighbours) and reads out the full date. */
+      cells
+        .on("pointerenter pointermove", function (event, d) {
+          d3.select(this).raise()
+            .attr("stroke", ctx.theme.ink.primary)
+            .attr("stroke-width", 1.5);
+          var row = d.value == null ?
+            '<span style="opacity:0.65">no data</span>' :
+            pv.swatchRow(colorOf(d.value), ctx.x.vlab || "value",
+                         ctx.fmt(d.value));
+          pv.showTip(ctx, event,
+            "<b>" + fmtDate(d.date) + "</b><br>" + row);
+        })
+        .on("pointerleave", function () {
+          d3.select(this).attr("stroke", "none");
+          pv.hideTip(ctx);
+        });
+    });
   };
 
 })();

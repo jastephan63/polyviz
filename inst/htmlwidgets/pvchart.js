@@ -57,6 +57,7 @@ HTMLWidgets.widget({
 });
 
 function pvRender(el, x, width, height, mq) {
+  el.__pvLastX = x;
   /* Pick the light or dark colour set. "auto" follows the viewer's own
      system preference; the R side can also force one mode. */
   var mode = x.mode === "auto" ? (mq && mq.matches ? "dark" : "light") : x.mode;
@@ -109,6 +110,41 @@ function pvRender(el, x, width, height, mq) {
     duration: x.duration == null ? 500 : x.duration,
     fmt: d3.format(",.2~f")
   };
+
+  /* Shiny round-trip: renderers report interactions through ctx.emit and,
+     when the chart lives inside a Shiny app, they arrive as input values
+     named <outputId>_<event> (e.g. input$mychart_click). Outside Shiny
+     the call is a no-op, so renderers never need to check. */
+  ctx.emit = function (event, payload) {
+    if (window.Shiny && Shiny.setInputValue && el.id) {
+      Shiny.setInputValue(el.id + "_" + event, payload,
+        { priority: "event" });
+    }
+  };
+
+  /* Crosstalk linking: when the R side attached a selection group
+     (pv_link), keep a live handle on it. A selection made anywhere in
+     the group re-renders this chart with ctx.selected holding the keys,
+     and renderers dim what isn't in it via pv.keyOpacity. Selections
+     this chart makes go out through ctx.select. */
+  ctx.selected = el.__pvSelected || null;
+  ctx.select = function () {};
+  if (x.ctGroup && window.crosstalk) {
+    if (!el.__pvCtHandle) {
+      el.__pvCtHandle = new crosstalk.SelectionHandle();
+      el.__pvCtHandle.setGroup(x.ctGroup);
+      el.__pvCtHandle.on("change", function (e) {
+        el.__pvSelected = (e.value && e.value.length) ?
+          e.value : null;
+        pvRender(el, el.__pvLastX || x, el.offsetWidth || width,
+          el.offsetHeight || height, mq);
+      });
+    }
+    ctx.selected = el.__pvSelected || null;
+    ctx.select = function (keys) {
+      el.__pvCtHandle.set(keys && keys.length ? keys : null);
+    };
+  }
 
   var renderer = pvRenderers[x.type];
   if (!renderer) {

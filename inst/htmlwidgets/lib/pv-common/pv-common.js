@@ -198,5 +198,130 @@ window.pv = (function () {
       "h" + (-(w - r)) + "z";
   };
 
+  /* ---------- annotation, trend, and selection layers ----------
+     Cartesian renderers call these after building their scales, so the
+     modifier functions on the R side (pv_annotate, pv_trend, pv_link)
+     work on every chart without the chart knowing anything about them. */
+
+  /* Draws the chart's annotation list: reference lines, shaded bands,
+     and text labels with optional leader lines. Bands go under the data
+     (the gUnder group), lines and labels above it (gOver). Values on a
+     category axis pass through the scale, so "Luzern" works as well
+     as 100. */
+  pv.drawAnnotations = function (ctx, gUnder, gOver, xs, ys, iw, ih) {
+    var anns = ctx.x.annotations;
+    if (!anns || !anns.length) return;
+    var px = function (v) { return +xs(v); };
+    var py = function (v) { return +ys(v); };
+    anns.forEach(function (a) {
+      if (a.type === "band") {
+        var horiz = a.y0 != null;
+        var r = gUnder.append("rect")
+          .attr("fill", ctx.theme.ink.grid).attr("fill-opacity", 0.55);
+        if (horiz) {
+          var y1 = py(a.y0), y2 = py(a.y1);
+          r.attr("x", 0).attr("width", iw)
+            .attr("y", Math.min(y1, y2))
+            .attr("height", Math.abs(y2 - y1));
+        } else {
+          var x1 = px(a.x0), x2 = px(a.x1);
+          r.attr("y", 0).attr("height", ih)
+            .attr("x", Math.min(x1, x2))
+            .attr("width", Math.abs(x2 - x1));
+        }
+        if (a.label) {
+          gUnder.append("text")
+            .attr("x", horiz ? 6 : Math.min(px(a.x0), px(a.x1)) + 5)
+            .attr("y", horiz ? Math.min(py(a.y0), py(a.y1)) + 13 : 13)
+            .attr("fill", ctx.theme.ink.muted)
+            .style("font-size", "10.5px")
+            .text(a.label);
+        }
+      } else if (a.type === "hline" || a.type === "vline") {
+        var line = gOver.append("line")
+          .attr("stroke", a.color || ctx.theme.ink.secondary)
+          .attr("stroke-width", 1)
+          .attr("stroke-dasharray", "4,3");
+        if (a.type === "hline") {
+          line.attr("x1", 0).attr("x2", iw)
+            .attr("y1", py(a.at)).attr("y2", py(a.at));
+        } else {
+          line.attr("y1", 0).attr("y2", ih)
+            .attr("x1", px(a.at)).attr("x2", px(a.at));
+        }
+        if (a.label) {
+          gOver.append("text")
+            .attr("x", a.type === "hline" ? iw - 4 : px(a.at) + 5)
+            .attr("y", a.type === "hline" ? py(a.at) - 5 : 12)
+            .attr("text-anchor", a.type === "hline" ? "end" : "start")
+            .attr("fill", a.color || ctx.theme.ink.secondary)
+            .style("font-size", "11px")
+            .style("paint-order", "stroke")
+            .style("stroke", ctx.theme.ink.surface)
+            .style("stroke-width", 3)
+            .text(a.label);
+        }
+      } else if (a.type === "label") {
+        var lx = px(a.x), ly = py(a.y);
+        var tx = lx + (a.dx || 0), ty = ly + (a.dy || 0);
+        if (a.dx || a.dy) {
+          gOver.append("line")
+            .attr("x1", lx).attr("y1", ly).attr("x2", tx).attr("y2", ty)
+            .attr("stroke", ctx.theme.ink.muted)
+            .attr("stroke-width", 0.75);
+        }
+        gOver.append("text")
+          .attr("x", tx + ((a.dx || 0) >= 0 ? 4 : -4))
+          .attr("y", ty)
+          .attr("text-anchor", (a.dx || 0) >= 0 ? "start" : "end")
+          .attr("dominant-baseline", "middle")
+          .attr("fill", ctx.theme.ink.secondary)
+          .style("font-size", "11px")
+          .style("paint-order", "stroke")
+          .style("stroke", ctx.theme.ink.surface)
+          .style("stroke-width", 3)
+          .text(a.text);
+      }
+    });
+  };
+
+  /* Draws R-fitted trend curves: a confidence ribbon (when the fit
+     carries one) under a 2px line, both in the requested palette slot.
+     The points arrive already ordered by x. */
+  pv.drawTrends = function (ctx, g, xs, ys) {
+    var trends = ctx.x.trends;
+    if (!trends || !trends.length) return;
+    trends.forEach(function (t) {
+      var color = ctx.theme.palette[(t.slot || 2) - 1] ||
+        ctx.theme.palette[1];
+      if (t.points.length && t.points[0].lo != null) {
+        g.append("path").datum(t.points)
+          .attr("fill", color).attr("fill-opacity", 0.14)
+          .attr("d", d3.area()
+            .x(function (d) { return xs(d.x); })
+            .y0(function (d) { return ys(d.lo); })
+            .y1(function (d) { return ys(d.hi); })
+            .curve(d3.curveMonotoneX));
+      }
+      g.append("path").datum(t.points)
+        .attr("fill", "none")
+        .attr("stroke", color).attr("stroke-width", 2)
+        .attr("stroke-dasharray", t.dash ? "5,3" : null)
+        .attr("d", d3.line()
+          .x(function (d) { return xs(d.x); })
+          .y(function (d) { return ys(d.y); })
+          .curve(d3.curveMonotoneX));
+    });
+  };
+
+  /* Linked-selection opacity: full strength for selected keys (or when
+     nothing is selected anywhere), faded for the rest. Renderers use it
+     wherever they set mark opacity. */
+  pv.keyOpacity = function (ctx, key, base, dim) {
+    if (!ctx.selected) return base;
+    return ctx.selected.indexOf(String(key)) >= 0 ? base :
+      (dim == null ? 0.12 : dim);
+  };
+
   return pv;
 })();

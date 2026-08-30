@@ -3,3 +3,21 @@ dependencies:
     version: 7.9.0
     src: htmlwidgets/lib/d3-7
     script: d3.v7.min.js
+  - name: d3-sankey
+    version: 0.12.3
+    src: htmlwidgets/lib/d3-sankey
+    script: d3-sankey.min.js
+  - name: pv-fonts
+    version: 0.2.0
+    src: htmlwidgets/lib/pv-fonts
+    stylesheet: inter.css
+  - name: pv-common
+    version: 0.2.0
+    src: htmlwidgets/lib/pv-common
+    script: pv-common.js
+  - name: pv-renderers
+    version: 0.2.0
+    src: htmlwidgets/lib/pv-renderers
+    script:
+      - basic.js
+      - relational.js

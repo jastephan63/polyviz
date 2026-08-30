@@ -55,8 +55,8 @@ pv_plot_corr <- function(data, mode = "light") {
                     KEEP.OUT.ATTRS = FALSE)
   df$r <- cm[cbind(as.character(df$y), as.character(df$x))]
   ink <- pv_colors$ink[[mode]]
-  div <- pv_colors$diverging
-  midpoint <- if (mode == "dark") div$mid_dark else div$mid_light
+  div <- pv_colors$diverging[[mode]]
+  midpoint <- div$mid
 
   ggplot2::ggplot(df, ggplot2::aes(.data$x, .data$y, fill = .data$r)) +
     ggplot2::geom_tile(colour = ink$surface, linewidth = 1.5) +

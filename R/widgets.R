@@ -7,7 +7,10 @@ pv_widget <- function(type, payload, width = NULL, height = NULL,
   payload$type <- type
   payload$theme <- list(
     categorical = pv_colors$categorical,
-    ink = pv_colors$ink
+    sequential = pv_colors$sequential,
+    diverging = pv_colors$diverging,
+    ink = pv_colors$ink,
+    font = pv_font_stack()
   )
   # Send data frames as one object per row (easier to loop over in d3),
   # and missing values as null so JavaScript can spot them.
@@ -37,8 +40,9 @@ check_columns <- function(data, cols) {
   }
 }
 
-chart_opts <- function(title, subtitle, mode, duration) {
-  list(title = title, subtitle = subtitle, mode = mode, duration = duration)
+chart_opts <- function(title, subtitle, mode, duration, source = NULL) {
+  list(title = title, subtitle = subtitle, mode = mode,
+       duration = duration, source = source)
 }
 
 # Works out what kind of x axis a column needs. Dates go across as ISO
@@ -65,10 +69,15 @@ as_axis_values <- function(x) {
 #' @param y Name of the numeric value column.
 #' @param series Optional name of a grouping column (grouped bars).
 #' @param sort Sort bars by value, largest first? (Single-series only.)
+#' @param horizontal Draw bars horizontally? The readable choice for long
+#'   category names — labels stay upright and values sit at the bar ends.
+#'   Single-series only.
 #' @param title,subtitle Optional chart heading text.
 #' @param mode `"auto"` (default: follow the viewer's light/dark setting),
 #'   `"light"`, or `"dark"`.
 #' @param duration Entrance transition length in ms.
+#' @param source Optional source/credit line, shown small and grey at the
+#'   bottom left — e.g. `"Source: Bundesamt für Statistik"`.
 #' @param width,height,elementId Standard htmlwidgets sizing arguments.
 #' @return An htmlwidget.
 #' @examples
@@ -76,10 +85,14 @@ as_axis_values <- function(x) {
 #' pv_bar(sales, x = "region", y = "revenue", title = "Revenue by region")
 #' @export
 pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
+                   horizontal = FALSE,
                    title = NULL, subtitle = NULL, mode = "auto",
-                   duration = 700, width = NULL, height = NULL,
+                   duration = 500, source = NULL, width = NULL, height = NULL,
                    elementId = NULL) {
   check_columns(data, list(x, y, series))
+  if (isTRUE(horizontal) && !is.null(series)) {
+    rlang::abort("`horizontal` bars support a single series only.")
+  }
   df <- data.frame(x = as.character(data[[x]]), y = as.numeric(data[[y]]))
   if (!is.null(series)) {
     df$series <- as.character(data[[series]])
@@ -87,8 +100,8 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
     df <- df[order(-df$y), ]
   }
   pv_widget("bar", c(list(
-    data = df, xlab = x, ylab = y
-  ), chart_opts(title, subtitle, mode, duration)),
+    data = df, xlab = x, ylab = y, horizontal = isTRUE(horizontal)
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 
@@ -110,7 +123,7 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
 #' @export
 pv_line <- function(data, x, y, series = NULL,
                     title = NULL, subtitle = NULL, mode = "auto",
-                    duration = 900, width = NULL, height = NULL,
+                    duration = 800, source = NULL, width = NULL, height = NULL,
                     elementId = NULL) {
   check_columns(data, list(x, y, series))
   ax <- as_axis_values(data[[x]])
@@ -124,7 +137,7 @@ pv_line <- function(data, x, y, series = NULL,
   pv_widget("line", c(list(
     data = df, xtype = ax$xtype, xlab = x, ylab = y,
     showLegend = !is.null(series)
-  ), chart_opts(title, subtitle, mode, duration)),
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 
@@ -146,7 +159,8 @@ pv_line <- function(data, x, y, series = NULL,
 #' @export
 pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
                        title = NULL, subtitle = NULL, mode = "auto",
-                       duration = 500, width = NULL, height = NULL,
+                       duration = 400, source = NULL, width = NULL,
+                       height = NULL,
                        elementId = NULL) {
   check_columns(data, list(x, y, color, size, label))
   if (!is.null(color)) {
@@ -165,7 +179,7 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   pv_widget("scatter", c(list(
     data = df, xlab = x, ylab = y, sizelab = size,
     showLegend = !is.null(color)
-  ), chart_opts(title, subtitle, mode, duration)),
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 
@@ -188,7 +202,7 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
 #' @export
 pv_force <- function(nodes, links, id = "id", label = id, group = NULL,
                      title = NULL, subtitle = NULL, mode = "auto",
-                     duration = 0, width = NULL, height = NULL,
+                     duration = 0, source = NULL, width = NULL, height = NULL,
                      elementId = NULL) {
   check_columns(nodes, list(id, label, group))
   check_columns(links, list("source", "target"))
@@ -207,7 +221,7 @@ pv_force <- function(nodes, links, id = "id", label = id, group = NULL,
   }
   pv_widget("force", c(list(
     nodes = nd, links = lk
-  ), chart_opts(title, subtitle, mode, duration)),
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 
@@ -226,7 +240,7 @@ pv_force <- function(nodes, links, id = "id", label = id, group = NULL,
 #' @export
 pv_chord <- function(matrix, labels = NULL,
                      title = NULL, subtitle = NULL, mode = "auto",
-                     duration = 800, width = NULL, height = NULL,
+                     duration = 600, source = NULL, width = NULL, height = NULL,
                      elementId = NULL) {
   m <- as.matrix(matrix)
   if (nrow(m) != ncol(m)) {
@@ -236,7 +250,7 @@ pv_chord <- function(matrix, labels = NULL,
   pv_widget("chord", c(list(
     matrix = unname(apply(m, 1, as.numeric, simplify = FALSE)),
     labels = as.character(labels)
-  ), chart_opts(title, subtitle, mode, duration)),
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 
@@ -256,7 +270,8 @@ pv_chord <- function(matrix, labels = NULL,
 #' @export
 pv_sunburst <- function(data, levels, value,
                         title = NULL, subtitle = NULL, mode = "auto",
-                        duration = 750, width = NULL, height = NULL,
+                        duration = 650, source = NULL, width = NULL,
+                        height = NULL,
                         elementId = NULL) {
   check_columns(data, list(levels, value))
   if (length(levels) < 1) {
@@ -281,7 +296,7 @@ pv_sunburst <- function(data, levels, value,
   root <- list(name = "root", children = build(data, levels))
   pv_widget("sunburst", c(list(
     root = root
-  ), chart_opts(title, subtitle, mode, duration)),
+  ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
 

@@ -1,0 +1,10 @@
+/* Inter (SIL Open Font License 1.1) - bundled so charts look the same
+ * everywhere, offline included. One variable file covers all weights.
+ * https://rsms.me/inter/ */
+@font-face {
+  font-family: "InterVariable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("InterVariable.woff2") format("woff2");
+}

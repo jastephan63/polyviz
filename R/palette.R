@@ -1,42 +1,71 @@
 #' polyviz colour tokens
 #'
-#' The palette polyviz uses everywhere — ggplot2 themes and D3 widgets alike.
-#' The categorical slots are ordered so that adjacent pairs stay separable
-#' under the common colour-vision deficiencies; the order is part of the
-#' design and series are always assigned in slot order, never cycled.
+#' The palette every polyviz chart draws from — ggplot2 themes and D3
+#' widgets alike. The hues are anchored on The Economist's published web
+#' chart palette, then re-stepped in OKLCH so that every colour sits in a
+#' legal lightness band for its surface, and the slot ORDER was chosen by
+#' exhaustive search so that adjacent pairs stay distinguishable under the
+#' common colour-vision deficiencies in both light and dark mode (worst
+#' adjacent pair: Delta E 11.6 light / 10.2 dark, target 8). The first
+#' three slots additionally survive the stricter every-pair-adjacent test,
+#' which is why scatter plots cap colour groups at three.
+#'
+#' Series always take colours in slot order — the order is part of the
+#' accessibility guarantee, never cosmetic.
 #'
 #' @format A list with elements `categorical` (light/dark, 8 hex colours
-#'   each), `sequential` (11-step single-hue blue ramp), `diverging`
-#'   (blue/red poles with a neutral grey midpoint), and `ink` (chart chrome:
-#'   surface, text, grid, baseline for both modes).
+#'   each, same hue per slot across modes), `sequential` (light/dark
+#'   11-step single-hue blue ramps, low to high, with the low end receding
+#'   toward the surface), `diverging` (blue/red poles with a warm neutral
+#'   midpoint, per mode), and `ink` (chart chrome: warm paper surface,
+#'   near-black text, hairline grid, per mode).
 #' @export
 pv_colors <- list(
   categorical = list(
-    light = c("#2a78d6", "#eb6834", "#1baf7a", "#eda100",
-              "#e87ba4", "#008300", "#4a3aa7", "#e34948"),
-    dark  = c("#3987e5", "#d95926", "#199e70", "#c98500",
-              "#d55181", "#008300", "#9085e9", "#e66767")
+    light = c("#006ba2", "#db444b", "#3ebcd2", "#b2b837",
+              "#a25a81", "#dca61c", "#1b9c8c", "#d4a75d"),
+    dark  = c("#006ba2", "#db444b", "#11a2b8", "#939807",
+              "#a25a81", "#b78807", "#1b9c8c", "#b4883c")
   ),
-  sequential = c("#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec",
-                 "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab",
-                 "#184f95", "#104281", "#0d366b"),
+  sequential = list(
+    light = c("#cbe2f4", "#b3cfe5", "#9cbdd7", "#86acc9", "#6f9abb",
+              "#5989ac", "#42789e", "#2a6790", "#095783", "#00466c",
+              "#013655"),
+    dark  = c("#142634", "#1f3546", "#2a4559", "#35566d", "#426782",
+              "#4e7897", "#5b8aad", "#689dc4", "#76afda", "#83c3f2",
+              "#9fd5fe")
+  ),
   diverging = list(
-    low = "#2a78d6", mid_light = "#f0efec", mid_dark = "#383835",
-    high = "#e34948"
+    light = list(low = "#026fa8", mid = "#efece4", high = "#b94548"),
+    dark  = list(low = "#5aa6dd", mid = "#383734", high = "#cd5f5f")
   ),
   ink = list(
-    light = list(surface = "#fcfcfb", primary = "#0b0b0b",
-                 secondary = "#52514e", muted = "#898781",
-                 grid = "#e1e0d9", baseline = "#c3c2b7"),
-    dark  = list(surface = "#1a1a19", primary = "#ffffff",
-                 secondary = "#c3c2b7", muted = "#898781",
-                 grid = "#2c2c2a", baseline = "#383835")
+    light = list(surface = "#fbf9f5", primary = "#161511",
+                 secondary = "#57544b", muted = "#8b8779",
+                 grid = "#eae6dd", baseline = "#c9c4b6",
+                 tooltipBg = "#ffffff", tooltipText = "#161511",
+                 tooltipBorder = "#ddd8cc"),
+    dark  = list(surface = "#1b1a18", primary = "#f6f4ef",
+                 secondary = "#c7c3b8", muted = "#8b8779",
+                 grid = "#2e2d29", baseline = "#45433d",
+                 tooltipBg = "#262522", tooltipText = "#f6f4ef",
+                 tooltipBorder = "#45433d")
   )
 )
 
+# The CSS font stack every widget renders with. Inter is bundled with the
+# package (SIL Open Font License); the rest of the stack is the fallback
+# when the font file can't load. Kept in one place so the R side and the
+# JavaScript side always agree.
+pv_font_stack <- function() {
+  paste0('"InterVariable", "Inter", system-ui, -apple-system, ',
+         '"Segoe UI", sans-serif')
+}
+
 #' Categorical palette
 #'
-#' Returns the first `n` categorical colours in their fixed, CVD-safe order.
+#' Returns the first `n` categorical colours in their fixed,
+#' colourblind-checked order.
 #'
 #' @param n Number of colours (1–8).
 #' @param mode `"light"` or `"dark"` — the surface the chart renders on.

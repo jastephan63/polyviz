@@ -10,7 +10,8 @@ pv_chord(
   title = NULL,
   subtitle = NULL,
   mode = "auto",
-  duration = 800,
+  duration = 600,
+  source = NULL,
   width = NULL,
   height = NULL,
   elementId = NULL
@@ -28,6 +29,9 @@ entity \code{i} to entity \code{j}. Row names (or \code{labels}) name the entiti
 \code{"light"}, or \code{"dark"}.}
 
 \item{duration}{Entrance transition length in ms.}
+
+\item{source}{Optional source/credit line, shown small and grey at the
+bottom left — e.g. \code{"Source: Bundesamt für Statistik"}.}
 
 \item{width, height, elementId}{Standard htmlwidgets sizing arguments.}
 }

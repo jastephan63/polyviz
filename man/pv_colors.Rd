@@ -6,17 +6,28 @@
 \title{polyviz colour tokens}
 \format{
 A list with elements \code{categorical} (light/dark, 8 hex colours
-each), \code{sequential} (11-step single-hue blue ramp), \code{diverging}
-(blue/red poles with a neutral grey midpoint), and \code{ink} (chart chrome:
-surface, text, grid, baseline for both modes).
+each, same hue per slot across modes), \code{sequential} (light/dark
+11-step single-hue blue ramps, low to high, with the low end receding
+toward the surface), \code{diverging} (blue/red poles with a warm neutral
+midpoint, per mode), and \code{ink} (chart chrome: warm paper surface,
+near-black text, hairline grid, per mode).
 }
 \usage{
 pv_colors
 }
 \description{
-The palette polyviz uses everywhere — ggplot2 themes and D3 widgets alike.
-The categorical slots are ordered so that adjacent pairs stay separable
-under the common colour-vision deficiencies; the order is part of the
-design and series are always assigned in slot order, never cycled.
+The palette every polyviz chart draws from — ggplot2 themes and D3
+widgets alike. The hues are anchored on The Economist's published web
+chart palette, then re-stepped in OKLCH so that every colour sits in a
+legal lightness band for its surface, and the slot ORDER was chosen by
+exhaustive search so that adjacent pairs stay distinguishable under the
+common colour-vision deficiencies in both light and dark mode (worst
+adjacent pair: Delta E 11.6 light / 10.2 dark, target 8). The first
+three slots additionally survive the stricter every-pair-adjacent test,
+which is why scatter plots cap colour groups at three.
+}
+\details{
+Series always take colours in slot order — the order is part of the
+accessibility guarantee, never cosmetic.
 }
 \keyword{datasets}

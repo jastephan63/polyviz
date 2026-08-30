@@ -14,7 +14,8 @@ pv_scatter(
   title = NULL,
   subtitle = NULL,
   mode = "auto",
-  duration = 500,
+  duration = 400,
+  source = NULL,
   width = NULL,
   height = NULL,
   elementId = NULL
@@ -38,6 +39,9 @@ values keeps every pair distinguishable; more will error).}
 \code{"light"}, or \code{"dark"}.}
 
 \item{duration}{Entrance transition length in ms.}
+
+\item{source}{Optional source/credit line, shown small and grey at the
+bottom left — e.g. \code{"Source: Bundesamt für Statistik"}.}
 
 \item{width, height, elementId}{Standard htmlwidgets sizing arguments.}
 }

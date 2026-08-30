@@ -10,10 +10,12 @@ pv_bar(
   y,
   series = NULL,
   sort = FALSE,
+  horizontal = FALSE,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
-  duration = 700,
+  duration = 500,
+  source = NULL,
   width = NULL,
   height = NULL,
   elementId = NULL
@@ -30,12 +32,19 @@ pv_bar(
 
 \item{sort}{Sort bars by value, largest first? (Single-series only.)}
 
+\item{horizontal}{Draw bars horizontally? The readable choice for long
+category names — labels stay upright and values sit at the bar ends.
+Single-series only.}
+
 \item{title, subtitle}{Optional chart heading text.}
 
 \item{mode}{\code{"auto"} (default: follow the viewer's light/dark setting),
 \code{"light"}, or \code{"dark"}.}
 
 \item{duration}{Entrance transition length in ms.}
+
+\item{source}{Optional source/credit line, shown small and grey at the
+bottom left — e.g. \code{"Source: Bundesamt für Statistik"}.}
 
 \item{width, height, elementId}{Standard htmlwidgets sizing arguments.}
 }

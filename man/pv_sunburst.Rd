@@ -11,7 +11,8 @@ pv_sunburst(
   title = NULL,
   subtitle = NULL,
   mode = "auto",
-  duration = 750,
+  duration = 650,
+  source = NULL,
   width = NULL,
   height = NULL,
   elementId = NULL
@@ -31,6 +32,9 @@ first, defining the hierarchy.}
 \code{"light"}, or \code{"dark"}.}
 
 \item{duration}{Entrance transition length in ms.}
+
+\item{source}{Optional source/credit line, shown small and grey at the
+bottom left — e.g. \code{"Source: Bundesamt für Statistik"}.}
 
 \item{width, height, elementId}{Standard htmlwidgets sizing arguments.}
 }

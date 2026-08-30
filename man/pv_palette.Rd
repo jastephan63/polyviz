@@ -15,7 +15,8 @@ pv_palette(n = 8, mode = c("light", "dark"))
 Character vector of \code{n} hex colours.
 }
 \description{
-Returns the first \code{n} categorical colours in their fixed, CVD-safe order.
+Returns the first \code{n} categorical colours in their fixed,
+colourblind-checked order.
 }
 \examples{
 pv_palette(3)

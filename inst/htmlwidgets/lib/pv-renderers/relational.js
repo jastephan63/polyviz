@@ -60,13 +60,29 @@
       .force("collide", d3.forceCollide().radius(function (d) {
         return nr(d) + 6; }));
 
+    /* Linked selection (pv_link): while a selection exists anywhere in
+       the group, nodes outside it fade, and so do links that touch no
+       selected node. These are the resting opacities that every hover
+       restores - with no selection they are simply 1 and 0.75. */
+    function nodeOp(d) { return pv.keyOpacity(ctx, d.id, 1, 0.15); }
+    function linkOp(l) {
+      if (!ctx.selected) return 0.75;
+      /* The simulation swaps the id strings for node objects; accept
+         either form so this works whenever it is called. */
+      var s = l.source.id !== undefined ? l.source.id : l.source;
+      var t = l.target.id !== undefined ? l.target.id : l.target;
+      return ctx.selected.indexOf(String(s)) >= 0 ||
+             ctx.selected.indexOf(String(t)) >= 0 ? 0.75 : 0.1;
+    }
+
     var link = g.selectAll("line").data(links).enter().append("line")
       .attr("stroke", ctx.theme.ink.muted)
-      .attr("stroke-opacity", 0.75)
+      .attr("stroke-opacity", linkOp)
       .attr("stroke-width", function (l) { return lw(l.value); });
 
     var node = g.selectAll("g.node").data(nodes).enter().append("g")
-      .attr("class", "node").style("cursor", "grab");
+      .attr("class", "node").style("cursor", "grab")
+      .attr("opacity", nodeOp);
 
     node.append("circle")
       .attr("r", nr)
@@ -121,9 +137,20 @@
         pv.showTip(ctx, event, rows.join("<br>"));
       })
       .on("pointerleave", function () {
-        node.attr("opacity", 1);
-        link.attr("stroke-opacity", 0.75);
+        node.attr("opacity", nodeOp);
+        link.attr("stroke-opacity", linkOp);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, a click reports the node as input$<id>_click. A drag
+         that actually moved suppresses its trailing click, so this only
+         fires for a genuine click in place. */
+      .on("click", function (event, d) {
+        if (event.defaultPrevented) return;
+        ctx.emit("click", {
+          id: d.id, label: d.label,
+          group: hasGroup ? d.group : null,
+          connections: degree[d.id] || 0
+        });
       });
 
     /* Decide, for the current node positions, whether each label fits in
@@ -248,12 +275,16 @@
       .attr("class", "ribbon")
       .attr("d", ribbon)
       .attr("fill", function (d) { return color(labels[d.source.index]); })
-      .attr("fill-opacity", 0)
+      .attr("fill-opacity", ctx.duration > 0 ? 0 : 0.72)
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 0.75);
 
-    ribbons.transition().duration(ctx.duration)
-      .delay(function (d, i) { return i * 30; })
-      .attr("fill-opacity", 0.72);
+    /* Entrance: ribbons fade in one after the other. Skipped entirely
+       in instant mode - the final opacity is already set above. */
+    if (ctx.duration > 0) {
+      ribbons.transition().duration(ctx.duration)
+        .delay(function (d, i) { return i * 30; })
+        .attr("fill-opacity", 0.72);
+    }
 
     function focus(idx) {
       ribbons.attr("fill-opacity", function (d) {
@@ -269,7 +300,14 @@
         pv.showTip(ctx, event, "<b>" + pv.esc(labels[d.index]) + "</b><br>" +
           "outbound total: <b>" + ctx.fmt(total) + "</b>");
       })
-      .on("pointerleave", function () { unfocus(); pv.hideTip(ctx); });
+      .on("pointerleave", function () { unfocus(); pv.hideTip(ctx); })
+      /* In Shiny, clicking a group arc reports it as input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          part: "group", label: labels[d.index],
+          total: d3.sum(matrix[d.index])
+        });
+      });
 
     ribbons
       .on("pointerenter pointermove", function (event, d) {
@@ -283,7 +321,16 @@
         }
         pv.showTip(ctx, event, rows.join("<br>"));
       })
-      .on("pointerleave", function () { unfocus(); pv.hideTip(ctx); });
+      .on("pointerleave", function () { unfocus(); pv.hideTip(ctx); })
+      /* In Shiny, clicking a ribbon reports the flow it carries. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          part: "ribbon",
+          source: labels[d.source.index],
+          target: labels[d.target.index],
+          value: matrix[d.source.index][d.target.index]
+        });
+      });
   };
 
   /* ---------- zoomable sunburst ---------- */
@@ -446,7 +493,20 @@
         });
     }
 
-    path.filter(function (d) { return d.children; }).on("click", clicked);
+    /* In Shiny, clicking any segment reports its path from the top ring
+       down - e.g. ["West", "Widget"] - as input$<id>_click. Branch
+       segments also zoom; the centre circle only zooms back out. */
+    function emitPath(d) {
+      ctx.emit("click", d.ancestors().reverse().slice(1)
+        .map(function (a) { return a.data.name; }));
+    }
+    path.filter(function (d) { return d.children; })
+      .on("click", function (event, d) {
+        emitPath(d);
+        clicked(event, d);
+      });
+    path.filter(function (d) { return !d.children; })
+      .on("click", function (event, d) { emitPath(d); });
     parentCircle.on("click", clicked);
 
     var rootTotal = root.value || 1;

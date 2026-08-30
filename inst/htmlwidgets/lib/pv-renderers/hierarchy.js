@@ -136,18 +136,33 @@
         });
     }
 
+    /* In Shiny, clicking any circle reports its path down the tree -
+       e.g. name "Forest", path ["Natural", "Forest"] - as
+       input$<id>_click, alongside the zoom. */
+    function emitNode(d) {
+      ctx.emit("click", {
+        name: d.data.name,
+        path: d.ancestors().reverse().slice(1)
+          .map(function (a) { return a.data.name; }),
+        value: d.value
+      });
+    }
     circle.filter(function (d) { return !!d.children; })
       .on("click", function (event, d) {
         event.stopPropagation();
+        emitNode(d);
         /* Clicking the circle already in focus steps back out instead
            of zooming to where we already are. */
         zoomInto(d === focus ? (d.parent || root) : d);
       });
-    /* Leaves swallow their clicks so a stray click inside a branch
-       doesn't bounce the view around; the background steps out one
-       level per click. */
+    /* Leaves report their click too, but swallow it so a stray click
+       inside a branch doesn't bounce the view around; the background
+       steps out one level per click. */
     circle.filter(function (d) { return !d.children; })
-      .on("click", function (event) { event.stopPropagation(); });
+      .on("click", function (event, d) {
+        event.stopPropagation();
+        emitNode(d);
+      });
     svg.on("click", function () {
       if (focus.parent) zoomInto(focus.parent);
     });
@@ -345,6 +360,14 @@
       .on("pointerleave", function () {
         unhighlight();
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a junction reports the merge: the names of
+         every leaf under it and the height it happened at. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          leaves: d.leaves().map(function (l) { return l.data.name; }),
+          height: d.data.height
+        });
       });
 
     /* Leaves answer with their full, untruncated name (plus cluster). An

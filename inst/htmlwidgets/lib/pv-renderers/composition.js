@@ -76,17 +76,22 @@
     /* Each slice sweeps open from its own start angle, one after the
        other, so the ring appears to draw itself clockwise. d.index is
        the pie's angular order, which can differ from data order because
-       the pie sorts slices largest-first. */
-    paths.transition().duration(ctx.duration)
-      .delay(function (d) { return Math.min(d.index * 60, 420); })
-      .ease(d3.easeCubicOut)
-      .attrTween("d", function (d) {
-        var sweep = d3.interpolate(d.startAngle, d.endAngle);
-        return function (t) {
-          return arc({ startAngle: d.startAngle, endAngle: sweep(t),
-                       padAngle: d.padAngle });
-        };
-      });
+       the pie sorts slices largest-first. In instant mode the finished
+       ring is drawn synchronously instead. */
+    if (ctx.duration > 0) {
+      paths.transition().duration(ctx.duration)
+        .delay(function (d) { return Math.min(d.index * 60, 420); })
+        .ease(d3.easeCubicOut)
+        .attrTween("d", function (d) {
+          var sweep = d3.interpolate(d.startAngle, d.endAngle);
+          return function (t) {
+            return arc({ startAngle: d.startAngle, endAngle: sweep(t),
+                         padAngle: d.padAngle });
+          };
+        });
+    } else {
+      paths.attr("d", arc);
+    }
 
     /* Direct labels for the big slices: name and rounded share just
        outside the arc, anchored away from the circle. Neighbouring
@@ -128,8 +133,12 @@
       .text(function (l) {
         return d3.format(".0%")(l.d.data.value / total);
       });
-    lab.transition().delay(ctx.duration * 0.8).duration(250)
-      .style("opacity", 1);
+    if (ctx.duration > 0) {
+      lab.transition().delay(ctx.duration * 0.8).duration(250)
+        .style("opacity", 1);
+    } else {
+      lab.style("opacity", 1);
+    }
 
     /* A donut's hole earns its keep: show the grand total in the middle
        (skipped for pies and holes too small to hold the number). */
@@ -148,8 +157,12 @@
         .attr("fill", ctx.theme.ink.muted)
         .style("font-size", "10.5px")
         .text("total");
-      center.transition().delay(ctx.duration * 0.6).duration(250)
-        .style("opacity", 1);
+      if (ctx.duration > 0) {
+        center.transition().delay(ctx.duration * 0.6).duration(250)
+          .style("opacity", 1);
+      } else {
+        center.style("opacity", 1);
+      }
     }
 
     /* Hovering a slice pops it 6px outward along its own centroid, dims
@@ -174,6 +187,14 @@
       .on("pointerleave", function () {
         paths.attr("opacity", 1).attr("transform", null);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a slice reports it as input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          category: d.data.category,
+          value: d.data.value,
+          share: d.data.value / total
+        });
       });
   };
 
@@ -224,15 +245,22 @@
     var leaves = root.leaves();
     var total = root.value || 1;
 
+    /* Linked selection (pv_link): leaf cells key on their leaf name.
+       While a selection exists anywhere in the group, cells outside it
+       fade - this is the resting opacity every hover restores. */
+    function cellOp(d) { return pv.keyOpacity(ctx, d.data.name, 1, 0.25); }
+
     /* One group per cell, positioned at its centre, so the entrance can
-       fade and scale each cell up around its own middle. */
+       fade and scale each cell up around its own middle. In instant
+       mode the cells are simply drawn in place. */
     var cell = g.selectAll("g.cell").data(leaves).enter().append("g")
       .attr("class", "cell")
       .attr("transform", function (d) {
         return "translate(" + (d.x0 + d.x1) / 2 + "," +
-          (d.y0 + d.y1) / 2 + ") scale(0.8)";
+          (d.y0 + d.y1) / 2 + ") scale(" +
+          (ctx.duration > 0 ? 0.8 : 1) + ")";
       })
-      .attr("opacity", 0);
+      .attr("opacity", ctx.duration > 0 ? 0 : cellOp);
 
     cell.append("rect")
       .attr("x", function (d) { return -(d.x1 - d.x0) / 2; })
@@ -289,22 +317,27 @@
       .style("pointer-events", "none")
       .text(function (d) { return ctx.fmt(d.value); });
 
-    cell.transition().duration(Math.max(200, ctx.duration * 0.7))
-      .delay(function (d, i) { return Math.min(i * 20, 500); })
-      .ease(d3.easeCubicOut)
-      .attr("opacity", 1)
-      .attr("transform", function (d) {
-        return "translate(" + (d.x0 + d.x1) / 2 + "," +
-          (d.y0 + d.y1) / 2 + ") scale(1)";
-      });
+    if (ctx.duration > 0) {
+      cell.transition().duration(Math.max(200, ctx.duration * 0.7))
+        .delay(function (d, i) { return Math.min(i * 20, 500); })
+        .ease(d3.easeCubicOut)
+        .attr("opacity", cellOp)
+        .attr("transform", function (d) {
+          return "translate(" + (d.x0 + d.x1) / 2 + "," +
+            (d.y0 + d.y1) / 2 + ") scale(1)";
+        });
+    }
 
     /* Hovering a cell keeps its whole top-level branch lit, dims the
        other branches, and shows the full path and share of the total. */
     cell
       .on("pointerenter pointermove", function (event, d) {
         var mine = topOf(d);
+        /* Cells outside the hovered branch dim; a cell already faded by
+           a linked selection never brightens past its resting state. */
         cell.attr("opacity", function (c) {
-          return topOf(c) === mine ? 1 : 0.25;
+          var rest = cellOp(c);
+          return topOf(c) === mine ? rest : Math.min(rest, 0.25);
         });
         var trail = d.ancestors().reverse().slice(1)
           .map(function (a) { return pv.esc(a.data.name); }).join(" / ");
@@ -314,8 +347,19 @@
           " &middot; " + d3.format(".1%")(d.value / total) + " of total");
       })
       .on("pointerleave", function () {
-        cell.attr("opacity", 1);
+        cell.attr("opacity", cellOp);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a cell reports its full path down the tree -
+         e.g. name "Forest", path ["Natural", "Forest"] - as
+         input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          name: d.data.name,
+          path: d.ancestors().reverse().slice(1)
+            .map(function (a) { return a.data.name; }),
+          value: d.value
+        });
       });
   };
 
@@ -378,31 +422,39 @@
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1.5);
 
     /* Stems grow out from zero with each head riding its stem tip,
-       staggered down the chart. */
-    var delayOf = function (d, i) { return Math.min(i * 16, 480); };
-    stems.transition().duration(ctx.duration).delay(delayOf)
-      .ease(d3.easeCubicOut)
-      .attr("x2", function (d) { return x(d.y); });
-    heads.transition().duration(ctx.duration).delay(delayOf)
-      .ease(d3.easeCubicOut)
-      .attr("cx", function (d) { return x(d.y); })
-      .attr("r", 5.5);
+       staggered down the chart. In instant mode everything is placed
+       synchronously at its final position instead. */
+    if (ctx.duration > 0) {
+      var delayOf = function (d, i) { return Math.min(i * 16, 480); };
+      stems.transition().duration(ctx.duration).delay(delayOf)
+        .ease(d3.easeCubicOut)
+        .attr("x2", function (d) { return x(d.y); });
+      heads.transition().duration(ctx.duration).delay(delayOf)
+        .ease(d3.easeCubicOut)
+        .attr("cx", function (d) { return x(d.y); })
+        .attr("r", 5.5);
+    } else {
+      stems.attr("x2", function (d) { return x(d.y); });
+      heads.attr("cx", function (d) { return x(d.y); }).attr("r", 5.5);
+    }
 
     /* Compact value at each head - a labelled ranking needs no
        gridlines; the tooltip carries full precision. Skipped entirely
        when the flag resolved to off (no room, or FALSE from R). */
     if (showValues) {
-      row.append("text")
+      var vals = row.append("text")
         .attr("x", function (d) { return x(d.y) + 10; })
         .attr("y", function (d) { return yBand(d.x); })
         .attr("dominant-baseline", "middle")
         .attr("fill", ctx.theme.ink.secondary)
         .style("font-size", "11px")
         .style("font-variant-numeric", "tabular-nums")
-        .style("opacity", 0)
-        .text(function (d) { return pv.fmtTick(d.y); })
-        .transition().delay(ctx.duration).duration(200)
-        .style("opacity", 1);
+        .style("opacity", ctx.duration > 0 ? 0 : 1)
+        .text(function (d) { return pv.fmtTick(d.y); });
+      if (ctx.duration > 0) {
+        vals.transition().delay(ctx.duration).duration(200)
+          .style("opacity", 1);
+      }
     }
 
     /* An invisible strip per row makes the whole line hoverable, not
@@ -423,6 +475,11 @@
       .on("pointerleave", function () {
         row.attr("opacity", 1);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking anywhere on a row reports it as
+         input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", { category: d.x, value: d.y });
       });
   };
 

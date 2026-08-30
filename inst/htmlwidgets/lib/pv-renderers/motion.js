@@ -273,6 +273,11 @@
       .on("pointerleave", function () {
         ent.attr("opacity", 1);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a bar reports the entity with its value at
+         the moment shown, as input$<id>_click. */
+      .on("click", function (event, e) {
+        ctx.emit("click", { id: e.id, value: e.v, time: curTime });
       });
 
     /* duration 0 is the still photograph: the final standings, drawn
@@ -497,6 +502,18 @@
       labels.attr("opacity", 1);
     }
 
+    /* The index of the entity's measurement nearest the pointer's x
+       position - what both the tooltip and the click report. */
+    function nearestIdx(s, px) {
+      var best = null, bd = Infinity, i;
+      for (i = 0; i < K; i++) {
+        if (!s.pts[i]) continue;
+        var d = Math.abs(xs(timesN[i]) - px);
+        if (d < bd) { bd = d; best = i; }
+      }
+      return best;
+    }
+
     g.selectAll("path.hit").data(series).enter()
       .append("path")
       .attr("class", "hit")
@@ -507,13 +524,7 @@
       .attr("d", function (s) { return lineGen(s.pts); })
       .on("pointerenter pointermove", function (event, s) {
         focus(s);
-        var px = d3.pointer(event, g.node())[0];
-        var best = null, bd = Infinity, i;
-        for (i = 0; i < K; i++) {
-          if (!s.pts[i]) continue;
-          var d = Math.abs(xs(timesN[i]) - px);
-          if (d < bd) { bd = d; best = i; }
-        }
+        var best = nearestIdx(s, d3.pointer(event, g.node())[0]);
         if (best === null) return;
         var p = s.pts[best];
         pv.showTip(ctx, event, "<b>" + pv.esc(s.id) + "</b> &middot; " +
@@ -524,6 +535,18 @@
       .on("pointerleave", function () {
         unfocus();
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a line reports the entity at the measurement
+         nearest the click, as input$<id>_click. `t` is the time value
+         exactly as the R side sent it. */
+      .on("click", function (event, s) {
+        var best = nearestIdx(s, d3.pointer(event, g.node())[0]);
+        if (best === null) return;
+        var p = s.pts[best];
+        ctx.emit("click", {
+          id: s.id, t: ctx.x.times[best],
+          rank: p.rank, value: p.value
+        });
       });
   };
 

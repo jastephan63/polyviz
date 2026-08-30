@@ -61,12 +61,16 @@
                               nodeColor(l.target))(0.5);
       })
       .attr("stroke-width", function (l) { return Math.max(1, l.width); })
-      .attr("stroke-opacity", 0);
+      .attr("stroke-opacity", ctx.duration > 0 ? 0 : 0.45);
 
-    link.transition().duration(ctx.duration)
-      .delay(function (l, i) { return Math.min(i * 18, 450); })
-      .ease(d3.easeCubicOut)
-      .attr("stroke-opacity", 0.45);
+    /* Entrance: ribbons fade in one after the other. Skipped entirely
+       in instant mode - the final opacity is already set above. */
+    if (ctx.duration > 0) {
+      link.transition().duration(ctx.duration)
+        .delay(function (l, i) { return Math.min(i * 18, 450); })
+        .ease(d3.easeCubicOut)
+        .attr("stroke-opacity", 0.45);
+    }
 
     var node = svg.append("g")
       .selectAll("rect").data(graph.nodes).enter().append("rect")
@@ -76,11 +80,13 @@
       .attr("height", function (d) { return Math.max(1, d.y1 - d.y0); })
       .attr("rx", 3).attr("ry", 3)
       .attr("fill", function (d) { return nodeColor(d); })
-      .attr("fill-opacity", 0);
+      .attr("fill-opacity", ctx.duration > 0 ? 0 : 1);
 
-    node.transition().duration(Math.min(300, ctx.duration))
-      .ease(d3.easeCubicOut)
-      .attr("fill-opacity", 1);
+    if (ctx.duration > 0) {
+      node.transition().duration(Math.min(300, ctx.duration))
+        .ease(d3.easeCubicOut)
+        .attr("fill-opacity", 1);
+    }
 
     /* Labels sit beside their node, pointing inward: nodes on the left
        half label to the right, nodes on the right half to the left, so
@@ -98,11 +104,13 @@
       .attr("dominant-baseline", "middle")
       .attr("fill", ctx.theme.ink.secondary)
       .style("font-size", "11px")
-      .attr("opacity", 0)
+      .attr("opacity", ctx.duration > 0 ? 0 : 1)
       .text(function (d) { return d.name; });
 
-    label.transition().duration(Math.min(300, ctx.duration))
-      .attr("opacity", 1);
+    if (ctx.duration > 0) {
+      label.transition().duration(Math.min(300, ctx.duration))
+        .attr("opacity", 1);
+    }
 
     /* Hovering a ribbon raises it and reads out the flow. */
     link
@@ -114,6 +122,14 @@
       .on("pointerleave", function () {
         d3.select(this).attr("stroke-opacity", 0.45);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a ribbon reports the flow it carries. */
+      .on("click", function (event, l) {
+        ctx.emit("click", {
+          part: "link",
+          source: l.source.name, target: l.target.name,
+          value: l.value
+        });
       });
 
     /* Hovering a node isolates everything that touches it and totals the
@@ -132,6 +148,14 @@
       .on("pointerleave", function () {
         link.attr("stroke-opacity", 0.45);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a node reports it with its traffic totals. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          part: "node", name: d.name,
+          incoming: d3.sum(d.targetLinks, function (l) { return l.value; }),
+          outgoing: d3.sum(d.sourceLinks, function (l) { return l.value; })
+        });
       });
   };
 
@@ -202,6 +226,21 @@
       });
     }
 
+    /* What a row is called when it is reported to Shiny: its label
+       column when one was given, its 1-based row number otherwise. */
+    function rowKey(d, i) {
+      return d.label !== undefined ? d.label : i + 1;
+    }
+    /* After every brush change, Shiny hears which rows survive all the
+       active brushes, as input$<id>_brush. */
+    function emitBrush() {
+      var keep = [];
+      data.forEach(function (d, i) {
+        if (rowVisible(d)) keep.push(rowKey(d, i));
+      });
+      ctx.emit("brush", keep);
+    }
+
     /* Lines go in before the axes so tick labels and brushes stay on top. */
     var linesG = g.append("g");
     var lines = linesG.selectAll("path.row").data(data).enter()
@@ -214,10 +253,16 @@
       .attr("pointer-events", "none")
       .attr("d", pathOf);
 
-    lines.transition().duration(ctx.duration)
-      .delay(function (d, i) { return Math.min(i * 4, 400); })
-      .ease(d3.easeCubicOut)
-      .attr("stroke-opacity", baseOp);
+    /* Entrance: lines fade in a few at a time. Skipped entirely in
+       instant mode, where they appear at full resting opacity at once. */
+    if (ctx.duration > 0) {
+      lines.transition().duration(ctx.duration)
+        .delay(function (d, i) { return Math.min(i * 4, 400); })
+        .ease(d3.easeCubicOut)
+        .attr("stroke-opacity", baseOp);
+    } else {
+      lines.attr("stroke-opacity", baseOp);
+    }
 
     /* A 1.5px line is a mean hover target, so an invisible 9px twin of
        each line does the pointer work. */
@@ -269,6 +314,7 @@
           .on("start brush end", function (event) {
             brushRanges[i] = event.selection;
             applyBrushes();
+            emitBrush();
           });
         var bg = d3.select(this).call(b);
         bg.selectAll(".selection")
@@ -302,6 +348,17 @@
           .attr("stroke-width", 1.5)
           .attr("stroke-opacity", rowVisible(d) ? baseOp : 0.06);
         pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a line reports the whole row: its key, its
+         group when one was mapped, and the axis values in column
+         order. */
+      .on("click", function (event, d) {
+        var i = data.indexOf(d);
+        ctx.emit("click", {
+          label: rowKey(d, i),
+          series: hasSeries ? d.series : null,
+          values: cols.map(function (c, j) { return d["v" + (j + 1)]; })
+        });
       });
   };
 

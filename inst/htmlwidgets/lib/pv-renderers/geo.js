@@ -191,6 +191,54 @@
           "none" : null;
       });
 
+    /* Linked selection (pv_link): regions key on their id, as a string.
+       While a selection exists - made here by clicking, or anywhere
+       else in the crosstalk group - regions outside it fade through
+       fill-opacity. Background features without an id never dim. */
+    function keyOf(f) {
+      var id = propOf(f, "id");
+      return id === null ? null : String(id);
+    }
+    var selected = (ctx.selected || []).slice();
+    function applySelection() {
+      regions.attr("fill-opacity", function (f) {
+        var k = keyOf(f);
+        return k === null ? 1 : pv.keyOpacity(ctx, k, 1, 0.25);
+      });
+    }
+    applySelection();
+
+    /* Clicking a region toggles it in the selection and tells both
+       Shiny (input$<id>_click) and the crosstalk group about it;
+       clicking the empty background clears the whole selection. The
+       local set keeps the toggle working even without crosstalk. */
+    regions.filter(function (f) { return keyOf(f) !== null; })
+      .style("cursor", "pointer")
+      .on("click", function (event, f) {
+        event.stopPropagation();
+        var k = keyOf(f);
+        var i = selected.indexOf(k);
+        if (i >= 0) { selected.splice(i, 1); } else { selected.push(k); }
+        ctx.selected = selected.length ? selected.slice() : null;
+        ctx.el.__pvSelected = ctx.selected;
+        applySelection();
+        ctx.select(selected.slice());
+        var v = valueOf(f);
+        ctx.emit("click", {
+          id: k, name: propOf(f, "name"),
+          value: v === undefined ? null : v,
+          selected: i < 0
+        });
+      });
+    svg.on("click", function () {
+      if (!selected.length) return;
+      selected = [];
+      ctx.selected = null;
+      ctx.el.__pvSelected = null;
+      applySelection();
+      ctx.select([]);
+    });
+
     /* Entrance: regions fade in swept west to east across the map, by
        centroid. Kept well under 600ms in total - and skipped entirely at
        duration 0, where the final state must exist synchronously. */

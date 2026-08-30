@@ -29,3 +29,4 @@ dependencies:
       - hierarchy.js
       - motion.js
       - points.js
+      - facet.js

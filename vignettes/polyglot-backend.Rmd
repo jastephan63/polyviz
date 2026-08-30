@@ -1,0 +1,203 @@
+---
+title: "The polyglot backend"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{The polyglot backend}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(polyviz)
+```
+
+You write R. Underneath, polyviz talks to whatever engine fits the job:
+SQLite for data that lives in a database, `haven` for SAS files and
+their variable labels, an optional Python module for numeric profiling,
+and D3.js for every chart. This vignette shows each seam — and makes
+the point that none of them require you to leave R, or even to notice
+which engine did the work.
+
+## One reader for every file
+
+`pv_read()` dispatches on the file extension: CSV and RDS via base R,
+`.sas7bdat`/`.xpt` via haven, `.sqlite`/`.db` via DBI. The package
+bundles a small SQLite database to demonstrate:
+
+```{r read-dispatch}
+db <- system.file("extdata", "demo.sqlite", package = "polyviz")
+sales <- pv_read(db, table = "sales")
+head(sales, 3)
+```
+
+## SQL, when the data lives in a database
+
+For anything beyond "give me the table", open a real connection and
+push work to the database. Aggregating in SQL and charting the small
+result in R is the natural division of labour:
+
+```{r sql}
+con <- pv_db_connect(db)
+pv_db_tables(con)
+
+by_region <- pv_query(con, "
+  SELECT region, SUM(revenue) AS revenue
+  FROM sales
+  GROUP BY region
+  ORDER BY revenue DESC
+")
+by_region
+```
+
+Parameters are bound with `?` placeholders — values never get pasted
+into the SQL string:
+
+```{r sql-params}
+pv_query(con,
+  "SELECT COUNT(*) AS n FROM sales WHERE region = ? AND units > ?",
+  params = list("North", 300))
+```
+
+The result of a query is an ordinary data frame, so it flows straight
+into a chart:
+
+```{r sql-chart}
+pv_bar(by_region, x = "region", y = "revenue",
+       title = "Aggregated by SQLite, drawn by D3",
+       subtitle = "Revenue by region, summed in the database")
+```
+
+Schema and seed scripts can stay as plain `.sql` files and run with
+`pv_run_sql_file()`. Scratch databases work the same way —
+`pv_db_connect()` with no path opens an in-memory one, and
+`pv_db_write()` puts any data frame into it.
+
+```{r sql-cleanup}
+pv_db_disconnect(con)
+```
+
+## SAS, without SAS
+
+`haven` reads and writes SAS files directly, so polyviz can round-trip
+them — including *variable labels*, the SAS metadata that usually gets
+lost in translation. Attach labels, write an `.xpt` transport file,
+read it back:
+
+```{r sas-roundtrip}
+labelled <- pv_set_labels(mtcars[1:4], c(
+  mpg = "Miles per US gallon",
+  cyl = "Number of cylinders",
+  disp = "Displacement (cu in)",
+  hp = "Gross horsepower"
+))
+
+xpt <- tempfile(fileext = ".xpt")
+pv_write_sas(labelled, xpt)
+
+back <- pv_read_sas(xpt)
+pv_labels(back)
+```
+
+The labels survive the trip, and downstream tools use them:
+`pv_summary()` shows a label column whenever one is present.
+
+```{r sas-summary}
+pv_summary(back)
+```
+
+## Python, when it happens to be there
+
+Numeric profiling (`pv_profile()`, `pv_outliers()`) can run on a small
+Python module bundled with the package, via `reticulate`. The rule:
+Python is never required. Every Python-backed function has a pure-R
+implementation that returns identical results, and `engine = "auto"`
+(the default) quietly picks whichever is available.
+
+```{r python}
+pv_py_available()
+
+prof <- pv_profile(mtcars[c("mpg", "hp", "wt")])
+attr(prof, "engine")
+prof
+```
+
+On a machine with Python, that `engine` attribute reads `"python"`; on
+one without, `"r"` — and the numbers are the same either way, which the
+package's test suite asserts. Forcing a specific engine is explicit:
+`engine = "r"` always works, `engine = "python"` errors (rather than
+silently downgrading) when Python is missing.
+
+```{r python-match}
+identical(prof$mean, pv_profile(mtcars[c("mpg", "hp", "wt")],
+                                engine = "r")$mean)
+```
+
+## JavaScript: what actually travels to D3
+
+Every chart function builds a plain payload — data as row-wise records,
+options, and the colour theme — and hands it to the bundled D3 v7
+renderers through htmlwidgets. No JavaScript is written at chart time,
+and you can inspect exactly what crosses the boundary:
+
+```{r payload}
+w <- pv_bar(by_region, x = "region", y = "revenue")
+names(w$x)
+str(w$x$data)
+```
+
+`type` picks the renderer, `theme` carries the full light *and* dark
+token sets (the browser picks at render time, following the viewer's
+system preference), and modifiers like `pv_trend()` just add fields to
+this list: the loess or lm fit runs in R, and only the fitted points
+travel to JavaScript. R stays the single source of statistical truth;
+D3 only draws.
+
+## Coming back: events and linked selections
+
+The boundary runs both ways. Inside a Shiny app, every chart reports
+interactions as input values named `<outputId>_<event>`:
+
+```{r shiny-sketch, eval = FALSE}
+library(shiny)
+
+ui <- fluidPage(
+  pvchartOutput("revenue"),
+  verbatimTextOutput("detail")
+)
+
+server <- function(input, output, session) {
+  output$revenue <- renderPvchart(
+    pv_bar(by_region, x = "region", y = "revenue")
+  )
+  # Clicking a bar arrives here as input$revenue_click.
+  output$detail <- renderPrint(input$revenue_click)
+}
+
+shinyApp(ui, server)
+```
+
+And without any server at all, `pv_link()` joins charts through a
+crosstalk selection group — brushing points in one chart dims the
+non-matching marks in every linked widget, even in a static HTML page:
+
+```{r crosstalk-sketch, eval = FALSE}
+f25 <- subset(pv_fiscal, year == 2025)
+sd <- crosstalk::SharedData$new(f25)
+
+# Both charts are built from the same rows and linked to the same
+# group: selecting municipalities in the scatter highlights them on
+# the map, and vice versa.
+htmltools::browsable(htmltools::tagList(
+  pv_scatter(f25, x = "resource_index", y = "equalization_chf",
+             label = "municipality") |> pv_link(sd),
+  pv_choropleth(f25, id = "municipality_id",
+                value = "resource_index") |> pv_link(sd)
+))
+```
+
+Four engines, one interface — and the seams only show when you go
+looking for them.

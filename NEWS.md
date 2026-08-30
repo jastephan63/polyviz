@@ -1,3 +1,43 @@
+# polyviz 0.4.0
+
+Depth over breadth: layers, links, and infrastructure that work across
+the existing 24 chart types, composed with the pipe.
+
+## Chart layers (pipe-able modifiers)
+
+* `pv_annotate()` with `pv_hline()`, `pv_vline()`, `pv_band()`, and
+  `pv_note()` — reference lines, shaded bands, and leader-line callouts
+  on the cartesian charts.
+* `pv_trend()` — loess or lm fits with confidence ribbons on scatter
+  and line charts, computed in R, drawn by d3.
+* `pv_facet()` — small multiples with shared scales for bar, line,
+  scatter, and area.
+
+## Interactivity
+
+* Shiny round-trips: clicks (and scatter/bar hovers) arrive as
+  `input$<outputId>_<event>` values on every chart type.
+* Crosstalk linking via `pv_link()`: brush a scatter or beeswarm, click
+  regions on a choropleth, and every linked polyviz widget (and any
+  other crosstalk widget) highlights the same rows.
+
+## Theming
+
+* `pv_set_theme()` / `pv_reset_theme()` — bring your own brand palette;
+  dark-mode colours derive automatically via OKLCH re-stepping.
+* `pv_check_palette()` — the colour-vision-deficiency validator behind
+  polyviz's own palette, as a public R function: lightness band, chroma
+  floor, Machado-simulated CVD separation, contrast, and a suggested
+  slot ordering.
+
+## Reporting and infrastructure
+
+* `pv_report()` — one call turns a data frame into a themed HTML report
+  of real widgets.
+* Continuous integration (GitHub Actions `R CMD check`), a pkgdown
+  reference site at `/reference`, two vignettes, and CRAN submission
+  notes.
+
 # polyviz 0.3.0
 
 Eight new chart types — 24 in total — plus map boundaries and daily

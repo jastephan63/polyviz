@@ -5,12 +5,15 @@
 pv_widget <- function(type, payload, width = NULL, height = NULL,
                       elementId = NULL) {
   payload$type <- type
+  # The active theme is the packaged one unless pv_set_theme() swapped in
+  # a validated user theme for this session.
+  tokens <- the$theme %||% pv_colors
   payload$theme <- list(
-    categorical = pv_colors$categorical,
-    sequential = pv_colors$sequential,
-    diverging = pv_colors$diverging,
-    ink = pv_colors$ink,
-    font = pv_font_stack()
+    categorical = tokens$categorical,
+    sequential = tokens$sequential,
+    diverging = tokens$diverging,
+    ink = tokens$ink,
+    font = the$font %||% pv_font_stack()
   )
   # Send data frames as one object per row (easier to loop over in d3),
   # and missing values as null so JavaScript can spot them.

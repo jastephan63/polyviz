@@ -1,0 +1,131 @@
+# pkgdown configuration. The built site lives under docs/reference/ - the
+# hand-made chart gallery owns the docs/ root (docs/index.html and
+# docs/lib), so pkgdown writes into its own subfolder and never touches
+# them.
+url: https://jastephan63.github.io/polyviz/reference
+destination: docs/reference
+
+authors:
+  Jake Stephan:
+    href: https://github.com/jastephan63
+
+template:
+  bootstrap: 5
+  # The light/dark toggle defaults to following the viewer's system
+  # preference - matching the charts, whose "auto" mode does the same.
+  light-switch: true
+  # Brand-adjacent colours: the warm paper surface and the first
+  # categorical blue of the packaged chart theme (see pv_colors).
+  bslib:
+    bg: "#fbf9f5"
+    fg: "#161511"
+    primary: "#006ba2"
+
+reference:
+- title: Charts
+  desc: >
+    Every chart function returns an htmlwidget rendered by the bundled
+    D3.js v7 - interactive, animated, and theme-aware. All of them share
+    the same title/subtitle/mode/duration/source options.
+  contents:
+  - pv_bar
+  - pv_line
+  - pv_area
+  - pv_scatter
+  - pv_lollipop
+  - pv_donut
+  - pv_treemap
+  - pv_sunburst
+  - pv_pack
+  - pv_dendrogram
+  - pv_histogram
+  - pv_boxplot
+  - pv_violin
+  - pv_ridgeline
+  - pv_beeswarm
+  - pv_heatmap
+  - pv_calendar
+  - pv_bump
+  - pv_parallel
+  - pv_sankey
+  - pv_chord
+  - pv_force
+  - pv_choropleth
+  - pv_race
+
+- title: Chart layers & linking
+  desc: >
+    Pipe-able modifiers - annotations, fitted trends, small multiples,
+    and crosstalk selection linking - that layer onto an existing chart.
+  contents:
+  - pv_annotate
+  - annotations
+  - pv_trend
+  - pv_facet
+  - pv_link
+
+- title: Data in & out
+  desc: >
+    One reader that dispatches on file extension, plus direct access to
+    the SQLite and SAS backends.
+  contents:
+  - pv_read
+  - pv_read_sas
+  - pv_write_sas
+  - pv_labels
+  - pv_set_labels
+  - pv_db_connect
+  - pv_db_disconnect
+  - pv_db_write
+  - pv_db_tables
+  - pv_query
+  - pv_run_sql_file
+
+- title: Analysis
+  desc: >
+    Summaries, numeric profiling (Python-backed when available, pure R
+    otherwise), outlier flags, and the one-call HTML report.
+  contents:
+  - pv_summary
+  - pv_profile
+  - pv_outliers
+  - pv_py_available
+  - pv_plot_corr
+  - pv_plot_missing
+  - pv_report
+
+- title: Theming
+  desc: >
+    The packaged colour tokens, palette accessors and ggplot2 scales,
+    and the session theme API with its accessibility checker.
+  contents:
+  - pv_colors
+  - pv_palette
+  - pv_set_theme
+  - pv_reset_theme
+  - pv_check_palette
+  - scale_colour_pv
+  - theme_polyviz
+
+- title: Datasets
+  desc: >
+    Bundled demonstration data - simulated sales and networks, plus real
+    Swiss open data (cities, commuters, Lucerne fiscal equalization,
+    elections, boundaries, and weather).
+  contents:
+  - pv_sales
+  - pv_network
+  - pv_flows
+  - pv_city_population
+  - pv_city_sectors
+  - pv_city_landuse
+  - pv_commuters
+  - pv_fiscal
+  - pv_elections
+  - pv_lucerne_map
+  - pv_weather
+
+- title: Shiny
+  desc: Output and render bindings for using the charts in Shiny apps.
+  contents:
+  - pvchart-shiny

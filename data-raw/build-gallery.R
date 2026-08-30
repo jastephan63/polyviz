@@ -23,7 +23,8 @@ display_names <- c(
   parallel = "Parallel coordinates", pack = "Circle packing",
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
-  violin = "Violin plot", calendar = "Calendar heatmap"
+  violin = "Violin plot", calendar = "Calendar heatmap",
+  annotated = "Annotations & trends", facet = "Small multiples"
 )
 
 # Pull the id / explanation / code blocks out of one snippet file.

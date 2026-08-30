@@ -9,4 +9,6 @@
 ^\.github$
 ^docs$
 ^ROADMAP\.md$
+^_pkgdown\.yml$
+^cran-comments\.md$
 

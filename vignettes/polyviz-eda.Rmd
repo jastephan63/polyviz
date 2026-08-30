@@ -1,0 +1,173 @@
+---
+title: "Exploring a dataset with polyviz"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Exploring a dataset with polyviz}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(polyviz)
+```
+
+polyviz is built around a simple loop: look at the data, ask a question,
+draw the chart that answers it, repeat. This vignette walks that loop
+once, end to end, on `pv_fiscal` — a real dataset that ships with the
+package.
+
+## The data: who pays for whom in Canton Lucerne
+
+Like most Swiss cantons, Lucerne runs a *fiscal equalization* scheme:
+municipalities with a strong tax base pay in, municipalities with a weak
+one receive support. `pv_fiscal` holds the key figures for every Lucerne
+municipality since 2020, published by LUSTAT Statistik Luzern:
+
+* `resource_per_capita` — tax resource potential per resident, in CHF;
+* `resource_index` — the same figure indexed so the cantonal average
+  is 100;
+* `equalization_chf` — the equalization amount the municipality
+  receives (0 for net contributors).
+
+First look, before any chart:
+
+```{r summary}
+pv_summary(pv_fiscal)
+```
+
+About 80 municipalities per year (municipalities occasionally merge, so
+the count moves), no missing values, and years running from 2020 to
+`r max(pv_fiscal$year)` — the last two of which are published
+projections, not accounts. `pv_profile()` gives the numeric columns a
+closer read:
+
+```{r profile}
+pv_profile(pv_fiscal[c("resource_per_capita", "resource_index",
+                       "equalization_chf")], engine = "r")
+```
+
+Two things stand out. The resource index spans roughly 37 to 292 — the
+strongest municipality has almost eight times the per-resident tax
+resources of the weakest. And `equalization_chf` has a 25th percentile
+of 0: a sizeable minority of municipalities receive nothing at all.
+
+## How unequal is the tax base?
+
+```{r histogram}
+f25 <- subset(pv_fiscal, year == 2025)
+
+pv_histogram(
+  f25, x = "resource_index",
+  title = "Most Lucerne municipalities sit well below the average",
+  subtitle = "Resource index, 2025 (cantonal average = 100)",
+  source = "Quelle: LUSTAT Statistik Luzern"
+) |>
+  pv_annotate(pv_vline(100, label = "cantonal average"))
+```
+
+The distribution is heavily right-skewed. The bulk of municipalities
+cluster between roughly 50 and 90, below the average line; a long thin
+tail of lakeside communities — Meggen, Weggis, Vitznau — stretches past
+200. Because the index weights by population, a handful of strong
+municipalities is enough to pull the average of 100 far above the
+median (about `r round(median(f25$resource_index))` in 2025).
+
+Is that a snapshot quirk or a trend? Boxplots by year show the whole
+distribution moving:
+
+```{r boxplot}
+pv_boxplot(
+  pv_fiscal, value = "resource_index", group = "year",
+  title = "The middle is drifting away from the top",
+  subtitle = "Resource index by year; 2026-27 are projections",
+  source = "Quelle: LUSTAT Statistik Luzern"
+)
+```
+
+The median slides from about 78 in 2020 to about 70 in the 2027
+projection, while the maximum barely moves. On this measure, dispersion
+is widening — which is exactly the situation equalization exists for.
+
+## Who receives, and how much?
+
+```{r scatter}
+pv_scatter(
+  f25, x = "resource_index", y = "equalization_chf",
+  label = "municipality",
+  title = "Payments fade out as the tax base approaches the average",
+  subtitle = "Resource index vs. equalization received, 2025",
+  ylab = "equalization (CHF)",
+  source = "Quelle: LUSTAT Statistik Luzern"
+) |>
+  pv_trend("loess") |>
+  pv_annotate(
+    pv_vline(100, label = "cantonal average"),
+    pv_note(65.9, 23278722, "Emmen", dx = -18, dy = 10)
+  )
+```
+
+The broad shape is what the scheme promises: payments are concentrated
+below the average and reach zero near it. In 2025,
+`r sum(f25$equalization_chf == 0)` of `r nrow(f25)` municipalities
+receive nothing, and none of them has an index under about 87.
+
+```{r receiver-correlation, include = FALSE}
+receivers <- subset(f25, equalization_chf > 0)
+recv_cor <- round(cor(receivers$resource_index,
+                      receivers$equalization_chf), 2)
+```
+
+But the scatter is honest about what the index alone does not explain.
+The largest single payment — about CHF 23 million to Emmen — goes to a
+municipality that is far from the poorest; Emmen is simply large, and
+`equalization_chf` is a total, not a per-resident amount. Among
+receivers, the correlation between index and amount is close to zero
+(`r recv_cor`), because population size dominates. A ranking of
+absolute amounts is therefore mostly a ranking of size:
+
+```{r lollipop}
+top20 <- head(f25[order(-f25$equalization_chf), ], 20)
+
+pv_lollipop(
+  top20, x = "municipality", y = "equalization_chf",
+  title = "The biggest cheques go to the biggest municipalities",
+  subtitle = "Largest equalization payments, 2025 (CHF)",
+  source = "Quelle: LUSTAT Statistik Luzern"
+)
+```
+
+## Where the weak tax bases are
+
+The municipality numbers in `pv_fiscal` are official BFS ids, and the
+bundled `pv_lucerne_map` boundaries carry the same ids — so the join to
+a map is automatic:
+
+```{r map}
+pv_choropleth(
+  f25, id = "municipality_id", value = "resource_index",
+  title = "Tax resources follow the lake",
+  subtitle = "Resource index by municipality, 2025 (average = 100)",
+  source = "Quelle: LUSTAT Statistik Luzern; Grenzen: BFS ThemaKart"
+)
+```
+
+The geography is stark: the strong tax bases hug Lake Lucerne and the
+agglomeration, while the rural north-west — the Napf hinterland around
+Romoos and Luthern — holds the weakest. Fiscal equalization in Lucerne
+is, to a first approximation, a transfer from the lakeshore to the
+hills.
+
+## Where to go next
+
+* The whole pipeline — CSV, SQLite, SAS, and the Python profiler —
+  is covered in `vignette("polyglot-backend")`.
+* `pv_report()` writes a one-call HTML report (summary, histograms,
+  correlations) of any data frame, built from the same widgets used
+  here.
+* Every chart above is interactive in the browser: hover for exact
+  values, and in Shiny each chart also reports clicks (see
+  `?pvchartOutput`).

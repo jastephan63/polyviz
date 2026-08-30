@@ -1,6 +1,6 @@
 Package: polyviz
 Title: Polyglot Data Analysis and 'D3'-Powered Visualisation
-Version: 0.3.0
+Version: 0.4.0
 Authors@R:
     person("Jake", "Stephan", email = "jake@stephan-j.com",
            role = c("aut", "cre"))
@@ -20,10 +20,12 @@ RoxygenNote: 7.3.2
 Depends:
     R (>= 4.1)
 Imports:
+    crosstalk,
     DBI,
     ggplot2,
     graphics,
     haven,
+    htmltools,
     htmlwidgets,
     RSQLite,
     rlang,
@@ -39,3 +41,4 @@ Suggests:
     rmarkdown
 Config/testthat/edition: 3
 LazyData: true
+VignetteBuilder: knitr

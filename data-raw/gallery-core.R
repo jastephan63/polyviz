@@ -5,11 +5,15 @@
 ## bar
 # explain: The bar chart is the workhorse of comparison - one bar per
 #   category, length encoding the value. polyviz draws bars with rounded
-#   value-ends growing from a zero baseline, and the horizontal
-#   orientation keeps long category names upright and readable, with the
-#   exact value at each bar's end. Here it ranks how the city of Lucerne
-#   uses its land: agriculture and buildings each cover more ground than
-#   forest, and unproductive land is nearly absent.
+#   value-ends growing from a zero baseline. Orientation defaults to
+#   "auto": a single-series chart flips itself horizontal when its
+#   category labels are too long to sit under vertical bars, and vertical
+#   bars print their values on top when there is room for the numbers.
+#   Here the horizontal orientation is pinned explicitly - the readable
+#   choice for ranked categories, labels upright and the exact value at
+#   each bar's end - ranking how the city of Lucerne uses its land:
+#   agriculture and buildings each cover more ground than forest, and
+#   unproductive land is nearly absent.
 pv_bar(
   aggregate(hectares ~ category,
             pv_city_landuse[pv_city_landuse$city == "Luzern", ], sum),
@@ -57,7 +61,9 @@ pv_scatter(
 #   economic structures are highly similar (correlation of employment
 #   shares across all 19 economic sectors above 0.94), sized by how many
 #   similar cities each has, and coloured by population class. Hovering
-#   a city highlights its economic look-alikes.
+#   a city highlights its economic look-alikes. Labels wear a halo of the
+#   background and drop below their node when two would collide, and a
+#   gentle pull toward the centre keeps separate components in frame.
 local({
   # Wide matrix of sector shares per city, for the 30 most populous cities.
   # xtabs keeps sectors aligned even where a city has no row for a sector.
@@ -112,7 +118,8 @@ local({
 #   hierarchy here is Lucerne's land use in two levels: settlement,
 #   cultivated, and natural land, each split into its categories, so you
 #   can see at a glance that cultivated land dominates and then zoom
-#   into how the settlement area subdivides.
+#   into how the settlement area subdivides. Segments too thin to carry
+#   their label stay unlabelled - hovering names any of them.
 pv_sunburst(
   pv_city_landuse[pv_city_landuse$city == "Luzern", ],
   levels = c("group", "category"), value = "hectares",

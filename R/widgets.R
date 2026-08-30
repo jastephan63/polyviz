@@ -45,6 +45,33 @@ chart_opts <- function(title, subtitle, mode, duration, source = NULL) {
        duration = duration, source = source)
 }
 
+# Several chart options accept TRUE, FALSE, or "auto". "auto" is the
+# interesting one: it travels to the JavaScript side as-is, which decides
+# at render time from the actual data and pixel sizes - something R cannot
+# know when the widget is built. Anything else is refused here.
+check_flag <- function(value, name) {
+  ok <- isTRUE(value) || isFALSE(value) ||
+    (is.character(value) && length(value) == 1 && !is.na(value) &&
+       value == "auto")
+  if (!ok) {
+    rlang::abort(sprintf('`%s` must be TRUE, FALSE, or "auto".', name))
+  }
+  value
+}
+
+# Resolves an axis-title override: NULL keeps the column name, NA or ""
+# suppresses the title, and any other string replaces it. The empty
+# string is what travels to JavaScript for "no title" - it is falsy
+# there, so both the axis label and its margin space are skipped.
+axis_title <- function(override, colname) {
+  if (is.null(override)) return(colname)
+  if (length(override) != 1) {
+    rlang::abort("Axis title overrides must be a single string, NA, or NULL.")
+  }
+  if (is.na(override) || !nzchar(override)) return("")
+  as.character(override)
+}
+
 # Works out what kind of x axis a column needs. Dates go across as ISO
 # strings ("2025-01-01") and are parsed back into dates by d3; numbers stay
 # numbers; anything else is treated as a list of categories.
@@ -69,9 +96,20 @@ as_axis_values <- function(x) {
 #' @param y Name of the numeric value column.
 #' @param series Optional name of a grouping column (grouped bars).
 #' @param sort Sort bars by value, largest first? (Single-series only.)
-#' @param horizontal Draw bars horizontally? The readable choice for long
-#'   category names — labels stay upright and values sit at the bar ends.
-#'   Single-series only.
+#' @param horizontal Draw bars horizontally — the readable choice for long
+#'   category names, with labels upright and the exact value at each bar's
+#'   end. `TRUE` forces it (single-series only), `FALSE` forces vertical
+#'   bars; `"auto"` (default) flips to horizontal when the chart is
+#'   single-series and the category labels are too long to sit side by
+#'   side under vertical bars.
+#' @param value_labels Print each bar's value on the chart. `TRUE` always,
+#'   `FALSE` never; `"auto"` (default) shows values on vertical bars only
+#'   when the chart is single-series with at most 12 bars wide enough to
+#'   carry a number, and always on horizontal bars, which have the room
+#'   at the bar ends.
+#' @param xlab,ylab Axis titles. `NULL` (default) uses the column names;
+#'   `NA` or `""` suppresses the title entirely; any other string
+#'   replaces it.
 #' @param title,subtitle Optional chart heading text.
 #' @param mode `"auto"` (default: follow the viewer's light/dark setting),
 #'   `"light"`, or `"dark"`.
@@ -85,11 +123,14 @@ as_axis_values <- function(x) {
 #' pv_bar(sales, x = "region", y = "revenue", title = "Revenue by region")
 #' @export
 pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
-                   horizontal = FALSE,
+                   horizontal = "auto", value_labels = "auto",
+                   xlab = NULL, ylab = NULL,
                    title = NULL, subtitle = NULL, mode = "auto",
                    duration = 500, source = NULL, width = NULL, height = NULL,
                    elementId = NULL) {
   check_columns(data, list(x, y, series))
+  check_flag(horizontal, "horizontal")
+  check_flag(value_labels, "value_labels")
   if (isTRUE(horizontal) && !is.null(series)) {
     rlang::abort("`horizontal` bars support a single series only.")
   }
@@ -100,7 +141,8 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
     df <- df[order(-df$y), ]
   }
   pv_widget("bar", c(list(
-    data = df, xlab = x, ylab = y, horizontal = isTRUE(horizontal)
+    data = df, xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
+    horizontal = horizontal, valueLabels = value_labels
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -115,17 +157,23 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
 #' @param x Name of the x column — `Date`, numeric, or categorical.
 #' @param y Name of the numeric value column.
 #' @param series Optional name of a series column (one line per level).
+#' @param legend Show the colour legend row above the chart? `TRUE` always
+#'   shows it, `FALSE` hides it (the direct labels at the line ends
+#'   remain); `"auto"` (default) shows it exactly when a `series` mapping
+#'   with more than one level exists.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
 #' monthly <- aggregate(revenue ~ month + region, pv_sales, sum)
 #' pv_line(monthly, x = "month", y = "revenue", series = "region")
 #' @export
-pv_line <- function(data, x, y, series = NULL,
+pv_line <- function(data, x, y, series = NULL, legend = "auto",
+                    xlab = NULL, ylab = NULL,
                     title = NULL, subtitle = NULL, mode = "auto",
                     duration = 800, source = NULL, width = NULL, height = NULL,
                     elementId = NULL) {
   check_columns(data, list(x, y, series))
+  check_flag(legend, "legend")
   ax <- as_axis_values(data[[x]])
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
@@ -135,8 +183,9 @@ pv_line <- function(data, x, y, series = NULL,
   ord <- if (ax$xtype == "category") order(df$series) else order(df$series, df$x)
   df <- df[ord, ]
   pv_widget("line", c(list(
-    data = df, xtype = ax$xtype, xlab = x, ylab = y,
-    showLegend = !is.null(series)
+    data = df, xtype = ax$xtype,
+    xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
+    showLegend = !is.null(series), legend = legend
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -152,17 +201,22 @@ pv_line <- function(data, x, y, series = NULL,
 #'   values keeps every pair distinguishable; more will error).
 #' @param size Optional name of a numeric column mapped to point area.
 #' @param label Optional name of a column shown in tooltips.
+#' @param legend Show the colour legend row above the chart? `TRUE` always
+#'   shows it (when a `color` mapping exists), `FALSE` hides it; `"auto"`
+#'   (default) shows it exactly when a `color` mapping exists.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
 #' pv_scatter(mtcars, x = "wt", y = "mpg", size = "hp")
 #' @export
 pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
+                       legend = "auto", xlab = NULL, ylab = NULL,
                        title = NULL, subtitle = NULL, mode = "auto",
                        duration = 400, source = NULL, width = NULL,
                        height = NULL,
                        elementId = NULL) {
   check_columns(data, list(x, y, color, size, label))
+  check_flag(legend, "legend")
   if (!is.null(color)) {
     n_levels <- length(unique(data[[color]]))
     if (n_levels > 3) {
@@ -177,8 +231,9 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   if (!is.null(size)) df$size <- as.numeric(data[[size]])
   if (!is.null(label)) df$label <- as.character(data[[label]])
   pv_widget("scatter", c(list(
-    data = df, xlab = x, ylab = y, sizelab = size,
-    showLegend = !is.null(color)
+    data = df, xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
+    sizelab = size,
+    showLegend = !is.null(color), legend = legend
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

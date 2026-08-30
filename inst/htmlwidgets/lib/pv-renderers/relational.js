@@ -43,18 +43,26 @@
     /* The physics: links pull connected nodes together, "charge" pushes all
        nodes apart, "center" keeps the whole thing in the middle, and
        "collide" stops nodes overlapping. d3 runs this simulation and calls
-       our "tick" handler below on every step. */
+       our "tick" handler below on every step. Repulsion and spring length
+       scale mildly with graph size - small graphs spread out to fill the
+       frame, large graphs pull tighter so they still fit - and a weak pull
+       toward the middle stops disconnected components drifting into the
+       corners and out of view. */
+    var sizeK = Math.max(0.6, Math.min(1.6,
+      Math.pow(30 / Math.max(1, nodes.length), 0.25)));
     var sim = d3.forceSimulation(nodes)
       .force("link", d3.forceLink(links)
-        .id(function (d) { return d.id; }).distance(70))
-      .force("charge", d3.forceManyBody().strength(-220))
+        .id(function (d) { return d.id; }).distance(70 * sizeK))
+      .force("charge", d3.forceManyBody().strength(-220 * sizeK))
       .force("center", d3.forceCenter(w / 2, h / 2))
+      .force("x", d3.forceX(w / 2).strength(0.06))
+      .force("y", d3.forceY(h / 2).strength(0.06))
       .force("collide", d3.forceCollide().radius(function (d) {
         return nr(d) + 6; }));
 
     var link = g.selectAll("line").data(links).enter().append("line")
-      .attr("stroke", ctx.theme.ink.baseline)
-      .attr("stroke-opacity", 0.8)
+      .attr("stroke", ctx.theme.ink.muted)
+      .attr("stroke-opacity", 0.75)
       .attr("stroke-width", function (l) { return lw(l.value); });
 
     var node = g.selectAll("g.node").data(nodes).enter().append("g")
@@ -67,10 +75,17 @@
       })
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1.5);
 
+    /* Labels get a halo the colour of the chart surface (painted under
+       the letters via paint-order) so they stay readable when they cross
+       a link or another node. */
     node.append("text")
       .attr("dx", function (d) { return nr(d) + 4; })
       .attr("dominant-baseline", "middle")
       .attr("fill", ctx.theme.ink.secondary)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 3)
+      .style("paint-order", "stroke")
+      .style("stroke-linejoin", "round")
       .style("font-size", "11px")
       .style("pointer-events", "none")
       .text(function (d) { return d.label; });
@@ -107,9 +122,35 @@
       })
       .on("pointerleave", function () {
         node.attr("opacity", 1);
-        link.attr("stroke-opacity", 0.8);
+        link.attr("stroke-opacity", 0.75);
         pv.hideTip(ctx);
       });
+
+    /* Decide, for the current node positions, whether each label fits in
+       its usual spot beside the node or has to drop below it. Walk the
+       nodes keeping the boxes of labels already placed; when the beside
+       position would overlap one of them, move the label under its node
+       instead. Runs every tick, so labels dodge each other live as the
+       graph settles or is dragged around. */
+    function placeLabels() {
+      var placed = [];
+      node.each(function (d) {
+        var tw = pv.textWidth(d.label, 11);
+        var beside = { x0: d.x + nr(d) + 4, x1: d.x + nr(d) + 4 + tw,
+                       y0: d.y - 7, y1: d.y + 7 };
+        var collides = placed.some(function (b) {
+          return beside.x0 < b.x1 && beside.x1 > b.x0 &&
+                 beside.y0 < b.y1 && beside.y1 > b.y0;
+        });
+        placed.push(collides ?
+          { x0: d.x - tw / 2, x1: d.x + tw / 2,
+            y0: d.y + nr(d) + 6, y1: d.y + nr(d) + 20 } : beside);
+        d3.select(this).select("text")
+          .attr("dx", collides ? 0 : nr(d) + 4)
+          .attr("dy", collides ? nr(d) + 13 : 0)
+          .attr("text-anchor", collides ? "middle" : "start");
+      });
+    }
 
     sim.on("tick", function () {
       link
@@ -124,6 +165,7 @@
         d.y = Math.max(14, Math.min(h - 14, d.y));
         return "translate(" + d.x + "," + d.y + ")";
       });
+      placeLabels();
     });
   };
 
@@ -162,7 +204,10 @@
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1.5);
 
     /* Labels sit just outside each arc, rotated to face outward. Labels on
-       the left half get flipped 180 degrees so they read the right way up. */
+       the left half get flipped 180 degrees so they read the right way up.
+       Each label is truncated to the room actually left between the circle
+       and the chart edge along its own direction, so nothing runs off the
+       frame on narrow charts - the legend and tooltip carry full names. */
     groupG.append("text")
       .each(function (d) { d.angle = (d.startAngle + d.endAngle) / 2; })
       .attr("transform", function (d) {
@@ -176,7 +221,27 @@
       .attr("dominant-baseline", "middle")
       .attr("fill", ctx.theme.ink.secondary)
       .style("font-size", "11px")
-      .text(function (d) { return labels[d.index]; });
+      .text(function (d) { return labels[d.index]; })
+      .each(function (d) {
+        /* How far this label may run before hitting the chart edge,
+           along its own outward direction. */
+        var ux = Math.sin(d.angle), uy = -Math.cos(d.angle);
+        var px = (outer + 8) * ux, py = (outer + 8) * uy;
+        var tx = ux > 0 ? (w / 2 - px) / ux :
+                 ux < 0 ? (-w / 2 - px) / ux : Infinity;
+        var ty = uy > 0 ? (h / 2 - py) / uy :
+                 uy < 0 ? (-h / 2 - py) / uy : Infinity;
+        var room = Math.min(tx, ty);
+        /* Measure the real rendered width; only truncate labels that
+           genuinely overflow (a few clipped pixels beat an ellipsis),
+           proportionally to the overshoot. */
+        var len = this.getComputedTextLength();
+        if (len > room + 5) {
+          var name = labels[d.index];
+          var keep = Math.max(4, Math.floor(name.length * room / len) - 1);
+          d3.select(this).text(pv.truncate(name, keep));
+        }
+      });
 
     var ribbons = g.selectAll("path.ribbon").data(chords).enter()
       .append("path")
@@ -248,12 +313,15 @@
 
     /* Every segment inherits the colour of its top-level ancestor, faded a
        step further toward the background for each ring outward - so a whole
-       branch reads as one family. */
+       branch reads as one family. Light surfaces wash colours out faster
+       than dark ones, so fade a smaller step per ring in light mode. */
+    var fadeStep = ctx.theme.mode === "light" ? 0.15 : 0.22;
     function fillOf(d) {
       var anc = d;
       while (anc.depth > 1) anc = anc.parent;
       var base = color(anc.data.name);
-      return d3.interpolate(base, ctx.theme.ink.surface)(0.22 * (d.depth - 1));
+      return d3.interpolate(base, ctx.theme.ink.surface)(
+        fadeStep * (d.depth - 1));
     }
 
     var svg = pv.baseSvg(ctx);
@@ -273,8 +341,17 @@
     function visible(d) {
       return d.y1 <= root.height + 1 && d.y0 >= 1 && d.x1 > d.x0;
     }
-    function labelFits(d) {
-      return visible(d) && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.05;
+    /* A label appears only when it truly fits its segment: the arc at
+       the label's radius must be at least as long as the rendered text,
+       and the ring thick enough for a line of 11px type. `pos` is the
+       segment's geometry (its current or zoom-target coordinates) and
+       `d` the hierarchy node that knows the name. Dropped labels lose
+       nothing - the tooltip always carries the full trail. */
+    function labelFits(d, pos) {
+      if (!visible(pos)) return false;
+      var arcLen = (pos.x1 - pos.x0) * ((pos.y0 + pos.y1) / 2) * ringR;
+      var ring = (pos.y1 - pos.y0) * ringR;
+      return ring >= 13 && arcLen >= pv.textWidth(d.data.name, 11) + 6;
     }
     function labelTransform(d) {
       var a = (d.x0 + d.x1) / 2 * 180 / Math.PI;
@@ -303,7 +380,7 @@
       .selectAll("text").data(descendants).enter().append("text")
       .attr("dy", "0.35em")
       .attr("fill", ctx.theme.ink.primary)
-      .attr("fill-opacity", function (d) { return +labelFits(d.current); })
+      .attr("fill-opacity", function (d) { return +labelFits(d, d.current); })
       .attr("transform", function (d) { return labelTransform(d.current); })
       .style("font-size", "11px")
       .text(function (d) { return d.data.name; });
@@ -361,9 +438,9 @@
           return function () { return arc(d.current); };
         });
       label.filter(function (d) {
-        return +this.getAttribute("fill-opacity") || labelFits(d.target);
+        return +this.getAttribute("fill-opacity") || labelFits(d, d.target);
       }).transition(t)
-        .attr("fill-opacity", function (d) { return +labelFits(d.target); })
+        .attr("fill-opacity", function (d) { return +labelFits(d, d.target); })
         .attrTween("transform", function (d) {
           return function () { return labelTransform(d.current); };
         });

@@ -21,3 +21,7 @@ dependencies:
     script:
       - basic.js
       - relational.js
+      - distribution.js
+      - composition.js
+      - evolution.js
+      - flow.js

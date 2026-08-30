@@ -19,9 +19,25 @@ window.pv = (function () {
   };
 
   /* Compact tick labels: 6M instead of 6,000,000; plain numbers below 10k.
-     No thousands separator under 10k - otherwise years render as "2,020". */
+     No thousands separator under 10k - otherwise years render as "2,020".
+     Three significant digits ("23.3M", not "23.2787M") - charts round,
+     tooltips carry the precision. */
   pv.fmtTick = function (v) {
-    return Math.abs(v) >= 10000 ? d3.format("~s")(v) : String(v);
+    return Math.abs(v) >= 10000 ? d3.format(".3~s")(v) : String(v);
+  };
+
+  /* Shorten a label to fit, with an ellipsis. Charts that truncate must
+     keep the full text available in their tooltip. */
+  pv.truncate = function (s, maxChars) {
+    s = String(s);
+    return s.length <= maxChars ? s : s.slice(0, Math.max(1, maxChars - 1)) + "…";
+  };
+
+  /* How many pixels a label roughly needs at the given font size - for
+     fit decisions before anything is drawn. Slightly generous on purpose:
+     a label that just fits usually reads as cramped. */
+  pv.textWidth = function (s, fontSize) {
+    return String(s).length * (fontSize || 11) * 0.62;
   };
 
   pv.uniq = function (arr) {

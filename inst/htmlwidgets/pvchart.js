@@ -19,16 +19,34 @@ HTMLWidgets.widget({
 
   factory: function (el, width, height) {
     var lastX = null;
+    var lastW = 0, lastH = 0;
     var mq = window.matchMedia ?
       window.matchMedia("(prefers-color-scheme: dark)") : null;
 
     function draw(w, h) {
       if (!lastX) return;
-      pvRender(el, lastX, w || el.offsetWidth || width,
-               h || el.offsetHeight || height, mq);
+      lastW = w || el.offsetWidth || width;
+      lastH = h || el.offsetHeight || height;
+      pvRender(el, lastX, lastW, lastH, mq);
     }
     if (mq && mq.addEventListener) {
       mq.addEventListener("change", function () { draw(); });
+    }
+
+    /* Containers change size without a window resize event - viewer
+       panes get dragged, screenshot tools emulate viewports, layouts
+       reflow. Watch the element itself and re-render (debounced) any
+       time its box actually changes, so a chart never stays laid out
+       for a width it no longer has. */
+    if (window.ResizeObserver) {
+      var pending = null;
+      new ResizeObserver(function () {
+        var w = el.offsetWidth, h = el.offsetHeight;
+        if (!lastX || !w || !h) return;
+        if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+        clearTimeout(pending);
+        pending = setTimeout(function () { draw(w, h); }, 120);
+      }).observe(el);
     }
 
     return {

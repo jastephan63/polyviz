@@ -96,6 +96,7 @@ pv_commuters <- data.frame(
 x <- utils::read.csv(raw("fa-lu-ra.csv"), sep = ";")
 pv_fiscal <- data.frame(
   year = as.integer(x$fa_jahr),
+  municipality_id = as.integer(x$gnr),
   municipality = x$gname,
   resource_per_capita = round(as.numeric(x$rp_pEinw), 2),
   resource_index = round(as.numeric(x$ri), 1),
@@ -108,6 +109,7 @@ rownames(pv_fiscal) <- NULL
 x <- utils::read.csv(raw("grwahlen-lu.csv"), sep = ";")
 pv_elections <- data.frame(
   year = as.integer(x$jahr),
+  municipality_id = as.integer(x$gnr),
   municipality = x$gemeinde,
   party = x$partei_kurz,
   sex = ifelse(x$sex == "m", "male", "female"),

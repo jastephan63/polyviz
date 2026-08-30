@@ -90,8 +90,9 @@
 #' received. Distributions across ~80 municipalities — good for boxplots,
 #' histograms, and lollipop rankings.
 #'
-#' @format A data frame: `year`, `municipality`, `resource_per_capita`
-#'   (CHF), `resource_index`, `equalization_chf`.
+#' @format A data frame: `year`, `municipality_id` (official BFS
+#'   municipality number — joins [pv_lucerne_map]), `municipality`,
+#'   `resource_per_capita` (CHF), `resource_index`, `equalization_chf`.
 #' @source LUSTAT Statistik Luzern, "Finanzausgleich Kanton Luzern", via
 #'   opendata.swiss. Open use with source citation
 #'   ("Quelle: LUSTAT Statistik Luzern"); commercial use requires the data
@@ -104,10 +105,38 @@
 #' party, sex, incumbent or new, and whether the candidate was elected.
 #' Categorical hierarchies — good for sunbursts, donuts, and grouped bars.
 #'
-#' @format A data frame: `year`, `municipality`, `party`, `sex`, `status`,
-#'   `elected`.
+#' @format A data frame: `year`, `municipality_id` (BFS municipality
+#'   number), `municipality`, `party`, `sex`, `status`, `elected`.
 #' @source LUSTAT Statistik Luzern, "Gemeinderatswahlen Kanton Luzern seit
 #'   2020", via opendata.swiss. Open use with source citation
 #'   ("Quelle: LUSTAT Statistik Luzern"); commercial use requires the data
 #'   owner's permission.
 "pv_elections"
+
+#' Municipal boundaries of Canton Lucerne
+#'
+#' Boundary polygons of the 79 Lucerne municipalities (status 1 January
+#' 2025) as a GeoJSON FeatureCollection stored as a plain R list, ready
+#' for [pv_choropleth()]. Each feature carries `id` (the official BFS
+#' municipality number, which joins [pv_fiscal] and [pv_elections]) and
+#' `name`.
+#'
+#' @format A list mirroring GeoJSON: `type`, and `features` — one per
+#'   boundary polygon, with `properties` (`id`, `name`) and `geometry`
+#'   in WGS84 longitude/latitude.
+#' @source Bundesamt für Statistik, "Generalisierte Gemeindegrenzen"
+#'   (GG25, generalisation level G1, reprojected to WGS84). Open use,
+#'   source citation required ("© BFS, ThemaKart").
+"pv_lucerne_map"
+
+#' Daily weather in Lucerne
+#'
+#' Daily measurements from the MeteoSwiss station LUZ (Luzern, 454 m),
+#' 2020 through 2025 — temperature, precipitation, and sunshine. Good for
+#' calendar heatmaps and seasonal charts.
+#'
+#' @format A data frame: `date`, `temp_mean`, `temp_max`, `temp_min`
+#'   (°C), `precip_mm`, `sunshine_min` (minutes).
+#' @source MeteoSwiss open government data, SwissMetNet station LUZ.
+#'   Open use, source citation required ("Source: MeteoSwiss").
+"pv_weather"

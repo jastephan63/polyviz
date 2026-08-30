@@ -1,0 +1,53 @@
+# Continuous integration: run R CMD check on every push and pull request
+# to main. One job only - current R release on Ubuntu - which keeps the
+# feedback loop fast; the package is pure R plus bundled JavaScript, so
+# platform-specific breakage is unlikely.
+#
+# Built on the r-lib/actions building blocks, the standard way to check
+# R packages on GitHub Actions.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+name: R-CMD-check
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ubuntu-latest
+
+    name: ubuntu-latest (R release)
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      # The bundled Swiss datasets carry UTF-8 place names; check in a
+      # UTF-8 locale so they compare and print the way they do locally.
+      LANG: en_US.UTF-8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pandoc is needed to build the vignettes during the check.
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      # Fail the build on any WARNING but tolerate NOTEs: the check has
+      # exactly one benign NOTE (marked UTF-8 strings in the bundled
+      # Swiss datasets - intentional, see cran-comments.md).
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          error-on: '"warning"'
+          upload-snapshots: true

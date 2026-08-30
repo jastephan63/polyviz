@@ -9,6 +9,8 @@ pv_histogram(
   x,
   bins = NULL,
   density = FALSE,
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -28,6 +30,10 @@ pv_histogram(
 default.}
 
 \item{density}{Overlay a kernel density curve?}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (the default) uses the \code{x} column
+name for x and \code{"count"} for y; \code{NA} or \code{""} suppresses the title;
+any other string replaces it.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

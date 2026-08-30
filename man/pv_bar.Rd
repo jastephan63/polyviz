@@ -10,7 +10,10 @@ pv_bar(
   y,
   series = NULL,
   sort = FALSE,
-  horizontal = FALSE,
+  horizontal = "auto",
+  value_labels = "auto",
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -32,9 +35,22 @@ pv_bar(
 
 \item{sort}{Sort bars by value, largest first? (Single-series only.)}
 
-\item{horizontal}{Draw bars horizontally? The readable choice for long
-category names — labels stay upright and values sit at the bar ends.
-Single-series only.}
+\item{horizontal}{Draw bars horizontally — the readable choice for long
+category names, with labels upright and the exact value at each bar's
+end. \code{TRUE} forces it (single-series only), \code{FALSE} forces vertical
+bars; \code{"auto"} (default) flips to horizontal when the chart is
+single-series and the category labels are too long to sit side by
+side under vertical bars.}
+
+\item{value_labels}{Print each bar's value on the chart. \code{TRUE} always,
+\code{FALSE} never; \code{"auto"} (default) shows values on vertical bars only
+when the chart is single-series with at most 12 bars wide enough to
+carry a number, and always on horizontal bars, which have the room
+at the bar ends.}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
+\code{NA} or \code{""} suppresses the title entirely; any other string
+replaces it.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

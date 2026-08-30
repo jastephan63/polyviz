@@ -8,7 +8,9 @@ pv_boxplot(
   data,
   value,
   group = NULL,
-  points = FALSE,
+  points = "auto",
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -28,9 +30,16 @@ pv_boxplot(
 max 8). Omit it for a single box.}
 
 \item{points}{Also show the raw values as jittered points behind each
-box? Groups with more than 400 values are thinned to a sample of 400,
+box? \code{TRUE} always draws them, \code{FALSE} never does, and \code{"auto"} (the
+default) draws them only when the groups hold at most 600 values in
+total — few enough that the cloud still reads as individual dots.
+Groups with more than 400 values are thinned to a sample of 400,
 drawn with a fixed seed so the same data always shows the same
 points. The box statistics always use every value.}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (the default) uses the \code{group}
+column name for x and the \code{value} column name for y; \code{NA} or \code{""}
+suppresses the title; any other string replaces it.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

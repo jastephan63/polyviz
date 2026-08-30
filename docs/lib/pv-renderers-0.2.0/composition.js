@@ -4,6 +4,13 @@
  */
 (function () {
 
+  /* Resolve a tri-state option sent from R: TRUE/FALSE force the look,
+     "auto" (or a missing field from an older payload) takes the
+     decision computed here from the real data and pixel sizes. */
+  function opt(v, autoDecision) {
+    return v === "auto" || v == null ? autoDecision : !!v;
+  }
+
   /* ---------- donut ---------- */
 
   pvRenderers.donut = function (ctx) {
@@ -13,10 +20,18 @@
       .domain(data.map(function (d) { return d.category; }))
       .range(ctx.theme.palette);
 
-    /* Slices big enough to carry their own label do; slivers under 5%
-       go to a legend instead so no label ever fights for space. */
-    var small = data.filter(function (d) { return d.value / total < 0.05; });
-    var labelled = data.filter(function (d) { return d.value / total >= 0.05; });
+    /* Slices big enough to carry their own label do; the rest go to a
+       legend instead so no label ever fights for space. The `labels`
+       flag steers the split: "auto" labels slices of 5%+ but falls back
+       to legend-only under ~480px, where outside labels collide; TRUE
+       labels everything down to 2%; FALSE sends it all to the legend. */
+    var showLabels = opt(ctx.x.labels, ctx.width >= 480);
+    var minShare = ctx.x.labels === true ? 0.02 : 0.05;
+    function carriesLabel(d) {
+      return showLabels && d.value / total >= minShare;
+    }
+    var small = data.filter(function (d) { return !carriesLabel(d); });
+    var labelled = data.filter(carriesLabel);
     if (small.length) {
       pv.buildLegend(ctx.header,
         small.map(function (d) { return d.category; }), color, ctx.theme);
@@ -24,10 +39,18 @@
     }
 
     var w = ctx.width, h = ctx.height;
-    /* Leave room outside the ring for the direct labels. */
-    var longest = d3.max(labelled, function (d) {
-      return d.category.length; }) || 0;
-    var pad = labelled.length ? Math.min(150, 26 + longest * 6.2) : 16;
+    /* Leave room outside the ring for the direct labels - but never
+       more than 45% of the width in total (22.5% per side), so labels
+       can't squeeze the ring itself. Names longer than the room allows
+       are truncated; the tooltip keeps the full text. */
+    var longestPx = d3.max(labelled, function (d) {
+      return pv.textWidth(d.category, 11); }) || 0;
+    var pad = labelled.length ?
+      Math.min(150, Math.ceil(26 + longestPx), Math.floor(w * 0.225)) : 16;
+    /* The nudge keeps float rounding from eating the last character of
+       a name that exactly fits. */
+    var maxChars = Math.max(3,
+      Math.floor((pad - 26) / pv.textWidth("x", 11) + 0.01));
     var radius = Math.max(50, Math.min(w / 2 - pad, h / 2 - 28));
     var innerR = radius * ctx.x.innerRadius;
 
@@ -71,7 +94,7 @@
        we sort the labels by height and push any overlapping pair apart
        - the same trick the line chart uses for its end labels. */
     var labData = arcs.filter(function (d) {
-      return d.data.value / total >= 0.05;
+      return carriesLabel(d.data);
     }).map(function (d) {
       var p = labelArc.centroid(d);
       return { d: d, x: p[0], y: p[1],
@@ -97,7 +120,7 @@
       .style("opacity", 0);
     lab.append("tspan")
       .attr("fill", ctx.theme.ink.secondary)
-      .text(function (l) { return l.d.data.category; });
+      .text(function (l) { return pv.truncate(l.d.data.category, maxChars); });
     lab.append("tspan")
       .attr("x", 0).attr("dy", 13)
       .attr("fill", ctx.theme.ink.muted)
@@ -221,14 +244,21 @@
 
     /* Labels only where they honestly fit, 6px in from the corner: the
        name, and the value under it when there's room for a second line.
-       Everything else stays quiet and lives in the tooltip. */
+       Everything else stays quiet and lives in the tooltip. The
+       `labels` flag steers how eager this is: "auto" keeps the honest
+       fit, TRUE squeezes labels into cells with 20% less room (they
+       must still fit at all - slivers stay blank), FALSE writes no
+       cell text whatsoever. */
+    var showLabels = opt(ctx.x.labels, true);
+    var relax = ctx.x.labels === true ? 0.8 : 1;
     function fitsName(d) {
-      return (d.x1 - d.x0) - 12 >= d.data.name.length * 6.3 &&
-        (d.y1 - d.y0) - 12 >= 11;
+      return showLabels &&
+        (d.x1 - d.x0) - 12 >= d.data.name.length * 6.3 * relax &&
+        (d.y1 - d.y0) - 12 >= 11 * relax;
     }
     function fitsValue(d) {
-      return fitsName(d) && (d.y1 - d.y0) - 12 >= 26 &&
-        (d.x1 - d.x0) - 12 >= ctx.fmt(d.value).length * 6;
+      return fitsName(d) && (d.y1 - d.y0) - 12 >= 26 * relax &&
+        (d.x1 - d.x0) - 12 >= ctx.fmt(d.value).length * 6 * relax;
     }
     /* Label ink is chosen per cell: light text on dark fills, dark text
        on light fills, judged by the fill's actual luminance - a fixed
@@ -293,9 +323,23 @@
 
   pvRenderers.lollipop = function (ctx) {
     var data = ctx.x.data;
-    var longest = d3.max(data, function (d) { return d.x.length; }) || 4;
-    var m = { top: 8, right: 56, bottom: 34,
-              left: Math.min(190, 22 + longest * 6.6) };
+    /* The category margin grows with the longest name but may never eat
+       more than 45% of the width - a margin that swallows the plot
+       ranks nothing. Names beyond the room the margin gives are
+       truncated; the tooltip keeps the full text. */
+    var perChar = pv.textWidth("x", 11);
+    var longestPx = d3.max(data, function (d) {
+      return pv.textWidth(d.x, 11); }) || perChar * 4;
+    var left = Math.min(190, Math.ceil(22 + longestPx),
+                        Math.floor(ctx.width * 0.45));
+    /* The nudge keeps float rounding from eating the last character of
+       a name that exactly fits. */
+    var maxChars = Math.max(4, Math.floor((left - 22) / perChar + 0.01));
+    /* End-value labels need right-hand room. "auto" shows them only
+       while the plot stays at least 200px wide; once they're dropped
+       the right margin shrinks too, giving the plot the space back. */
+    var showValues = opt(ctx.x.valueLabels, ctx.width - left - 56 >= 200);
+    var m = { top: 8, right: showValues ? 56 : 18, bottom: 34, left: left };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -313,7 +357,8 @@
       .call(d3.axisBottom(x).ticks(Math.min(6, Math.floor(iw / 80)))
         .tickFormat(pv.fmtTick).tickSizeOuter(0));
     pv.styleAxis(xAxis, ctx.theme, true);
-    var yAxis = g.append("g").call(d3.axisLeft(yBand).tickSize(0));
+    var yAxis = g.append("g").call(d3.axisLeft(yBand).tickSize(0)
+      .tickFormat(function (d) { return pv.truncate(d, maxChars); }));
     pv.styleAxis(yAxis, ctx.theme, false);
 
     var row = g.selectAll("g.row").data(data).enter().append("g")
@@ -344,18 +389,21 @@
       .attr("r", 5.5);
 
     /* Compact value at each head - a labelled ranking needs no
-       gridlines; the tooltip carries full precision. */
-    row.append("text")
-      .attr("x", function (d) { return x(d.y) + 10; })
-      .attr("y", function (d) { return yBand(d.x); })
-      .attr("dominant-baseline", "middle")
-      .attr("fill", ctx.theme.ink.secondary)
-      .style("font-size", "11px")
-      .style("font-variant-numeric", "tabular-nums")
-      .style("opacity", 0)
-      .text(function (d) { return pv.fmtTick(d.y); })
-      .transition().delay(ctx.duration).duration(200)
-      .style("opacity", 1);
+       gridlines; the tooltip carries full precision. Skipped entirely
+       when the flag resolved to off (no room, or FALSE from R). */
+    if (showValues) {
+      row.append("text")
+        .attr("x", function (d) { return x(d.y) + 10; })
+        .attr("y", function (d) { return yBand(d.x); })
+        .attr("dominant-baseline", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", "11px")
+        .style("font-variant-numeric", "tabular-nums")
+        .style("opacity", 0)
+        .text(function (d) { return pv.fmtTick(d.y); })
+        .transition().delay(ctx.duration).duration(200)
+        .style("opacity", 1);
+    }
 
     /* An invisible strip per row makes the whole line hoverable, not
        just the small head. */

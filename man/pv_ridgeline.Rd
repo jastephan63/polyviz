@@ -8,6 +8,8 @@ pv_ridgeline(
   data,
   value,
   group,
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -25,6 +27,13 @@ pv_ridgeline(
 
 \item{group}{Name of the grouping column (one ridge per level, max 8;
 every level needs at least 2 non-missing values).}
+
+\item{xlab}{X-axis title. \code{NULL} (the default) uses the \code{value} column
+name; \code{NA} or \code{""} suppresses it; any other string replaces it.}
+
+\item{ylab}{Optional rotated title beside the group labels. Ridges are
+labelled directly, so \code{NULL} (the default) draws none, same as \code{NA}
+or \code{""}; a string adds one.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

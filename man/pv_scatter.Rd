@@ -11,6 +11,9 @@ pv_scatter(
   color = NULL,
   size = NULL,
   label = NULL,
+  legend = "auto",
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -32,6 +35,14 @@ values keeps every pair distinguishable; more will error).}
 \item{size}{Optional name of a numeric column mapped to point area.}
 
 \item{label}{Optional name of a column shown in tooltips.}
+
+\item{legend}{Show the colour legend row above the chart? \code{TRUE} always
+shows it (when a \code{color} mapping exists), \code{FALSE} hides it; \code{"auto"}
+(default) shows it exactly when a \code{color} mapping exists.}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
+\code{NA} or \code{""} suppresses the title entirely; any other string
+replaces it.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

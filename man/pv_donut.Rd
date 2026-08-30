@@ -9,6 +9,7 @@ pv_donut(
   category,
   value,
   inner_radius = 0.62,
+  labels = "auto",
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -32,6 +33,13 @@ must be non-negative.}
 
 \item{inner_radius}{Size of the centre hole as a fraction of the outer
 radius, from 0 to 0.85. \code{0} draws a classic pie.}
+
+\item{labels}{Show the outside name-and-share labels? \code{TRUE} labels
+every slice worth 2\% or more of the total, \code{FALSE} sends every
+slice to the legend instead, and \code{"auto"} (the default) labels
+slices of 5\% or more — unless the rendered chart is narrower than
+about 480px, where outside labels would collide, in which case it
+falls back to legend-only.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

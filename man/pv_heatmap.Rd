@@ -10,6 +10,10 @@ pv_heatmap(
   y,
   value,
   palette = c("sequential", "diverging"),
+  cell_values = "auto",
+  truncate_labels = 24,
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -31,6 +35,23 @@ pv_heatmap(
 
 \item{palette}{\code{"sequential"} (default, for magnitudes) or
 \code{"diverging"} (for values spanning zero, centred there).}
+
+\item{cell_values}{\code{TRUE}, \code{FALSE}, or \code{"auto"} (default). Whether the
+cells print their value. \code{"auto"} prints only when both cell
+dimensions exceed 40px; \code{TRUE} always prints, shrinking the font to
+9px when the smaller dimension is 24–40px (below 24px nothing fits at
+any honest size, so nothing prints); \code{FALSE} never prints. The exact
+value is always in the cell tooltip.}
+
+\item{truncate_labels}{Maximum length of an axis tick label, in
+characters, before it is shortened with an ellipsis (default 24).
+Narrow charts may shorten row labels further so the label margin
+never eats more than 40\% of the width; the tooltip always carries the
+full x and y names.}
+
+\item{xlab, ylab}{Optional axis titles. The heatmap draws none by
+default (\code{NULL}) — its axes are self-evident category lists — but a
+string here adds one; \code{NA} or \code{""} is the same as \code{NULL}.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

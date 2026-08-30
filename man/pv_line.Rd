@@ -9,6 +9,9 @@ pv_line(
   x,
   y,
   series = NULL,
+  legend = "auto",
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -27,6 +30,15 @@ pv_line(
 \item{y}{Name of the numeric value column.}
 
 \item{series}{Optional name of a series column (one line per level).}
+
+\item{legend}{Show the colour legend row above the chart? \code{TRUE} always
+shows it, \code{FALSE} hides it (the direct labels at the line ends
+remain); \code{"auto"} (default) shows it exactly when a \code{series} mapping
+with more than one level exists.}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
+\code{NA} or \code{""} suppresses the title entirely; any other string
+replaces it.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

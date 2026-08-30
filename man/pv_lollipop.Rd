@@ -9,6 +9,7 @@ pv_lollipop(
   x,
   y,
   sort = TRUE,
+  value_labels = "auto",
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -27,6 +28,12 @@ pv_lollipop(
 \item{y}{Name of the numeric value column.}
 
 \item{sort}{Sort categories by value, largest first?}
+
+\item{value_labels}{Print the compact value at each head? \code{TRUE}
+always, \code{FALSE} never, and \code{"auto"} (the default) shows them only
+while the plot area stays at least 200px wide — on narrower charts
+they cannot fit, so they are dropped and the tooltip alone carries
+the exact figures.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

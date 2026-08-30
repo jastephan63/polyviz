@@ -8,6 +8,7 @@ pv_treemap(
   data,
   levels,
   value,
+  labels = "auto",
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -26,6 +27,12 @@ first, defining the hierarchy. The first level takes the palette
 colours, so it allows at most 8 distinct groups.}
 
 \item{value}{Name of the numeric column summed within each cell.}
+
+\item{labels}{Write names inside the cells? \code{"auto"} (the default)
+labels exactly the cells the text honestly fits into; \code{TRUE}
+squeezes labels into cells with about 20\% less room than that (the
+text must still fit at all — tiny slivers stay blank); \code{FALSE}
+draws no cell text, leaving the names to the tooltip alone.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

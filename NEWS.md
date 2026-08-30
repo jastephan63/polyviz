@@ -1,3 +1,34 @@
+# polyviz 0.2.1
+
+Charts now correct themselves to fit their data and their container, and
+every automatic behaviour has an explicit override.
+
+## Adaptive rendering
+
+* Every chart re-renders whenever its container changes size (a
+  `ResizeObserver`, not just window resizes), so a chart is never laid
+  out for a width it no longer has.
+* Label-derived margins are capped at 45% of the chart width everywhere;
+  labels truncate with an ellipsis and the tooltip keeps the full text.
+* Scatter and parallel-coordinate opacity scales with row count; force
+  network physics scale with node count, links are clearly visible, and
+  node labels wear a halo and dodge collisions.
+* Sunburst labels only render where the arc genuinely fits them; light
+  mode reads richer.
+* Compact numbers round to three significant digits ("23.3M");
+  tooltips keep full precision. Years no longer render as "2,020".
+
+## New options (TRUE / FALSE / "auto")
+
+* `pv_bar(horizontal, value_labels)` — auto flips long-labelled
+  single-series charts horizontal and prints values when there is room.
+* `pv_line(legend)`, `pv_scatter(legend)`, `pv_area(legend)`.
+* `pv_boxplot(points)` — auto shows raw points up to 600 values.
+* `pv_donut(labels)`, `pv_treemap(labels)`, `pv_lollipop(value_labels)`.
+* `pv_heatmap(cell_values, truncate_labels)`.
+* `xlab` / `ylab` overrides on all cartesian charts (`NULL` keeps the
+  column name, `NA` or `""` suppresses the title).
+
 # polyviz 0.2.0
 
 Ten new d3 chart types, a research-backed design system, and real Swiss

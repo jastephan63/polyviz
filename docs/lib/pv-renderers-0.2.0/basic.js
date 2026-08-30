@@ -12,13 +12,41 @@
  */
 (function () {
 
+  /* Resolves a TRUE/FALSE/"auto" option sent from R. Explicit values win;
+     "auto" (or an old payload with no value at all) takes the decision the
+     renderer computed from the real data and pixel sizes - which is the
+     point of "auto": only this side knows the actual container. */
+  function opt(v, autoDecision) {
+    return v === "auto" || v == null ? autoDecision : !!v;
+  }
+
+  /* Bar value labels want to be short: three significant digits, with an
+     SI suffix for big numbers (4681280 reads "4.68M", not "4.68128M").
+     The tooltip still shows the exact value. */
+  function fmtVal(v) {
+    return Math.abs(v) >= 10000 ?
+      d3.format(".3~s")(v) : d3.format(".3~r")(v);
+  }
+
   /* ---------- bar ---------- */
 
   pvRenderers.bar = function (ctx) {
-    if (ctx.x.horizontal) { return renderBarH(ctx); }
     var data = ctx.x.data;
     var grouped = data.length && data[0].series !== undefined;
     var cats = pv.uniq(data.map(function (d) { return d.x; }));
+
+    /* "auto" flips to horizontal bars when this is a single series whose
+       category labels cannot sit side by side under vertical bars: their
+       total width would overflow the plot, or one label alone is far
+       wider than its band. 72px is the vertical layout's side margins. */
+    var estW = Math.max(50, ctx.width - 72);
+    var step = estW / Math.max(1, cats.length);
+    var widest = d3.max(cats, function (c) {
+      return pv.textWidth(c, 11); }) || 0;
+    var total = d3.sum(cats, function (c) { return pv.textWidth(c, 11); });
+    var horizontal = opt(ctx.x.horizontal,
+      !grouped && (total > 0.85 * estW || widest > 1.6 * step));
+    if (horizontal && !grouped) { return renderBarH(ctx); }
     var seriesNames = grouped ?
       pv.uniq(data.map(function (d) { return d.series; })) : [];
     var color = d3.scaleOrdinal()
@@ -77,6 +105,31 @@
         };
       });
 
+    /* Value labels above the bars. "auto" shows them only when a single
+       series has few enough bars, each wide enough, for the numbers to
+       read cleanly; TRUE forces them on regardless. They fade in after
+       the bars have finished growing. */
+    var showVals = opt(ctx.x.valueLabels,
+      !grouped && data.length <= 12 && x0.bandwidth() >= 34);
+    if (showVals) {
+      g.selectAll("text.val").data(data).enter().append("text")
+        .attr("class", "val")
+        .attr("x", function (d) {
+          var bx = grouped ? x0(d.x) + x1(d.series) : x0(d.x);
+          var bw = grouped ? x1.bandwidth() : x0.bandwidth();
+          return bx + bw / 2;
+        })
+        .attr("y", function (d) { return y(d.y) - 5; })
+        .attr("text-anchor", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", "11px")
+        .style("font-variant-numeric", "tabular-nums")
+        .style("opacity", 0)
+        .text(function (d) { return fmtVal(d.y); })
+        .transition().delay(ctx.duration).duration(200)
+        .style("opacity", 1);
+    }
+
     /* Hovering a bar dims the others and shows its exact value. */
     bars
       .on("pointerenter pointermove", function (event, d) {
@@ -98,9 +151,17 @@
      zero baseline. Single-series only (the R side enforces it). */
   function renderBarH(ctx) {
     var data = ctx.x.data;
-    var longest = d3.max(data, function (d) { return d.x.length; }) || 4;
-    var m = { top: 8, right: 46,
-              bottom: 34, left: Math.min(190, 22 + longest * 6.6) };
+    /* The label margin grows with the longest category name, but it must
+       never eat the plot: cap it at 45% of the chart width - and tighter
+       still where needed so the bars keep at least half the container -
+       then truncate the labels to what actually fits. The tooltip always
+       carries the full name, so a shortened label loses nothing. */
+    var longest = d3.max(data, function (d) {
+      return pv.textWidth(d.x, 11); }) || 30;
+    var m = { top: 8, right: 46, bottom: 34,
+              left: Math.max(70, Math.min(190, 0.45 * ctx.width,
+                0.5 * ctx.width - 46, 22 + longest)) };
+    var maxChars = Math.max(4, Math.floor((m.left - 12) / 6.9));
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -118,7 +179,8 @@
       .call(d3.axisBottom(x).ticks(Math.min(6, Math.floor(iw / 80)))
         .tickFormat(pv.fmtTick).tickSizeOuter(0));
     pv.styleAxis(xAxis, ctx.theme, true);
-    var yAxis = g.append("g").call(d3.axisLeft(yBand).tickSize(0));
+    var yAxis = g.append("g").call(d3.axisLeft(yBand).tickSize(0)
+      .tickFormat(function (d) { return pv.truncate(d, maxChars); }));
     pv.styleAxis(yAxis, ctx.theme, false);
 
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
@@ -140,19 +202,22 @@
       });
 
     /* Value labels at the bar ends - horizontal bars have the room, and a
-       labelled bar needs no gridlines at all. */
-    g.selectAll("text.val").data(data).enter().append("text")
-      .attr("class", "val")
-      .attr("x", function (d) { return x(d.y) + 6; })
-      .attr("y", function (d) { return yBand(d.x) + yBand.bandwidth() / 2; })
-      .attr("dominant-baseline", "middle")
-      .attr("fill", ctx.theme.ink.secondary)
-      .style("font-size", "11px")
-      .style("font-variant-numeric", "tabular-nums")
-      .style("opacity", 0)
-      .text(function (d) { return pv.fmtTick(d.y); })
-      .transition().delay(ctx.duration).duration(200)
-      .style("opacity", 1);
+       labelled bar needs no gridlines at all. On by default; only an
+       explicit value_labels = FALSE from R switches them off. */
+    if (opt(ctx.x.valueLabels, true)) {
+      g.selectAll("text.val").data(data).enter().append("text")
+        .attr("class", "val")
+        .attr("x", function (d) { return x(d.y) + 6; })
+        .attr("y", function (d) { return yBand(d.x) + yBand.bandwidth() / 2; })
+        .attr("dominant-baseline", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", "11px")
+        .style("font-variant-numeric", "tabular-nums")
+        .style("opacity", 0)
+        .text(function (d) { return fmtVal(d.y); })
+        .transition().delay(ctx.duration).duration(200)
+        .style("opacity", 1);
+    }
 
     bars
       .on("pointerenter pointermove", function (event, d) {
@@ -181,7 +246,11 @@
     var seriesNames = pv.uniq(data.map(function (d) { return d.series; }));
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
-    if (ctx.x.showLegend && seriesNames.length > 1) {
+    /* "auto" keeps the old rule - a legend only when a real series
+       mapping produced more than one line; TRUE and FALSE override it. */
+    var showLegend = opt(ctx.x.legend,
+      ctx.x.showLegend && seriesNames.length > 1);
+    if (showLegend && seriesNames.length) {
       pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
       ctx.height = Math.max(120, ctx.height - 26);
     }
@@ -225,6 +294,8 @@
       }));
     } else {
       xAxis.ticks(Math.min(8, Math.floor(iw / 80)));
+      /* Numeric axes must not comma-group - years would render "1,940". */
+      if (xtype === "number") { xAxis.tickFormat(pv.fmtTick); }
     }
     g.append("g").attr("transform", "translate(0," + ih + ")")
       .call(xAxis).call(function (s) { pv.styleAxis(s, ctx.theme, true); });
@@ -348,10 +419,19 @@
       pv.uniq(data.map(function (d) { return d.series; })) : [];
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
-    if (hasSeries) {
+    /* "auto" keeps the old rule - a legend exactly when a colour mapping
+       exists; TRUE and FALSE override it. */
+    var showLegend = opt(ctx.x.legend, hasSeries);
+    if (showLegend && seriesNames.length) {
       pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
       ctx.height = Math.max(120, ctx.height - 26);
     }
+
+    /* Dense clouds need lighter ink: up to 150 points keep the usual
+       opacity, beyond that fade smoothly toward a floor of 0.3 so
+       overplotted regions still show their structure. */
+    var baseOpacity = data.length <= 150 ? 0.62 :
+      Math.max(0.3, 0.62 * Math.sqrt(150 / data.length));
 
     var m = { top: 12, right: 24, bottom: 52, left: 58 };
     var iw = ctx.width - m.left - m.right,
@@ -389,7 +469,7 @@
       .attr("fill", function (d) {
         return hasSeries ? color(d.series) : ctx.theme.palette[0];
       })
-      .attr("fill-opacity", 0.62)
+      .attr("fill-opacity", baseOpacity)
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1);
 
     pts.transition().duration(ctx.duration)
@@ -398,7 +478,10 @@
 
     pts
       .on("pointerenter pointermove", function (event, d) {
+        /* Lift the hovered point to full opacity so it reads clearly
+           even inside a dense, faded cloud. */
         d3.select(this)
+          .attr("fill-opacity", 1)
           .attr("stroke-width", 2)
           .attr("r", (hasSize ? r(d.size) : r()) * 1.35);
         var rows = [];
@@ -416,6 +499,7 @@
       })
       .on("pointerleave", function (event, d) {
         d3.select(this)
+          .attr("fill-opacity", baseOpacity)
           .attr("stroke-width", 1)
           .attr("r", hasSize ? r(d.size) : r());
         pv.hideTip(ctx);

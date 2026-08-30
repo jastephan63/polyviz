@@ -10,6 +10,9 @@ pv_area(
   y,
   series = NULL,
   offset = c("stacked", "percent", "stream"),
+  legend = "auto",
+  xlab = NULL,
+  ylab = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -32,6 +35,17 @@ At most 8 levels — beyond that, fold the small ones into an
 \code{"Other"} level. Omit it for a single-series area.}
 
 \item{offset}{\code{"stacked"} (default), \code{"percent"}, or \code{"stream"}.}
+
+\item{legend}{\code{TRUE}, \code{FALSE}, or \code{"auto"} (default). \code{TRUE} always
+draws the legend row (even for a single series), \code{FALSE} never draws
+it, and \code{"auto"} draws it exactly when the chart has more than one
+series.}
+
+\item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
+\code{NA} or \code{""} suppresses a title; any other string replaces it. The
+default y title only appears on \code{offset = "stacked"} (a percent axis
+explains itself), but an explicit \code{ylab} shows there too. Streams
+have no y axis, so they never draw a y title.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

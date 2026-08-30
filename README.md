@@ -36,7 +36,7 @@ All charts are interactive htmlwidgets: they animate in, respond to hover with t
 
 ### Bar chart
 
-The bar chart is the workhorse of comparison - one bar per category, length encoding the value. polyviz draws bars with rounded value-ends growing from a zero baseline, and the horizontal orientation keeps long category names upright and readable, with the exact value at each bar's end. Here it ranks how the city of Lucerne uses its land: agriculture and buildings each cover more ground than forest, and unproductive land is nearly absent.
+The bar chart is the workhorse of comparison - one bar per category, length encoding the value. polyviz draws bars with rounded value-ends growing from a zero baseline. Orientation defaults to "auto": a single-series chart flips itself horizontal when its category labels are too long to sit under vertical bars, and vertical bars print their values on top when there is room for the numbers. Here the horizontal orientation is pinned explicitly - the readable choice for ranked categories, labels upright and the exact value at each bar's end - ranking how the city of Lucerne uses its land: agriculture and buildings each cover more ground than forest, and unproductive land is nearly absent.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/bar-dark.png"><img alt="Bar chart" src="man/figures/bar-light.png"></picture>
 
@@ -89,7 +89,7 @@ pv_scatter(
 
 ### Force-directed network
 
-The force-directed network is d3's signature physics simulation: nodes repel, links pull, and you can grab any node and drag it. Nodes here are large Swiss cities, linked when their economic structures are highly similar (correlation of employment shares across all 19 economic sectors above 0.94), sized by how many similar cities each has, and coloured by population class. Hovering a city highlights its economic look-alikes.
+The force-directed network is d3's signature physics simulation: nodes repel, links pull, and you can grab any node and drag it. Nodes here are large Swiss cities, linked when their economic structures are highly similar (correlation of employment shares across all 19 economic sectors above 0.94), sized by how many similar cities each has, and coloured by population class. Hovering a city highlights its economic look-alikes. Labels wear a halo of the background and drop below their node when two would collide, and a gentle pull toward the centre keeps separate components in frame.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/force-dark.png"><img alt="Force-directed network" src="man/figures/force-light.png"></picture>
 
@@ -147,7 +147,7 @@ local({
 
 ### Zoomable sunburst
 
-The sunburst lays a hierarchy out as concentric rings - the inner ring is the top level, outer rings its parts, and clicking any segment zooms into that branch (the centre zooms back out). The hierarchy here is Lucerne's land use in two levels: settlement, cultivated, and natural land, each split into its categories, so you can see at a glance that cultivated land dominates and then zoom into how the settlement area subdivides.
+The sunburst lays a hierarchy out as concentric rings - the inner ring is the top level, outer rings its parts, and clicking any segment zooms into that branch (the centre zooms back out). The hierarchy here is Lucerne's land use in two levels: settlement, cultivated, and natural land, each split into its categories, so you can see at a glance that cultivated land dominates and then zoom into how the settlement area subdivides. Segments too thin to carry their label stay unlabelled - hovering names any of them.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/sunburst-dark.png"><img alt="Zoomable sunburst" src="man/figures/sunburst-light.png"></picture>
 
@@ -163,7 +163,7 @@ pv_sunburst(
 
 ### Donut chart
 
-The donut shows how one whole divides into parts - each slice's angle is its share, the hole in the middle carries the grand total, and slices sweep in largest-first. Big slices are labelled directly with their share; slivers move to a legend, and hovering any slice pops it outward with its exact value and percentage. Here it splits the 385 municipal council seats filled in Lucerne's 2024 elections: Mitte took nearly half of them, the FDP about a quarter, and no other party reached ten percent.
+The donut shows how one whole divides into parts - each slice's angle is its share, the hole in the middle carries the grand total, and slices sweep in largest-first. Big slices are labelled directly with their share; slivers move to a legend, and hovering any slice pops it outward with its exact value and percentage. On charts narrower than about 480px the outside labels would collide, so all slices move to the legend automatically (the labels flag can force either look). Here it splits the 385 municipal council seats filled in Lucerne's 2024 elections: Mitte took nearly half of them, the FDP about a quarter, and no other party reached ten percent.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/donut-dark.png"><img alt="Donut chart" src="man/figures/donut-light.png"></picture>
 
@@ -188,7 +188,7 @@ The donut shows how one whole divides into parts - each slice's angle is its sha
 
 ### Treemap
 
-The treemap packs a hierarchy into nested rectangles - each cell's area is its value, its colour names its top-level branch, and labels appear only where they honestly fit. Hovering a cell keeps its branch lit, dims the rest, and reads out the full path and share of the total. This one carves up the city of Lucerne's roughly 2,900 hectares: settlement and cultivated land split it almost exactly in half (buildings and agriculture are the two biggest single categories), while natural land - water and unproductive ground - is a thin sliver of under three percent.
+The treemap packs a hierarchy into nested rectangles - each cell's area is its value, its colour names its top-level branch, and labels appear only where they honestly fit (the labels flag can make them eager, or turn them off entirely). Hovering a cell keeps its branch lit, dims the rest, and reads out the full path and share of the total. This one carves up the city of Lucerne's roughly 2,900 hectares: settlement and cultivated land split it almost exactly in half (buildings and agriculture are the two biggest single categories), while natural land - water and unproductive ground - is a thin sliver of under three percent.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/treemap-dark.png"><img alt="Treemap" src="man/figures/treemap-light.png"></picture>
 
@@ -205,7 +205,7 @@ pv_treemap(
 
 ### Lollipop chart
 
-The lollipop is a ranking chart - the bar chart's lighter cousin, marking each value with a hairline stem and a dot so dozens of categories stay readable without heavy ink. Categories run down the left, stems grow out from zero on load, the value sits at each head, and hovering a row highlights it with the exact figure. Ranked here: Lucerne's 2025 fiscal equalization, where Emmen receives about 23 million francs - more than three times second-placed Kriens - and the amounts flatten out quickly further down the field.
+The lollipop is a ranking chart - the bar chart's lighter cousin, marking each value with a hairline stem and a dot so dozens of categories stay readable without heavy ink. Categories run down the left, stems grow out from zero on load, the value sits at each head, and hovering a row highlights it with the exact figure. The name column never takes more than 45% of the width - on narrow charts long names are shortened with an ellipsis (hover for the full name) and the head values step aside when the plot drops under 200px (the value_labels flag can force either look). Ranked here: Lucerne's 2025 fiscal equalization, where Emmen receives about 23 million francs - more than three times second-placed Kriens - and the amounts flatten out quickly further down the field.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/lollipop-dark.png"><img alt="Lollipop chart" src="man/figures/lollipop-light.png"></picture>
 
@@ -240,7 +240,7 @@ pv_histogram(subset(pv_fiscal, year == 2025), x = "resource_per_capita",
 
 ### Boxplot
 
-A boxplot compresses a whole distribution into five numbers — quartile box, median line, whiskers to the last values within 1.5 IQR, dots for outliers beyond — which makes it the right tool for comparing several distributions side by side. Hovering a box dims the others and reads out all five statistics plus the group size; the jittered points behind each box show every underlying value. Across 2020-2027 the median Lucerne municipality's tax resources creep up from about 2,600 to 2,800 CHF per resident, while the same handful of wealthy outliers (Meggen, Weggis, Vitznau) float far above the boxes every single year.
+A boxplot compresses a whole distribution into five numbers — quartile box, median line, whiskers to the last values within 1.5 IQR, dots for outliers beyond — which makes it the right tool for comparing several distributions side by side. Hovering a box dims the others and reads out all five statistics plus the group size; the jittered points behind each box show the underlying values. By default (points = "auto") the point cloud appears only when the groups hold at most 600 values in total; here points = TRUE forces it on for all 638. On narrow screens crowded group labels thin themselves out or shorten with an ellipsis — the full name is always in the tooltip. Across 2020-2027 the median Lucerne municipality's tax resources creep up from about 2,600 to 2,800 CHF per resident, while the same handful of wealthy outliers (Meggen, Weggis, Vitznau) float far above the boxes every single year.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/boxplot-dark.png"><img alt="Boxplot" src="man/figures/boxplot-light.png"></picture>
 
@@ -255,7 +255,7 @@ pv_boxplot(pv_fiscal, value = "resource_per_capita", group = "year",
 
 ### Ridgeline
 
-A ridgeline chart stacks one density curve per group on overlapping baselines, so your eye can track how the shape of a distribution shifts across groups — typically across time. Ridges are ordered by median from the top down, and hovering one lifts it to full opacity while dimming the rest, with the group's median and size in the tooltip. The resource index sets the cantonal average to 100, and the bulk of Lucerne's municipalities slides steadily leftward: the median falls from 78 in 2020 to 70 by 2027, meaning the typical municipality drifts further below an average that a few rich outliers pull up.
+A ridgeline chart stacks one density curve per group on overlapping baselines, so your eye can track how the shape of a distribution shifts across groups — typically across time. Ridges are ordered by median from the top down, and hovering one lifts it to full opacity while dimming the rest, with the group's median and size in the tooltip. Group labels claim at most 30% of the chart width — on narrow screens long names shorten with an ellipsis and stay complete in the tooltip. The resource index sets the cantonal average to 100, and the bulk of Lucerne's municipalities slides steadily leftward: the median falls from 78 in 2020 to 70 by 2027, meaning the typical municipality drifts further below an average that a few rich outliers pull up.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/ridgeline-dark.png"><img alt="Ridgeline" src="man/figures/ridgeline-light.png"></picture>
 
@@ -268,7 +268,7 @@ pv_ridgeline(pv_fiscal, value = "resource_index", group = "year",
 
 ### Stacked area
 
-A stacked area chart piles series on top of each other, so you read the total from the outer edge and each part's contribution from its band — the form to reach for when the question is "how did the whole grow, and who did the growing". Hover anywhere for a crosshair that reads out every series (and the total) at that year, and hover a band to lift it out of the stack; offset = "percent" or "stream" re-renders the same data as composition-over-time or a streamgraph. Here the five biggest municipalities of the Lucerne agglomeration grew from about 72,000 people in 1930 to almost 180,000 in 2024 — but the city of Luzern itself peaked around 1970, so the suburbs did nearly all the growing since: Emmen and Kriens quadrupled, and Ebikon grew more than sixfold.
+A stacked area chart piles series on top of each other, so you read the total from the outer edge and each part's contribution from its band — the form to reach for when the question is "how did the whole grow, and who did the growing". Hover anywhere for a crosshair that reads out every series (and the total) at that year, and hover a band to lift it out of the stack; offset = "percent" or "stream" re-renders the same data as composition-over-time or a streamgraph. The legend appears whenever there is more than one series (force it either way with legend = TRUE/FALSE), and xlab/ylab override the column-name axis titles — NA or "" gives their room back to the plot, which helps on phone-width charts. Here the five biggest municipalities of the Lucerne agglomeration grew from about 72,000 people in 1930 to almost 180,000 in 2024 — but the city of Luzern itself peaked around 1970, so the suburbs did nearly all the growing since: Emmen and Kriens quadrupled, and Ebikon grew more than sixfold.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/area-dark.png"><img alt="Stacked area" src="man/figures/area-light.png"></picture>
 
@@ -287,7 +287,7 @@ A stacked area chart piles series on top of each other, so you read the total fr
 
 ### Heatmap
 
-A heatmap crosses two categories and colours each cell by a value, which makes a 200-cell table readable at a glance — use it when the pattern across the whole grid matters more than any single number. Darker cells mean a bigger share; hover any cell for the exact value and the full sector name, and the gradient bar under the title is the colour scale. Across the twelve most populous Swiss cities, health and social work is the biggest employer almost everywhere (24% of jobs in Lausanne), but each city keeps a signature: Bern and Bellinzona light up in public administration, Zürich, Genève and Lugano in finance, and Biel/Bienne is the lone manufacturing stronghold at over 20%.
+A heatmap crosses two categories and colours each cell by a value, which makes a 200-cell table readable at a glance — use it when the pattern across the whole grid matters more than any single number. Darker cells mean a bigger share; hover any cell for the exact value and the full sector name, and the gradient bar under the title is the colour scale. Cells print their value only when there is room (cell_values = TRUE forces it, shrinking the font for tight cells), and row labels shorten past truncate_labels characters — further still on narrow screens, where the label margin never takes more than 40% of the width, so the cells stay readable on a phone. Across the twelve most populous Swiss cities, health and social work is the biggest employer almost everywhere (24% of jobs in Lausanne), but each city keeps a signature: Bern and Bellinzona light up in public administration, Zürich, Genève and Lugano in finance, and Biel/Bienne is the lone manufacturing stronghold at over 20%.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/heatmap-dark.png"><img alt="Heatmap" src="man/figures/heatmap-light.png"></picture>
 

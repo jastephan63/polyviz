@@ -5,8 +5,9 @@
 \alias{pv_fiscal}
 \title{Fiscal equalization of Lucerne municipalities}
 \format{
-A data frame: \code{year}, \code{municipality}, \code{resource_per_capita}
-(CHF), \code{resource_index}, \code{equalization_chf}.
+A data frame: \code{year}, \code{municipality_id} (official BFS
+municipality number — joins \link{pv_lucerne_map}), \code{municipality},
+\code{resource_per_capita} (CHF), \code{resource_index}, \code{equalization_chf}.
 }
 \source{
 LUSTAT Statistik Luzern, "Finanzausgleich Kanton Luzern", via

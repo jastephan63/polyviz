@@ -5,8 +5,8 @@
 \alias{pv_elections}
 \title{Lucerne municipal council elections}
 \format{
-A data frame: \code{year}, \code{municipality}, \code{party}, \code{sex}, \code{status},
-\code{elected}.
+A data frame: \code{year}, \code{municipality_id} (BFS municipality
+number), \code{municipality}, \code{party}, \code{sex}, \code{status}, \code{elected}.
 }
 \source{
 LUSTAT Statistik Luzern, "Gemeinderatswahlen Kanton Luzern seit

@@ -25,3 +25,7 @@ dependencies:
       - composition.js
       - evolution.js
       - flow.js
+      - geo.js
+      - hierarchy.js
+      - motion.js
+      - points.js

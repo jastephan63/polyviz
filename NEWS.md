@@ -1,3 +1,32 @@
+# polyviz 0.3.0
+
+Eight new chart types — 24 in total — plus map boundaries and daily
+weather data to power them.
+
+## New charts
+
+* `pv_choropleth()` — GeoJSON choropleth with sequential or
+  centre-pinned diverging colouring; ships with the Lucerne municipal
+  boundaries (`pv_lucerne_map`) joined by official BFS numbers.
+* `pv_race()` — the animated bar-chart race, with interpolated
+  keyframes, entering/exiting entities, and a replay control.
+* `pv_bump()` — ranks over time as crossing lines.
+* `pv_pack()` — zoomable circle packing.
+* `pv_dendrogram()` — feed `stats::hclust()` output straight in;
+  optional `k` colours the cut clusters.
+* `pv_beeswarm()` — force-packed dot strips, one dot per observation.
+* `pv_violin()` — mirrored densities with optional inner boxplots.
+* `pv_calendar()` — GitHub-style calendar heatmap, one block per year.
+
+## Data
+
+* `pv_lucerne_map` — boundary polygons of the 79 Lucerne municipalities
+  (BFS Generalisierte Gemeindegrenzen, 1.1.2025, WGS84).
+* `pv_weather` — six years of daily temperature, precipitation, and
+  sunshine from the MeteoSwiss Luzern station.
+* `pv_fiscal` and `pv_elections` gain `municipality_id` (the official
+  BFS number), joining the map exactly.
+
 # polyviz 0.2.1
 
 Charts now correct themselves to fit their data and their container, and

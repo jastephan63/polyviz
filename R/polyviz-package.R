@@ -19,3 +19,7 @@
 #' @importFrom utils read.csv head modifyList
 #' @importFrom rlang %||% abort .data
 "_PACKAGE"
+
+# pv_lucerne_map is a lazy-loaded dataset used as a default argument in
+# pv_choropleth(); declare it so the checker knows the binding is real.
+utils::globalVariables("pv_lucerne_map")

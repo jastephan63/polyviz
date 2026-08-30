@@ -2,21 +2,6 @@
 # file, this one only shapes the payload - the drawing lives in
 # inst/htmlwidgets/lib/pv-renderers/hierarchy.js.
 
-# The shared pvchart.yaml belongs to the widget core, so this family wires
-# its renderer up itself: each widget carries hierarchy.js as an extra
-# htmlwidgets dependency. Loading the file twice (should the core ever list
-# it too) is harmless - the script just re-registers the same renderers.
-# htmltools is always installed alongside htmlwidgets, which imports it.
-with_hierarchy_renderer <- function(w) {
-  w$dependencies <- c(w$dependencies, list(htmltools::htmlDependency(
-    name = "pv-renderer-hierarchy",
-    version = "0.2.1",
-    src = system.file("htmlwidgets/lib/pv-renderers", package = "polyviz"),
-    script = "hierarchy.js"
-  )))
-  w
-}
-
 #' Zoomable D3 circle packing
 #'
 #' A hierarchy as nested circles: each circle's area encodes its value,
@@ -78,10 +63,10 @@ pv_pack <- function(data, levels, value, labels = "auto",
     })
   }
   root <- list(name = "root", children = build(data, levels))
-  with_hierarchy_renderer(pv_widget("pack", c(list(
+  pv_widget("pack", c(list(
     root = root, labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
-  width, height, elementId))
+  width, height, elementId)
 }
 
 #' Interactive D3 dendrogram
@@ -161,9 +146,9 @@ pv_dendrogram <- function(hc, labels = NULL, k = NULL,
            children = list(build(hc$merge[i, 1]), build(hc$merge[i, 2])))
     }
   }
-  with_hierarchy_renderer(pv_widget("dendrogram", c(list(
+  pv_widget("dendrogram", c(list(
     tree = build(nrow(hc$merge)),
     k = if (is.null(k)) NULL else as.integer(k)
   ), chart_opts(title, subtitle, mode, duration, source)),
-  width, height, elementId))
+  width, height, elementId)
 }

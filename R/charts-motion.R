@@ -50,7 +50,7 @@ motion_ranked <- function(data, time, id, value) {
     rlang::abort(
       "`time` needs at least 2 distinct time points to animate between.")
   }
-  df$rank <- ave(-df$value, df$t,
+  df$rank <- stats::ave(-df$value, df$t,
                  FUN = function(v) rank(v, ties.method = "first"))
   df <- df[order(match(df$t, times), df$rank), , drop = FALSE]
   rownames(df) <- NULL

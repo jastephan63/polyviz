@@ -5,11 +5,12 @@ expect_pvchart <- function(w, type) {
   invisible(w)
 }
 
-# Both hierarchy widgets must carry their renderer script themselves -
-# the shared pvchart.yaml doesn't list hierarchy.js.
+# The renderer loads through the widget's shared dependency manifest -
+# make sure hierarchy.js is actually registered there.
 expect_hierarchy_dep <- function(w) {
-  scripts <- vapply(w$dependencies, function(d) d$script, character(1))
-  expect_true("hierarchy.js" %in% scripts)
+  yaml <- readLines(system.file("htmlwidgets", "pvchart.yaml",
+                                package = "polyviz"))
+  expect_true(any(grepl("hierarchy\\.js", yaml)))
   invisible(w)
 }
 

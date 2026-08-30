@@ -20,7 +20,10 @@ display_names <- c(
   boxplot = "Boxplot", ridgeline = "Ridgeline", donut = "Donut chart",
   treemap = "Treemap", lollipop = "Lollipop chart", area = "Stacked area",
   heatmap = "Heatmap", sankey = "Sankey diagram",
-  parallel = "Parallel coordinates"
+  parallel = "Parallel coordinates", pack = "Circle packing",
+  dendrogram = "Dendrogram", choropleth = "Choropleth map",
+  race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
+  violin = "Violin plot", calendar = "Calendar heatmap"
 )
 
 # Pull the id / explanation / code blocks out of one snippet file.

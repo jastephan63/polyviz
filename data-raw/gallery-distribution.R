@@ -39,6 +39,24 @@ pv_boxplot(pv_fiscal, value = "resource_per_capita", group = "year",
            subtitle = "Tax resource potential per resident in CHF, by year",
            source = "Source: LUSTAT Statistik Luzern")
 
+## violin
+# explain: A violin plot mirrors a kernel density curve around each
+#   group's centre line, trading the boxplot's five-number summary for
+#   the distribution's whole shape — skew and bimodality stay visible.
+#   The slim box inside each violin anchors the shape to its exact
+#   quartiles and median (box = "auto" keeps it on), and hovering a
+#   violin dims the others and reads out the group's size, median, and
+#   quartiles; points = TRUE would add the boxplot family's jittered raw
+#   values behind. The same data as the boxplot tells a sharper story
+#   here: municipal tax resources per resident are strongly
+#   right-skewed every single year — the violins bulge around 2,600-2,800
+#   CHF and taper into a long thin neck toward the handful of wealthy
+#   lakeside outliers above 8,000.
+pv_violin(pv_fiscal, value = "resource_per_capita", group = "year",
+          title = "The same skewed shape, year after year",
+          subtitle = "Tax resource potential per resident in CHF, by year",
+          source = "Source: LUSTAT Statistik Luzern")
+
 ## ridgeline
 # explain: A ridgeline chart stacks one density curve per group on
 #   overlapping baselines, so your eye can track how the shape of a

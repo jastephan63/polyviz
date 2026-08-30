@@ -111,6 +111,65 @@ test_that("boxplot refuses more groups than palette colours", {
                "numeric")
 })
 
+test_that("violin computes density plus box stats per group, in order", {
+  w <- expect_pvchart(
+    pv_violin(pv_fiscal, "resource_per_capita", group = "year"), "violin")
+  expect_equal(length(w$x$violins), 8)
+  v <- w$x$violins[[1]]
+  expect_equal(v$group, "2020")
+  vals20 <- pv_fiscal$resource_per_capita[pv_fiscal$year == 2020]
+  s <- pv_boxstats(vals20)
+  expect_equal(v$median, s$median)
+  expect_equal(v$q1, s$q1)
+  expect_equal(v$q3, s$q3)
+  expect_equal(v$lo, s$lo)
+  expect_equal(v$hi, s$hi)
+  expect_equal(v$n, s$n)
+  expect_true(all(c("x", "y") %in% names(v$density)))
+  expect_equal(v$density$y, pv_kde(vals20)$y)
+})
+
+test_that("violin box and points flags are tri-state and shape the payload", {
+  # defaults: box on, points off, nothing shipped for the cloud
+  w <- pv_violin(pv_fiscal, "resource_per_capita", group = "year")
+  expect_true(w$x$showBox)
+  expect_false(w$x$showPoints)
+  expect_null(w$x$points)
+  # "auto" travels as-is for the JavaScript side to resolve
+  w2 <- pv_violin(pv_fiscal, "resource_per_capita", group = "year",
+                  box = "auto", points = "auto")
+  expect_equal(w2$x$showBox, "auto")
+  expect_equal(w2$x$showPoints, "auto")
+  expect_null(w2$x$points)
+  # points = TRUE ships the jitter sample, capped at 400 per group
+  w3 <- pv_violin(pv_fiscal, "resource_per_capita", group = "year",
+                  points = TRUE)
+  expect_equal(nrow(w3$x$points), nrow(pv_fiscal))
+  expect_true(all(w3$x$points$value %in% pv_fiscal$resource_per_capita))
+  # anything else is refused up front
+  expect_error(pv_violin(pv_fiscal, "resource_per_capita", group = "year",
+                         box = "yes"), "TRUE, FALSE, or \"auto\"")
+})
+
+test_that("violin validates groups like its distribution siblings", {
+  expect_error(pv_violin(pv_fiscal, "resource_per_capita",
+                         group = "municipality"), "Other")
+  expect_error(pv_violin(pv_fiscal, "municipality", group = "year"),
+               "numeric")
+  tiny <- data.frame(v = c(1, 2, 3), g = c("a", "a", "b"))
+  expect_error(pv_violin(tiny, "v", group = "g"), "at least 2 values")
+  allna <- data.frame(v = c(NA_real_, NA_real_), g = c("a", "b"))
+  expect_error(pv_violin(allna, "v", group = "g"), "non-missing")
+  # axis titles default to the mapped column names
+  w <- pv_violin(pv_fiscal, "resource_per_capita", group = "year")
+  expect_equal(w$x$xlab, "year")
+  expect_equal(w$x$ylab, "resource_per_capita")
+  w2 <- pv_violin(pv_fiscal, "resource_per_capita", group = "year",
+                  xlab = NA, ylab = "CHF per resident")
+  expect_null(w2$x$xlab)
+  expect_equal(w2$x$ylab, "CHF per resident")
+})
+
 test_that("ridgeline orders groups by median, descending", {
   w <- expect_pvchart(
     pv_ridgeline(pv_fiscal, "resource_index", group = "year"), "ridgeline")

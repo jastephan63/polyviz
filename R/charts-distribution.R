@@ -1,6 +1,7 @@
-# Distribution charts: histogram, boxplot, ridgeline. All the statistics
-# come from the helpers in stats-helpers.R — R does the maths, and the
-# JavaScript side (lib/pv-renderers/distribution.js) only draws geometry.
+# Distribution charts: histogram, boxplot, violin, ridgeline. All the
+# statistics come from the helpers in stats-helpers.R — R does the maths,
+# and the JavaScript side (lib/pv-renderers/distribution.js) only draws
+# geometry.
 
 check_numeric_col <- function(data, col) {
   if (!is.numeric(data[[col]])) {
@@ -188,6 +189,91 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
   }
   pv_widget("boxplot", c(list(
     boxes = boxes, points = pts, showPoints = points,
+    xlab = resolve_lab(xlab, group), ylab = resolve_lab(ylab, value)
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Interactive D3 violin plot
+#'
+#' Mirrored kernel density curves, one violin per group on a shared value
+#' axis — the boxplot's five numbers replaced by the distribution's whole
+#' shape, so bimodality and skew stay visible. Each violin reaches 85% of
+#' its band at its own mode, so all the shapes read equally wide and only
+#' their outline differs. Hovering a violin dims the others and reads out
+#' the group's size, median, and quartiles.
+#'
+#' @param data A data frame.
+#' @param value Name of the numeric column whose distribution is drawn.
+#' @param group Name of the grouping column (one violin per level, max 8;
+#'   every level needs at least 2 non-missing values for a density).
+#' @param box Overlay a slim Tukey box-and-whisker inside each violin?
+#'   `TRUE` always draws it, `FALSE` never does; `"auto"` draws it —
+#'   same as `TRUE` today, but reserved for a future data-driven rule.
+#'   The box marks the quartiles and median so the shapes stay anchored
+#'   to exact numbers.
+#' @param points Also show the raw values as jittered points behind each
+#'   violin? `TRUE` always draws them (groups with more than 400 values
+#'   are thinned to a fixed-seed sample of 400, exactly like
+#'   [pv_boxplot()]), `FALSE` (the default) and `"auto"` draw none — a
+#'   violin already shows the distribution's shape, so the cloud is
+#'   opt-in here.
+#' @param xlab,ylab Axis titles. `NULL` (the default) uses the `group`
+#'   column name for x and the `value` column name for y; `NA` or `""`
+#'   suppresses the title; any other string replaces it.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' pv_violin(pv_fiscal, value = "resource_per_capita", group = "year",
+#'           title = "Municipal tax resources by year")
+#' @export
+pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
+                      xlab = NULL, ylab = NULL,
+                      title = NULL, subtitle = NULL, mode = "auto",
+                      duration = 600, source = NULL, width = NULL,
+                      height = NULL, elementId = NULL) {
+  check_columns(data, list(value, group))
+  check_numeric_col(data, value)
+  check_auto_flag(box, "box")
+  check_auto_flag(points, "points")
+  grp <- as.character(data[[group]])
+  keep <- !is.na(data[[value]]) & !is.na(grp)
+  vals <- data[[value]][keep]
+  grp <- grp[keep]
+  if (!length(vals)) {
+    rlang::abort("`value` needs at least 2 non-missing values.")
+  }
+  # Violins keep the groups in first-appearance order, like the boxplot -
+  # the natural order for years and ordered categories.
+  groups <- unique(grp)
+  check_palette_fit(groups, group)
+  counts <- table(grp)
+  small <- groups[counts[groups] < 2]
+  if (length(small)) {
+    rlang::abort(sprintf(
+      "Each `group` level needs at least 2 values for a density; too few in: %s",
+      paste(small, collapse = ", ")))
+  }
+
+  violins <- lapply(groups, function(gname) {
+    v <- vals[grp == gname]
+    s <- pv_boxstats(v)
+    list(group = gname, n = s$n, median = s$median, q1 = s$q1, q3 = s$q3,
+         lo = s$lo, hi = s$hi, density = pv_kde(v))
+  })
+  # Raw points ship only when they will certainly be drawn: TRUE. With
+  # FALSE or "auto" (which resolves to hidden for violins) the payload
+  # would be dead weight.
+  pts <- NULL
+  if (isTRUE(points)) {
+    pts <- do.call(rbind, lapply(groups, function(gname) {
+      v <- vals[grp == gname]
+      if (length(v) > 400) v <- sample_fixed(v, 400)
+      data.frame(group = gname, value = v)
+    }))
+  }
+  pv_widget("violin", c(list(
+    violins = violins, points = pts, showBox = box, showPoints = points,
     xlab = resolve_lab(xlab, group), ylab = resolve_lab(ylab, value)
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)

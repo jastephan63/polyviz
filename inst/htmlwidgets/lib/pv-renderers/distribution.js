@@ -1,7 +1,7 @@
 /*
- * Distribution renderers: histogram, boxplot, ridgeline. Every statistic
- * (bins, quartiles, densities) arrives pre-computed from R, so the code
- * here only draws geometry. See basic.js for the ctx contract.
+ * Distribution renderers: histogram, boxplot, violin, ridgeline. Every
+ * statistic (bins, quartiles, densities) arrives pre-computed from R, so
+ * the code here only draws geometry. See basic.js for the ctx contract.
  */
 (function () {
 
@@ -265,6 +265,167 @@
             rows.push("outliers: <b>" + b.outliers.length + "</b>");
           }
           pv.showTip(ctx, event, rows.join("<br>"));
+        })
+        .on("pointerleave", function () {
+          groupSel.forEach(function (other) { other.attr("opacity", 1); });
+          pv.hideTip(ctx);
+        });
+    });
+  };
+
+  /* ---------- violin ---------- */
+
+  pvRenderers.violin = function (ctx) {
+    var violins = ctx.x.violins;
+    var groups = violins.map(function (v) { return v.group; });
+    var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
+    /* "auto" keeps the slim box overlay on - the quartiles anchor the
+       shapes to exact numbers - while raw points default off: a violin
+       already shows the distribution's shape, so the cloud is opt-in. */
+    var showBox = opt(ctx.x.showBox, true);
+    var raw = opt(ctx.x.showPoints, false) ? (ctx.x.points || []) : [];
+
+    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var xBand = d3.scaleBand().domain(groups).range([0, iw])
+      .paddingInner(0.2).paddingOuter(0.1);
+    /* The densities are estimated over each group's observed range, so
+       their x values already bound every whisker and raw point too. */
+    var vmin = d3.min(violins, function (v) {
+      return d3.min(v.density, function (p) { return p.x; }); });
+    var vmax = d3.max(violins, function (v) {
+      return d3.max(v.density, function (p) { return p.x; }); });
+    var y = d3.scaleLinear().domain([vmin, vmax]).nice().range([ih, 0]);
+
+    pv.yGrid(g, y, iw, ctx.theme);
+    /* Group labels on narrow charts: thin first (every 2nd or 3rd label
+       at full length), truncate only as a last resort - same rule as the
+       boxplot. The full name stays in the violin's tooltip. */
+    var stepPx = xBand.step();
+    var needW = d3.max(groups, function (gg) {
+      return pv.textWidth(gg, 11); }) || 0;
+    var every = 1;
+    while (needW > stepPx * every - 6 && every < 3 &&
+           groups.length > 2 * (every + 1)) {
+      every++;
+    }
+    var tickChars = Math.max(2,
+      Math.floor((stepPx * every - 6) / pv.textWidth("M", 11)));
+    g.append("g").attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(xBand).tickSizeOuter(0)
+        .tickFormat(function (d, i) {
+          return i % every ? "" : pv.truncate(d, tickChars);
+        }))
+      .call(function (s) { pv.styleAxis(s, ctx.theme, true); });
+    g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
+      .call(function (s) { pv.styleAxis(s, ctx.theme, false); });
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
+
+    /* Fade an element in - unless instant mode is on, in which case the
+       final opacity is set synchronously with no transition pending. */
+    function reveal(sel, delay, to) {
+      var end = to == null ? 1 : to;
+      if (!ctx.duration) { return sel.attr("opacity", end); }
+      sel.attr("opacity", 0)
+        .transition().delay(delay).duration(ctx.duration)
+        .ease(d3.easeCubicOut).attr("opacity", end);
+      return sel;
+    }
+
+    var groupSel = [];
+    violins.forEach(function (v, i) {
+      var cx = xBand(v.group) + xBand.bandwidth() / 2;
+      var c = color(v.group);
+      /* The outline and the slim box need to stand out against the
+         violin's own translucent fill: darker than the fill on a light
+         surface, brighter than it on a dark one - the same slot colour
+         either way, just pushed away from the fill. */
+      var emph = ctx.theme.mode === "dark" ?
+        d3.color(c).brighter(0.8) : d3.color(c).darker(0.8);
+      var delay = Math.min(i * 60, 500);
+      var grp = g.append("g");
+      groupSel.push(grp);
+
+      /* Each violin reaches 85% of its band at its own mode, so all the
+         shapes read equally wide and only their outline differs. */
+      var half = d3.scaleLinear()
+        .domain([0, d3.max(v.density, function (p) { return p.y; })])
+        .range([0, xBand.bandwidth() * 0.85 / 2]);
+
+      /* Optional jittered raw values sit behind the shape and ghost
+         through its translucent fill. */
+      var mine = raw.filter(function (p) { return p.group === v.group; });
+      reveal(grp.selectAll("circle.raw").data(mine).enter()
+        .append("circle")
+        .attr("class", "raw")
+        .attr("cx", function (p, j) {
+          return cx + (hash(j) - 0.5) * xBand.bandwidth() * 0.5; })
+        .attr("cy", function (p) { return y(p.value); })
+        .attr("r", 3.5)
+        .attr("fill", c)
+        .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1),
+        delay, 0.35);
+
+      var area = d3.area()
+        .x0(function (p) { return cx - half(p.y); })
+        .x1(function (p) { return cx + half(p.y); })
+        .y(function (p) { return y(p.x); });
+      var shape = grp.append("path").datum(v.density)
+        .attr("fill", c).attr("fill-opacity", 0.7)
+        .attr("stroke", emph).attr("stroke-width", 1.5)
+        .attr("stroke-linejoin", "round")
+        .attr("d", area);
+      /* The shape grows sideways out of its own centre line; instant
+         mode leaves it at its final width with no transform at all. */
+      if (ctx.duration > 0) {
+        shape.attr("transform", "translate(" + cx + ",0) scale(0.05,1) " +
+            "translate(" + (-cx) + ",0)")
+          .transition().delay(delay).duration(ctx.duration)
+          .ease(d3.easeCubicOut)
+          .attr("transform", "translate(0,0)");
+      }
+
+      if (showBox) {
+        /* A slim Tukey box inside the violin: whisker stem, 10px
+           quartile box, and a median tick in the surface colour so it
+           stays visible on the darker box in both modes. */
+        reveal(grp.append("line")
+          .attr("x1", cx).attr("x2", cx)
+          .attr("y1", y(v.lo)).attr("y2", y(v.hi))
+          .attr("stroke", emph).attr("stroke-width", 1.5), delay);
+        reveal(grp.append("rect")
+          .attr("x", cx - 5).attr("width", 10).attr("rx", 2)
+          .attr("y", y(v.q3))
+          .attr("height", Math.max(1, y(v.q1) - y(v.q3)))
+          .attr("fill", emph), delay);
+        reveal(grp.append("line")
+          .attr("x1", cx - 5).attr("x2", cx + 5)
+          .attr("y1", y(v.median)).attr("y2", y(v.median))
+          .attr("stroke", ctx.theme.ink.surface)
+          .attr("stroke-width", 2), delay);
+      }
+
+      /* An invisible band-wide rectangle makes the whole column
+         hoverable; hovering dims the other violins immediately. */
+      grp.append("rect")
+        .attr("x", xBand(v.group)).attr("width", xBand.bandwidth())
+        .attr("y", 0).attr("height", ih)
+        .attr("fill", "transparent")
+        .on("pointerenter pointermove", function (event) {
+          groupSel.forEach(function (other, j) {
+            other.attr("opacity", j === i ? 1 : 0.3);
+          });
+          pv.showTip(ctx, event, [
+            pv.swatchRow(c, v.group, "n = " + v.n),
+            "upper quartile: <b>" + ctx.fmt(v.q3) + "</b>",
+            "median: <b>" + ctx.fmt(v.median) + "</b>",
+            "lower quartile: <b>" + ctx.fmt(v.q1) + "</b>"
+          ].join("<br>"));
         })
         .on("pointerleave", function () {
           groupSel.forEach(function (other) { other.attr("opacity", 1); });

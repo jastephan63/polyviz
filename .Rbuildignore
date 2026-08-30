@@ -1,0 +1,10 @@
+^data-raw$
+^demo$
+^\.git$
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.md$
+^LICENSE\.md$
+^\.gitignore$
+^\.github$
+

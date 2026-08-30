@@ -1,0 +1,40 @@
+Package: polyviz
+Title: Polyglot Data Analysis and 'D3'-Powered Visualisation
+Version: 0.1.0
+Authors@R:
+    person("Jake", "Stephan", email = "jake@stephan-j.com",
+           role = c("aut", "cre"))
+Description: An exploratory data analysis toolkit with a pure R interface
+    and a polyglot backend. Data ingestion is unified across CSV, 'SQLite'
+    databases (via 'DBI'/'RSQLite'), and SAS datasets ('sas7bdat'/'xpt' via
+    'haven'). Numeric profiling can be delegated to a bundled Python module
+    (via 'reticulate') with a transparent pure-R fallback. Visualisations
+    are rendered by a bundled copy of 'D3.js' v7 through 'htmlwidgets',
+    giving interactive, animated 'D3' graphics - bar, line, scatter,
+    force-directed networks, chord diagrams, and zoomable sunbursts -
+    without writing any JavaScript.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Depends:
+    R (>= 4.1)
+Imports:
+    DBI,
+    ggplot2,
+    haven,
+    htmlwidgets,
+    RSQLite,
+    rlang,
+    stats,
+    tools,
+    utils
+Suggests:
+    reticulate,
+    shiny,
+    testthat (>= 3.0.0),
+    withr,
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+LazyData: true

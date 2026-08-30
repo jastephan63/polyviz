@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>body{background-color:white;}</style>
+<script src="lib/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<script src="lib/d3-7.9.0/d3.v7.min.js"></script>
+<script src="lib/d3-sankey-0.12.3/d3-sankey.min.js"></script>
+<link href="lib/pv-fonts-0.2.0/inter.css" rel="stylesheet" />
+<script src="lib/pv-common-0.2.0/pv-common.js"></script>
+<script src="lib/pv-renderers-0.2.0/basic.js"></script>
+<script src="lib/pv-renderers-0.2.0/relational.js"></script>
+<script src="lib/pvchart-binding-0.1.0/pvchart.js"></script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>polyviz gallery</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; background: #fbf9f5; color: #161511;
+           font-family: 'InterVariable', 'Inter', system-ui, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1b1a18; color: #f6f4ef; }
+      header p, .explain, nav a, footer { color: #c7c3b8 !important; }
+      details { border-color: #45433d !important; }
+    }
+    main { max-width: 880px; margin: 0 auto; padding: 0 20px 60px; }
+    header { padding: 48px 0 8px; }
+    header h1 { font-size: 34px; letter-spacing: -0.02em; margin: 0; }
+    header p { color: #57544b; max-width: 640px; line-height: 1.55; }
+    nav { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 0 26px; }
+    nav a { color: #57544b; font-size: 13px; text-decoration: none;
+            border-bottom: 1px solid transparent; }
+    nav a:hover { border-bottom-color: #006ba2; color: #006ba2; }
+    section.chart { margin: 34px 0; }
+    section.chart h2 { font-size: 21px; letter-spacing: -0.01em;
+                       margin: 0 0 6px; }
+    .explain { color: #57544b; line-height: 1.6; max-width: 720px;
+               margin: 0 0 14px; }
+    details { margin-top: 10px; border: 1px solid #ddd8cc;
+              border-radius: 8px; padding: 8px 12px; }
+    summary { cursor: pointer; font-size: 13px; }
+    pre { overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+    footer { color: #8b8779; font-size: 12.5px; line-height: 1.6;
+             border-top: 1px solid #ddd8cc; padding-top: 18px;
+             margin-top: 48px; }
+    footer a { color: inherit; }
+  </style>
+</head>
+<html lang="en">
+  <body>
+    <main>
+      <header>
+        <h1>polyviz</h1>
+        <p>Interactive d3.js visualisations driven entirely from R. Every chart below is live - hover, drag, click, and zoom - and runs on real Swiss open government data bundled with the package. Install with devtools::install_github("jastephan63/polyviz").</p>
+      </header>
+      <nav>
+        <a href="#bar">Bar chart</a>
+        <a href="#line">Line chart</a>
+        <a href="#scatter">Scatter plot</a>
+        <a href="#force">Force-directed network</a>
+        <a href="#chord">Chord diagram</a>
+        <a href="#sunburst">Zoomable sunburst</a>
+      </nav>
+      <section id="bar" class="chart">
+        <h2>Bar chart</h2>
+        <p class="explain">The bar chart is the workhorse of comparison - one bar per category, length encoding the value. polyviz draws bars with rounded value-ends growing from a zero baseline, and the horizontal orientation keeps long category names upright and readable, with the exact value at each bar's end. Here it ranks how the city of Lucerne uses its land: agriculture and buildings each cover more ground than forest, and unproductive land is nearly absent.</p>
+        <div id="htmlwidget-a55260c31372d082f17a" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-a55260c31372d082f17a">{"x":{"data":[{"x":"Agriculture","y":778},{"x":"Buildings","y":751},{"x":"Forest","y":638},{"x":"Transport","y":329},{"x":"Urban green","y":188},{"x":"Industrial","y":150},{"x":"Water","y":56},{"x":"Unproductive","y":18}],"xlab":"category","ylab":"hectares","horizontal":true,"title":"Land use in the city of Lucerne","subtitle":"Hectares by category, 2013–2025 survey","mode":"auto","duration":500,"source":"Source: Bundesamt für Statistik – Arealstatistik","type":"bar","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>pv_bar(
+  aggregate(hectares ~ category,
+            pv_city_landuse[pv_city_landuse$city == "Luzern", ], sum),
+  x = "category", y = "hectares", sort = TRUE, horizontal = TRUE,
+  title = "Land use in the city of Lucerne",
+  subtitle = "Hectares by category, 2013–2025 survey",
+  source = "Source: Bundesamt für Statistik – Arealstatistik"
+)
+</code>
+          </pre>
+        </details>
+      </section>
+      <section id="line" class="chart">
+        <h2>Line chart</h2>
+        <p class="explain">The line chart shows how values evolve - polyviz draws each series in with a left-to-right animation, labels lines directly at their right ends (no legend hunting), and a crosshair tooltip reads out every series at the hovered year. The data here is nearly a century of population counts: the city of Lucerne grew until about 1970 and then plateaued, while its suburbs kept climbing.</p>
+        <div id="htmlwidget-ece1857e71b5906cf472" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-ece1857e71b5906cf472">{"x":{"data":[{"x":1930,"y":7905,"series":"Emmen"},{"x":1970,"y":22040,"series":"Emmen"},{"x":1980,"y":22392,"series":"Emmen"},{"x":1990,"y":25407,"series":"Emmen"},{"x":2000,"y":26885,"series":"Emmen"},{"x":2014,"y":29292,"series":"Emmen"},{"x":2024,"y":32619,"series":"Emmen"},{"x":1930,"y":7424,"series":"Kriens"},{"x":1970,"y":20409,"series":"Kriens"},{"x":1980,"y":21097,"series":"Kriens"},{"x":1990,"y":23079,"series":"Kriens"},{"x":2000,"y":24742,"series":"Kriens"},{"x":2014,"y":27229,"series":"Kriens"},{"x":2024,"y":30008,"series":"Kriens"},{"x":1930,"y":52102,"series":"Luzern"},{"x":1970,"y":83374,"series":"Luzern"},{"x":1980,"y":78274,"series":"Luzern"},{"x":1990,"y":76466,"series":"Luzern"},{"x":2000,"y":75425,"series":"Luzern"},{"x":2014,"y":81057,"series":"Luzern"},{"x":2024,"y":86234,"series":"Luzern"},{"x":1930,"y":11113,"series":"Zug"},{"x":1970,"y":22972,"series":"Zug"},{"x":1980,"y":21609,"series":"Zug"},{"x":1990,"y":21705,"series":"Zug"},{"x":2000,"y":22973,"series":"Zug"},{"x":2014,"y":28603,"series":"Zug"},{"x":2024,"y":32122,"series":"Zug"}],"xtype":"number","xlab":"year","ylab":"population","showLegend":true,"title":"A century of urban growth","subtitle":"Permanent resident population at census years since 1930","mode":"auto","duration":800,"source":"Source: Bundesamt für Statistik – Statistik der Schweizer Städte","type":"line","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>pv_line(
+  pv_city_population[pv_city_population$city %in%
+                       c("Luzern", "Emmen", "Kriens", "Zug"), ],
+  x = "year", y = "population", series = "city",
+  title = "A century of urban growth",
+  subtitle = "Permanent resident population at census years since 1930",
+  source = "Source: Bundesamt für Statistik – Statistik der Schweizer Städte"
+)
+</code>
+          </pre>
+        </details>
+      </section>
+      <section id="scatter" class="chart">
+        <h2>Scatter plot</h2>
+        <p class="explain">The scatter plot reveals the relationship between two numeric variables, one dot per observation, with hover tooltips for exact values. This one shows how Lucerne's fiscal equalization works as designed: municipalities with a low resource index (weak tax base) receive large equalization payments, and everyone above the 100-index line receives nothing.</p>
+        <div id="htmlwidget-dc9c83bac63347775bf3" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-dc9c83bac63347775bf3">{"x":{"data":[{"x":94.2,"y":0,"label":"Adligenswil"},{"x":95.5,"y":0,"label":"Aesch"},{"x":66,"y":493474,"label":"Alberswil"},{"x":72,"y":536842,"label":"Altbüron"},{"x":92.7,"y":376510,"label":"Altishofen"},{"x":88.8,"y":0,"label":"Ballwil"},{"x":71.8,"y":3631164,"label":"Beromünster"},{"x":78.3,"y":1905446,"label":"Buchrain"},{"x":72.59999999999999,"y":1342684,"label":"Büron"},{"x":82.90000000000001,"y":422585,"label":"Buttisholz"},{"x":82.3,"y":862431,"label":"Dagmersellen"},{"x":92.59999999999999,"y":0,"label":"Dierikon"},{"x":51.1,"y":1043003,"label":"Doppleschwand"},{"x":80.90000000000001,"y":2811682,"label":"Ebikon"},{"x":87.09999999999999,"y":0,"label":"Egolzwil"},{"x":157.3,"y":0,"label":"Eich"},{"x":65.90000000000001,"y":23278722,"label":"Emmen"},{"x":60.2,"y":3107654,"label":"Entlebuch"},{"x":74.3,"y":448252,"label":"Ermensee"},{"x":102.1,"y":0,"label":"Eschenbach"},{"x":54.8,"y":5123258,"label":"Escholzmatt-Marbach"},{"x":61.4,"y":2556273,"label":"Ettiswil"},{"x":55.1,"y":799321,"label":"Fischbach"},{"x":59.2,"y":1819822,"label":"Flühli"},{"x":70.3,"y":1695480,"label":"Geuensee"},{"x":107.8,"y":0,"label":"Gisikon"},{"x":99.5,"y":0,"label":"Greppen"},{"x":68.40000000000001,"y":565099,"label":"Grossdietwil"},{"x":67.59999999999999,"y":2230914,"label":"Grosswangen"},{"x":49.7,"y":2314285,"label":"Hasle"},{"x":48.1,"y":2672070,"label":"Hergiswil"},{"x":102.2,"y":0,"label":"Hildisrieden"},{"x":80.2,"y":1335069,"label":"Hitzkirch"},{"x":75,"y":4113008,"label":"Hochdorf"},{"x":73.5,"y":1144054,"label":"Hohenrain"},{"x":182.6,"y":0,"label":"Horw"},{"x":86.8,"y":0,"label":"Inwil"},{"x":92.09999999999999,"y":0,"label":"Knutwil"},{"x":80.2,"y":6444836,"label":"Kriens"},{"x":41.9,"y":2024563,"label":"Luthern"},{"x":137.3,"y":0,"label":"Luzern"},{"x":69.90000000000001,"y":4530252,"label":"Malters"},{"x":99.5,"y":0,"label":"Mauensee"},{"x":292.2,"y":0,"label":"Meggen"},{"x":94,"y":0,"label":"Meierskappel"},{"x":66.40000000000001,"y":2174470,"label":"Menznau"},{"x":77.3,"y":909324,"label":"Nebikon"},{"x":73.09999999999999,"y":3476024,"label":"Neuenkirch"},{"x":79.7,"y":992482,"label":"Nottwil"},{"x":101,"y":0,"label":"Oberkirch"},{"x":72.8,"y":1327852,"label":"Pfaffnau"},{"x":83.2,"y":335988,"label":"Rain"},{"x":68.7,"y":4716427,"label":"Reiden"},{"x":71.8,"y":1947123,"label":"Rickenbach"},{"x":65.8,"y":549198,"label":"Roggliswil"},{"x":65.09999999999999,"y":1396747,"label":"Römerswil"},{"x":36.9,"y":1168459,"label":"Romoos"},{"x":124.7,"y":0,"label":"Root"},{"x":91.40000000000001,"y":0,"label":"Rothenburg"},{"x":67.7,"y":4839665,"label":"Ruswil"},{"x":174.8,"y":0,"label":"Schenkon"},{"x":72,"y":492602,"label":"Schlierbach"},{"x":74.09999999999999,"y":473492,"label":"Schongau"},{"x":62.1,"y":4113488,"label":"Schötz"},{"x":56.7,"y":4588312,"label":"Schüpfheim"},{"x":66.2,"y":1286875,"label":"Schwarzenberg"},{"x":112.2,"y":0,"label":"Sempach"},{"x":107.4,"y":0,"label":"Sursee"},{"x":74,"y":2113824,"label":"Triengen"},{"x":110.5,"y":0,"label":"Udligenswil"},{"x":53.5,"y":1105983,"label":"Ufhusen"},{"x":194.6,"y":0,"label":"Vitznau"},{"x":74.5,"y":1049973,"label":"Wauwil"},{"x":210.3,"y":0,"label":"Weggis"},{"x":68.90000000000001,"y":1371288,"label":"Werthenstein"},{"x":76.90000000000001,"y":514990,"label":"Wikon"},{"x":71.3,"y":4957203,"label":"Willisau"},{"x":62.5,"y":3773930,"label":"Wolhusen"},{"x":70.7,"y":1203083,"label":"Zell"}],"xlab":"resource_index","ylab":"equalization_chf","sizelab":null,"showLegend":false,"title":"Fiscal equalization evens out municipal wealth","subtitle":"Lucerne municipalities, 2025 — resource index 100 = cantonal average","mode":"auto","duration":400,"source":"Source: LUSTAT Statistik Luzern","type":"scatter","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>pv_scatter(
+  pv_fiscal[pv_fiscal$year == 2025, ],
+  x = "resource_index", y = "equalization_chf", label = "municipality",
+  title = "Fiscal equalization evens out municipal wealth",
+  subtitle = "Lucerne municipalities, 2025 — resource index 100 = cantonal average",
+  source = "Source: LUSTAT Statistik Luzern"
+)
+</code>
+          </pre>
+        </details>
+      </section>
+      <section id="force" class="chart">
+        <h2>Force-directed network</h2>
+        <p class="explain">The force-directed network is d3's signature physics simulation: nodes repel, links pull, and you can grab any node and drag it. Nodes here are large Swiss cities, linked when their economic structures are highly similar (correlation of employment shares across all 19 economic sectors above 0.94), sized by how many similar cities each has, and coloured by population class. Hovering a city highlights its economic look-alikes.</p>
+        <div id="htmlwidget-b81bd30e88ded47f4010" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-b81bd30e88ded47f4010">{"x":{"nodes":[{"id":"Biel/Bienne","label":"Biel/Bienne","group":"50 000-99 999"},{"id":"Chur","label":"Chur","group":"20 000-49 999"},{"id":"Genève","label":"Genève","group":"100 000 und mehr"},{"id":"Lausanne","label":"Lausanne","group":"100 000 und mehr"},{"id":"Lugano","label":"Lugano","group":"50 000-99 999"},{"id":"Luzern","label":"Luzern","group":"50 000-99 999"},{"id":"Schaffhausen","label":"Schaffhausen","group":"20 000-49 999"},{"id":"St. Gallen","label":"St. Gallen","group":"50 000-99 999"},{"id":"Thun","label":"Thun","group":"20 000-49 999"},{"id":"Uster","label":"Uster","group":"20 000-49 999"},{"id":"Winterthur","label":"Winterthur","group":"100 000 und mehr"}],"links":[{"source":"Genève","target":"Lugano","value":1},{"source":"Lausanne","target":"Luzern","value":1},{"source":"Biel/Bienne","target":"Schaffhausen","value":1},{"source":"Chur","target":"St. Gallen","value":1},{"source":"Luzern","target":"St. Gallen","value":1},{"source":"Thun","target":"Uster","value":1},{"source":"St. Gallen","target":"Winterthur","value":1},{"source":"Uster","target":"Winterthur","value":1}],"title":"Cities with similar economies","subtitle":"Linked when employment mix across 19 sectors correlates above 0.94","mode":"auto","duration":0,"source":"Source: Bundesamt für Statistik – STATENT","type":"force","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>local({
+  # Wide matrix of sector shares per city, for the 30 most populous cities.
+  # xtabs keeps sectors aligned even where a city has no row for a sector.
+  latest &lt;- pv_city_population[pv_city_population$year ==
+                                 max(pv_city_population$year), ]
+  top &lt;- head(latest$city[order(-latest$population)], 30)
+  sect &lt;- pv_city_sectors[pv_city_sectors$city %in% top, ]
+  wide &lt;- stats::xtabs(share ~ city + sector_code, data = sect)
+  sim &lt;- stats::cor(t(wide))
+  pairs &lt;- which(sim &gt; 0.94 &amp; upper.tri(sim), arr.ind = TRUE)
+  cities &lt;- rownames(sim)
+  links &lt;- data.frame(source = cities[pairs[, 1]],
+                      target = cities[pairs[, 2]])
+  nodes &lt;- data.frame(
+    id = cities,
+    class = latest$size_class[match(cities, latest$city)]
+  )
+  keep &lt;- nodes$id %in% c(links$source, links$target)
+  pv_force(nodes[keep, ], links, group = "class",
+           title = "Cities with similar economies",
+           subtitle = "Linked when employment mix across 19 sectors correlates above 0.94",
+           source = "Source: Bundesamt für Statistik – STATENT")
+})
+</code>
+          </pre>
+        </details>
+      </section>
+      <section id="chord" class="chart">
+        <h2>Chord diagram</h2>
+        <p class="explain">The chord diagram shows flows between entities around a circle - ribbon width encodes volume, and hovering a group fades everything unrelated. Here it shows commuting between Canton Zug and its neighbours: ribbons leaving the Zug arc are people commuting out, ribbons arriving are people commuting in, and the asymmetry is the story - Zug pulls in far more workers than it sends out.</p>
+        <div id="htmlwidget-4e23571d29443f615e4e" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-4e23571d29443f615e4e">{"x":{"matrix":[[0,0,0,0,0,6399],[0,0,0,0,0,12376],[0,0,0,0,0,3177],[0,0,0,0,0,6196],[0,0,0,0,0,14910],[1376,5136,1667,1959,10189,0]],"labels":["Aargau","Luzern","Restliche Schweiz","Schwyz","Zürich","Zug"],"title":"Commuting to and from Canton Zug","subtitle":"Daily commuters, 2022-2024","mode":"auto","duration":600,"source":"Source: Fachstelle Statistik Kanton Zug","type":"chord","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>local({
+  latest &lt;- pv_commuters[pv_commuters$period ==
+                           max(pv_commuters$period), ]
+  regions &lt;- unique(latest$region)
+  m &lt;- matrix(0, length(regions) + 1, length(regions) + 1,
+              dimnames = list(c(regions, "Zug"), c(regions, "Zug")))
+  to_zug &lt;- latest[latest$direction == "to Zug", ]
+  from_zug &lt;- latest[latest$direction == "from Zug", ]
+  m[to_zug$region, "Zug"] &lt;- to_zug$commuters
+  m["Zug", from_zug$region] &lt;- from_zug$commuters
+  pv_chord(m,
+           title = "Commuting to and from Canton Zug",
+           subtitle = paste("Daily commuters,", max(latest$period)),
+           source = "Source: Fachstelle Statistik Kanton Zug")
+})
+</code>
+          </pre>
+        </details>
+      </section>
+      <section id="sunburst" class="chart">
+        <h2>Zoomable sunburst</h2>
+        <p class="explain">The sunburst lays a hierarchy out as concentric rings - the inner ring is the top level, outer rings its parts, and clicking any segment zooms into that branch (the centre zooms back out). The hierarchy here is Lucerne's land use in two levels: settlement, cultivated, and natural land, each split into its categories, so you can see at a glance that cultivated land dominates and then zoom into how the settlement area subdivides.</p>
+        <div id="htmlwidget-dfb72908ed474b8691d7" style="width:100%;height:470px;" class="pvchart html-widget"></div>
+        <script type="application/json" data-for="htmlwidget-dfb72908ed474b8691d7">{"x":{"root":{"name":"root","children":[{"name":"Cultivated","children":[{"name":"Agriculture","value":778},{"name":"Forest","value":638}]},{"name":"Natural","children":[{"name":"Unproductive","value":18},{"name":"Water","value":56}]},{"name":"Settlement","children":[{"name":"Buildings","value":751},{"name":"Industrial","value":150},{"name":"Transport","value":329},{"name":"Urban green","value":188}]}]},"title":"Lucerne's land, ring by ring","subtitle":"Click a segment to zoom in; click the centre to zoom out","mode":"auto","duration":650,"source":"Source: Bundesamt für Statistik – Arealstatistik","type":"sunburst","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script>
+        <details>
+          <summary>Show the R code</summary>
+          <pre>
+            <code>pv_sunburst(
+  pv_city_landuse[pv_city_landuse$city == "Luzern", ],
+  levels = c("group", "category"), value = "hectares",
+  title = "Lucerne's land, ring by ring",
+  subtitle = "Click a segment to zoom in; click the centre to zoom out",
+  source = "Source: Bundesamt für Statistik – Arealstatistik"
+)</code>
+          </pre>
+        </details>
+      </section>
+      <footer>Data: Bundesamt f&uuml;r Statistik (stats.swiss), LUSTAT Statistik Luzern and Fachstelle Statistik Kanton Zug via opendata.swiss - open data, cited per dataset above; LUSTAT data additionally requires the owner's permission for commercial use. Charts rendered by <a href='https://d3js.org'>d3.js</a> v7, type set in <a href='https://rsms.me/inter/'>Inter</a>. MIT-licensed R package: <a href='https://github.com/jastephan63/polyviz'>jastephan63/polyviz</a>.</footer>
+    </main>
+  </body>
+</html>
+</html>

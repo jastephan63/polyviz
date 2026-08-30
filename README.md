@@ -2,15 +2,17 @@
 
 **D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.**
 
-polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart below is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
+polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
+
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — every chart type, interactive, on real Swiss open government data.
 
 Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/pvchart.js` | Renders all six interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all sixteen interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
-| **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback when Python isn't available |
+| **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
 
 ## Installation
@@ -22,40 +24,16 @@ devtools::install_github("jastephan63/polyviz")
 
 Python is optional. If `reticulate` finds any Python ≥ 3.8, the profiling functions use it; otherwise they transparently run the same computation in R.
 
+## Design
+
+The look is research-backed, not taste-backed. The typeface is [Inter](https://rsms.me/inter/) (bundled, SIL OFL) — the open-licence counterpart of the grotesques used by the FT, The Economist, and the NYT graphics desks — with true tabular numerals on every axis. The categorical palette is anchored on The Economist's published web palette, then re-stepped in OKLCH colour space and slot-ordered by exhaustive search so that adjacent series remain distinguishable under the common colour-vision deficiencies, in light **and** dark mode (every chart follows your system theme automatically). Chart anatomy follows newsroom craft: left-aligned title block, horizontal hairline gridlines only, a zero baseline, direct labels over legends, compact "12.8k" numbers on axes with exact values in tooltips, and a source line on every chart.
+
 ## The charts
 
-All six are interactive htmlwidgets: they animate in, respond to hover with tooltips, follow your system's light/dark mode, and work in the RStudio Viewer, R Markdown, Quarto, and Shiny.
+All charts are interactive htmlwidgets: they animate in, respond to hover with tooltips, follow light/dark mode, and work in the RStudio Viewer, R Markdown, Quarto, and Shiny (`pvchartOutput()` / `renderPvchart()`). Each example below runs as-is on data bundled with the package.
 
-```r
-library(polyviz)
-
-# Animated bar chart
-totals <- aggregate(revenue ~ region, pv_sales, sum)
-pv_bar(totals, x = "region", y = "revenue", sort = TRUE,
-       title = "Revenue by region")
-
-# Multi-series line chart with a crosshair tooltip
-monthly <- aggregate(revenue ~ month + region, pv_sales, sum)
-pv_line(monthly, x = "month", y = "revenue", series = "region",
-        title = "Monthly revenue")
-
-# Scatter with size encoding
-pv_scatter(mtcars, x = "wt", y = "mpg", size = "hp",
-           title = "Weight vs efficiency")
-
-# Force-directed network — drag the nodes
-pv_force(pv_network$nodes, pv_network$links, group = "group",
-         title = "Collaboration network")
-
-# Chord diagram of flows between entities
-pv_chord(pv_flows, title = "Inter-warehouse shipments")
-
-# Zoomable sunburst — click a segment to zoom in, the centre to zoom out
-pv_sunburst(pv_sales, levels = c("region", "product"), value = "revenue",
-            title = "Revenue hierarchy")
-```
-
-There are also two static ggplot2 companions, `pv_plot_missing()` and `pv_plot_corr()`, plus `theme_polyviz()` and `scale_colour_pv()` / `scale_fill_pv()` if you want the same look on your own ggplots.
+<!-- gallery:start -->
+<!-- gallery:end -->
 
 ## Getting data in
 
@@ -94,14 +72,26 @@ attr(pv_profile(airquality), "engine")   # which backend did the work
 pv_outliers(airquality$Ozone, method = "iqr")
 ```
 
-## Demo data
+## Bundled data
 
-Three simulated datasets ship with the package so every example runs out of the box: `pv_sales` (two years of monthly sales), `pv_network` (a 16-person collaboration graph), and `pv_flows` (a warehouse shipment matrix). The same sales table is also bundled as `inst/extdata/demo.sqlite` and `inst/extdata/demo_sales.xpt` for practising the SQL and SAS readers.
+Six real open-government datasets ship with the package, covering the
+population, economy, and territory themes of Swiss official statistics:
 
-## Design notes
+- `pv_city_population` — 181 Swiss cities at census years 1930–2024 (BFS)
+- `pv_city_sectors` — employment shares by economic sector per city (BFS/STATENT)
+- `pv_city_landuse` — land use in hectares, two hierarchy levels (BFS Arealstatistik)
+- `pv_commuters` — commuter flows between Canton Zug and its neighbours (Fachstelle Statistik Zug)
+- `pv_fiscal` — fiscal equalization of Lucerne municipalities (LUSTAT Statistik Luzern)
+- `pv_elections` — Lucerne municipal council candidacies and seats (LUSTAT Statistik Luzern)
 
-The colour palette is colourblind-checked: adjacent series colours keep a safe perceptual distance under the common colour-vision deficiencies, in both light and dark mode, and series always take colours in the same fixed order. Charts cap or refuse encodings that would break that guarantee (for example, more than 8 bar series, or more than 3 scatter colour groups).
+All are openly licensed with source citation required (see each dataset's
+help page for the exact attribution); the LUSTAT datasets additionally
+require the data owner's permission for commercial use. Three simulated
+datasets (`pv_sales`, `pv_network`, `pv_flows`) remain for examples that
+need shapes the real data doesn't provide.
 
 ## Licence
 
-MIT © Jake Stephan
+MIT © Jake Stephan. Bundled: [d3.js](https://d3js.org) (ISC),
+[d3-sankey](https://github.com/d3/d3-sankey) (BSD-3),
+[Inter](https://rsms.me/inter/) (SIL OFL 1.1).

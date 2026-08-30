@@ -21,8 +21,15 @@ read_sdmx <- function(f) {
 }
 
 # ---- Swiss city population since 1930 (BFS) -------------------------------
+# The population indicator comes in several flavours: explicit census years
+# (pop_ref_period_1930 ... _2000), the current and ten-years-ago reference
+# periods (whose label column carries the year, e.g. "2024"), plus density
+# and percent-change variants we don't want. Keeping only rows whose label
+# is a bare four-digit year selects exactly the population counts. The
+# pseudo-city "_ST" is the all-cities total and is dropped throughout.
 x <- read_sdmx("pop1930.csv")
-keep <- grepl("^pop_ref_period_\\d{4}$", x[[9]])
+keep <- startsWith(x[[9]], "pop_ref_period") &
+  grepl("^\\d{4}$", x[[10]]) & x[[5]] != "_ST"
 pv_city_population <- data.frame(
   city = x[[6]][keep],
   size_class = x[[8]][keep],
@@ -37,7 +44,7 @@ rownames(pv_city_population) <- NULL
 
 # ---- Employment shares by economic sector (BFS / STATENT) -----------------
 x <- read_sdmx("sectors.csv")
-keep <- x[[9]] %in% LETTERS & !is.na(as.numeric(x[[11]]))
+keep <- x[[9]] %in% LETTERS & !is.na(as.numeric(x[[11]])) & x[[5]] != "_ST"
 title_case <- function(s) {
   s <- tolower(s)
   gsub("(^|[ -])([a-z])", "\\1\\U\\2", s, perl = TRUE)
@@ -64,7 +71,8 @@ landuse_groups <- c(
   sur_vert = "Settlement", sur_agr = "Cultivated", sur_bois = "Cultivated",
   sur_eau = "Natural", sur_unpr = "Natural"
 )
-keep <- x[[9]] %in% names(landuse_labels) & !is.na(as.numeric(x[[11]]))
+keep <- x[[9]] %in% names(landuse_labels) & !is.na(as.numeric(x[[11]])) &
+  x[[5]] != "_ST"
 pv_city_landuse <- data.frame(
   city = x[[6]][keep],
   group = unname(landuse_groups[x[[9]][keep]]),

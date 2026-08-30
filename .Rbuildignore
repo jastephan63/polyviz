@@ -7,4 +7,6 @@
 ^LICENSE\.md$
 ^\.gitignore$
 ^\.github$
+^docs$
+^ROADMAP\.md$
 

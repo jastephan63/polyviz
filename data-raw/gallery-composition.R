@@ -8,7 +8,10 @@
 #   angle is its share, the hole in the middle carries the grand total,
 #   and slices sweep in largest-first. Big slices are labelled directly
 #   with their share; slivers move to a legend, and hovering any slice
-#   pops it outward with its exact value and percentage. Here it splits
+#   pops it outward with its exact value and percentage. On charts
+#   narrower than about 480px the outside labels would collide, so all
+#   slices move to the legend automatically (the labels flag can force
+#   either look). Here it splits
 #   the 385 municipal council seats filled in Lucerne's 2024 elections:
 #   Mitte took nearly half of them, the FDP about a quarter, and no other
 #   party reached ten percent.
@@ -31,7 +34,8 @@
 ## treemap
 # explain: The treemap packs a hierarchy into nested rectangles - each
 #   cell's area is its value, its colour names its top-level branch, and
-#   labels appear only where they honestly fit. Hovering a cell keeps its
+#   labels appear only where they honestly fit (the labels flag can make
+#   them eager, or turn them off entirely). Hovering a cell keeps its
 #   branch lit, dims the rest, and reads out the full path and share of
 #   the total. This one carves up the city of Lucerne's roughly 2,900
 #   hectares: settlement and cultivated land split it almost exactly in
@@ -51,7 +55,11 @@ pv_treemap(
 #   cousin, marking each value with a hairline stem and a dot so dozens
 #   of categories stay readable without heavy ink. Categories run down
 #   the left, stems grow out from zero on load, the value sits at each
-#   head, and hovering a row highlights it with the exact figure. Ranked
+#   head, and hovering a row highlights it with the exact figure. The
+#   name column never takes more than 45% of the width - on narrow
+#   charts long names are shortened with an ellipsis (hover for the
+#   full name) and the head values step aside when the plot drops under
+#   200px (the value_labels flag can force either look). Ranked
 #   here: Lucerne's 2025 fiscal equalization, where Emmen receives about
 #   23 million francs - more than three times second-placed Kriens - and
 #   the amounts flatten out quickly further down the field.

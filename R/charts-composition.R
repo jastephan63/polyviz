@@ -2,6 +2,17 @@
 # forms. Each function validates here in R and ships a tidy payload to the
 # renderers in inst/htmlwidgets/lib/pv-renderers/composition.js.
 
+# The display flags below are tri-state: TRUE and FALSE force a look, and
+# "auto" leaves the decision to the JavaScript side, which resolves it at
+# render time from the real data and pixel sizes - only the browser knows
+# how wide the chart actually is. The value ships to JS as-is.
+check_tristate <- function(value, name) {
+  if (isTRUE(value) || isFALSE(value) || identical(value, "auto")) {
+    return(invisible(value))
+  }
+  rlang::abort(sprintf('`%s` must be TRUE, FALSE, or "auto".', name))
+}
+
 #' Interactive D3 donut chart
 #'
 #' Part-of-whole as a ring. Slices sweep in largest-first, slices worth 5%
@@ -18,6 +29,12 @@
 #'   must be non-negative.
 #' @param inner_radius Size of the centre hole as a fraction of the outer
 #'   radius, from 0 to 0.85. `0` draws a classic pie.
+#' @param labels Show the outside name-and-share labels? `TRUE` labels
+#'   every slice worth 2% or more of the total, `FALSE` sends every
+#'   slice to the legend instead, and `"auto"` (the default) labels
+#'   slices of 5% or more — unless the rendered chart is narrower than
+#'   about 480px, where outside labels would collide, in which case it
+#'   falls back to legend-only.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -27,10 +44,12 @@
 #'          title = "Council seats by party, 2024")
 #' @export
 pv_donut <- function(data, category, value, inner_radius = 0.62,
+                     labels = "auto",
                      title = NULL, subtitle = NULL, mode = "auto",
                      duration = 650, source = NULL, width = NULL,
                      height = NULL, elementId = NULL) {
   check_columns(data, list(category, value))
+  check_tristate(labels, "labels")
   if (!is.numeric(inner_radius) || length(inner_radius) != 1 ||
       is.na(inner_radius) || inner_radius < 0 || inner_radius > 0.85) {
     rlang::abort("`inner_radius` must be a single number between 0 and 0.85.")
@@ -54,7 +73,7 @@ pv_donut <- function(data, category, value, inner_radius = 0.62,
       nrow(df)))
   }
   pv_widget("donut", c(list(
-    data = df, innerRadius = inner_radius, vlab = value
+    data = df, innerRadius = inner_radius, labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -72,6 +91,11 @@ pv_donut <- function(data, category, value, inner_radius = 0.62,
 #'   first, defining the hierarchy. The first level takes the palette
 #'   colours, so it allows at most 8 distinct groups.
 #' @param value Name of the numeric column summed within each cell.
+#' @param labels Write names inside the cells? `"auto"` (the default)
+#'   labels exactly the cells the text honestly fits into; `TRUE`
+#'   squeezes labels into cells with about 20% less room than that (the
+#'   text must still fit at all — tiny slivers stay blank); `FALSE`
+#'   draws no cell text, leaving the names to the tooltip alone.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -79,11 +103,12 @@ pv_donut <- function(data, category, value, inner_radius = 0.62,
 #' pv_treemap(luzern, levels = c("group", "category"), value = "hectares",
 #'            title = "Land use in the city of Lucerne")
 #' @export
-pv_treemap <- function(data, levels, value,
+pv_treemap <- function(data, levels, value, labels = "auto",
                        title = NULL, subtitle = NULL, mode = "auto",
                        duration = 550, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(levels, value))
+  check_tristate(labels, "labels")
   if (length(levels) < 1) {
     rlang::abort("`levels` needs at least one column name.")
   }
@@ -112,7 +137,7 @@ pv_treemap <- function(data, levels, value,
   }
   root <- list(name = "root", children = build(data, levels))
   pv_widget("treemap", c(list(
-    root = root, vlab = value
+    root = root, labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -129,6 +154,11 @@ pv_treemap <- function(data, levels, value,
 #' @param x Name of the category column.
 #' @param y Name of the numeric value column.
 #' @param sort Sort categories by value, largest first?
+#' @param value_labels Print the compact value at each head? `TRUE`
+#'   always, `FALSE` never, and `"auto"` (the default) shows them only
+#'   while the plot area stays at least 200px wide — on narrower charts
+#'   they cannot fit, so they are dropped and the tooltip alone carries
+#'   the exact figures.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -137,11 +167,12 @@ pv_treemap <- function(data, levels, value,
 #' pv_lollipop(top, x = "municipality", y = "equalization_chf",
 #'             title = "Largest equalization payments, 2025")
 #' @export
-pv_lollipop <- function(data, x, y, sort = TRUE,
+pv_lollipop <- function(data, x, y, sort = TRUE, value_labels = "auto",
                         title = NULL, subtitle = NULL, mode = "auto",
                         duration = 600, source = NULL, width = NULL,
                         height = NULL, elementId = NULL) {
   check_columns(data, list(x, y))
+  check_tristate(value_labels, "value_labels")
   if (nrow(data) > 40) {
     rlang::abort(sprintf(paste(
       "%d categories won't fit a readable lollipop (the limit is 40).",
@@ -153,7 +184,7 @@ pv_lollipop <- function(data, x, y, sort = TRUE,
     df <- df[order(-df$y), ]
   }
   pv_widget("lollipop", c(list(
-    data = df, xlab = x, ylab = y
+    data = df, xlab = x, ylab = y, valueLabels = value_labels
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

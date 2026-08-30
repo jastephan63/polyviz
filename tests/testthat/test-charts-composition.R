@@ -27,6 +27,17 @@ test_that("donut validates slices, values, and inner_radius", {
   expect_error(pv_donut(ok, "cat", "val", inner_radius = -0.1), "0.85")
 })
 
+test_that("donut labels flag validates and rides along in the payload", {
+  ok <- data.frame(cat = c("a", "b"), val = c(1, 2))
+  expect_equal(pv_donut(ok, "cat", "val")$x$labels, "auto")
+  expect_true(pv_donut(ok, "cat", "val", labels = TRUE)$x$labels)
+  expect_false(pv_donut(ok, "cat", "val", labels = FALSE)$x$labels)
+  expect_error(pv_donut(ok, "cat", "val", labels = "yes"),
+               'TRUE, FALSE, or "auto"')
+  expect_error(pv_donut(ok, "cat", "val", labels = NA),
+               'TRUE, FALSE, or "auto"')
+})
+
 test_that("donut sums rows that share a category, keeping order", {
   dup <- data.frame(cat = c("b", "a", "b"), val = c(1, 2, 3))
   w <- pv_donut(dup, "cat", "val")
@@ -58,6 +69,17 @@ test_that("treemap caps top-level groups at the palette size", {
                levels = "g", value = "v"), "treemap")
 })
 
+test_that("treemap labels flag validates and rides along in the payload", {
+  df <- data.frame(g = c("a", "b"), v = 1:2)
+  expect_equal(pv_treemap(df, levels = "g", value = "v")$x$labels, "auto")
+  expect_true(pv_treemap(df, levels = "g", value = "v",
+                         labels = TRUE)$x$labels)
+  expect_false(pv_treemap(df, levels = "g", value = "v",
+                          labels = FALSE)$x$labels)
+  expect_error(pv_treemap(df, levels = "g", value = "v", labels = 1),
+               'TRUE, FALSE, or "auto"')
+})
+
 test_that("lollipop sorts by default and preserves order when asked", {
   f25 <- pv_fiscal[pv_fiscal$year == 2025, ]
   top <- head(f25[order(-f25$equalization_chf), ], 20)
@@ -74,4 +96,13 @@ test_that("lollipop sorts by default and preserves order when asked", {
 test_that("lollipop enforces the 40-category cap", {
   f25 <- pv_fiscal[pv_fiscal$year == 2025, ]
   expect_error(pv_lollipop(f25, "municipality", "equalization_chf"), "40")
+})
+
+test_that("lollipop value_labels flag validates and rides in the payload", {
+  df <- data.frame(m = c("a", "b"), v = c(2, 1))
+  expect_equal(pv_lollipop(df, "m", "v")$x$valueLabels, "auto")
+  expect_true(pv_lollipop(df, "m", "v", value_labels = TRUE)$x$valueLabels)
+  expect_false(pv_lollipop(df, "m", "v", value_labels = FALSE)$x$valueLabels)
+  expect_error(pv_lollipop(df, "m", "v", value_labels = "no"),
+               'TRUE, FALSE, or "auto"')
 })

@@ -306,27 +306,24 @@ A heatmap crosses two categories and colours each cell by a value, which makes a
 
 ### Sankey diagram
 
-The sankey diagram traces flows between stages - node height is the total volume passing through, ribbon width the size of each individual flow. Hovering a ribbon reads out its exact count, and hovering a node fades every flow that doesn't touch it. Commuting in and out of Canton Zug shows a one-sided bargain: in 2022-2024 about 43,000 people streamed in each day (Zurich and Lucerne sending the biggest contingents) while only 20,000 left - and half of those headed for Zurich.
+The sankey diagram traces flows through stages - node height is the volume passing through, ribbon width each individual flow, and the totals are conserved from column to column. Hovering a ribbon reads out its exact count; hovering a node fades every flow that doesn't touch it. Here every 2024 candidacy for a Lucerne municipal council flows from party through gender to outcome: Mitte and FDP field most of the candidates, women are just 37% of the field - but the two gender streams split into "elected" at virtually the same rate (87% vs 86%), so the imbalance sits in who stands for election, not in who wins one.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="man/figures/sankey-dark.png"><img alt="Sankey diagram" src="man/figures/sankey-light.png"></picture>
 
 ```r
 local({
-  latest <- pv_commuters[pv_commuters$period == max(pv_commuters$period), ]
-  # Inbound rows flow region -> Zug, outbound rows Zug -> region. The
-  # trailing space keeps each outbound destination distinct from its
-  # inbound namesake, so every region shows up on both sides of Zug.
-  links <- data.frame(
-    source = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
-    target = ifelse(latest$direction == "to Zug", "Zug",
-                    paste0(latest$region, " ")),
-    value = latest$commuters
-  )
-  pv_sankey(links,
-            title = "Commuter flows in and out of Canton Zug",
-            subtitle = paste("Daily commuters by neighbouring region,",
-                             max(latest$period)),
-            note = "Source: Fachstelle Statistik Kanton Zug")
+  e <- pv_elections[pv_elections$year == max(pv_elections$year), ]
+  outcome <- ifelse(e$elected, "elected", "not elected")
+  # Two aggregated stages that share the gender nodes in the middle;
+  # totals are conserved, so both columns fill the same height.
+  stage1 <- aggregate(list(value = rep(1, nrow(e))),
+                      list(source = e$party, target = e$sex), sum)
+  stage2 <- aggregate(list(value = rep(1, nrow(e))),
+                      list(source = e$sex, target = outcome), sum)
+  pv_sankey(rbind(stage1, stage2),
+            title = "The path to a council seat",
+            subtitle = "Lucerne municipal council candidacies 2024: party \u2192 gender \u2192 outcome",
+            note = "Source: LUSTAT Statistik Luzern")
 })
 
 ```

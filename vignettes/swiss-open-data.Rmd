@@ -25,7 +25,7 @@ those doors one by one and ends with the full path from portal to paper.
 None of the chunks below run while the vignette builds — they all need
 the network — so copy them into your own session.
 
-```{r library}
+```{r library, eval = FALSE}
 library(polyviz)
 ```
 
@@ -53,7 +53,7 @@ Start at the catalogue. A search returns a compact data frame — one row
 per dataset, with the publisher, the licence terms, and the file formats
 on offer:
 
-```{r search}
+```{r search, eval = FALSE}
 pv_search_opendata("Finanzausgleich Luzern", rows = 20)
 ```
 
@@ -69,7 +69,7 @@ glance before you commit to anything; more on the grades below.
 name; datasets often bundle several tables), downloads it from the
 publisher's server, and parses it:
 
-```{r fetch-opendata}
+```{r fetch-opendata, eval = FALSE}
 fiscal <- pv_fetch_opendata("finanzausgleich-kanton-luzern",
                             resource = "fa-lu-ra.csv")
 #> Source: LUSTAT Statistics Lucerne, "Equalisation of resources" via
@@ -103,7 +103,7 @@ four are open data; they differ in what they oblige you to do:
 Whatever polyviz fetches, the exact terms are printed at fetch time and
 stay attached to the data frame, so a script can check them later:
 
-```{r attributes}
+```{r attributes, eval = FALSE}
 attr(fiscal, "pv_source")
 attr(fiscal, "pv_licence")
 attr(fiscal, "pv_url")
@@ -117,7 +117,7 @@ chart you make from fetched data. The examples below do.
 When you already know the dataset, skip the catalogue. LUSTAT files are
 fetched by their file name on data.lustat.ch:
 
-```{r fetch-lustat}
+```{r fetch-lustat, eval = FALSE}
 fa <- pv_fetch_lustat("fa-lu-ra")
 #> Source: LUSTAT Statistik Luzern, dataset "fa-lu-ra" (data.lustat.ch)
 #> Licence: opendata.swiss "OPEN BY ASK" terms - free use with source
@@ -131,7 +131,7 @@ SDMX component becomes a column named by its lower-cased id holding the
 human-readable label, the underlying code sits in a matching `<id>_code`
 column, and the observation itself is `obs_value`:
 
-```{r fetch-bfs}
+```{r fetch-bfs, eval = FALSE}
 pop <- pv_fetch_bfs("DF_SSV_POP_1930")
 #> Source: Bundesamt für Statistik, dataflow CH1.SSV:DF_SSV_POP_1930(2026.1.0),
 #>   via stats.swiss
@@ -145,7 +145,7 @@ mixes census years with current-period codes whose *label* carries the
 year. Rows whose indicator code starts with `"pop_ref_period"` and whose
 label is a bare four-digit year are the actual population counts:
 
-```{r bfs-filter}
+```{r bfs-filter, eval = FALSE}
 cities <- pop[startsWith(pop$ssv_pop_1930_code, "pop_ref_period") &
                 grepl("^\\d{4}$", pop$ssv_pop_1930) &
                 pop$ssv_swiss_city_code != "_ST", ]
@@ -158,7 +158,7 @@ Every download lands in a per-user cache
 network; every later fetch of the same URL is instant and works offline
 — which also means a script re-run does not hammer a government server.
 
-```{r cache}
+```{r cache, eval = FALSE}
 pv_cache_status()   # one row per cached download: url, size, fetched
 pv_cache_clear()    # start over
 
@@ -176,7 +176,7 @@ lakes), and `pv_lucerne_map` (the 79 Lucerne municipalities). The one
 layer too big to ship — all ~2100 Swiss municipalities — is downloaded
 on first use and cached:
 
-```{r fetch-map}
+```{r fetch-map, eval = FALSE}
 muni <- pv_fetch_map("municipalities")   # needs sf on the first call only
 ```
 
@@ -186,7 +186,7 @@ on the BFS canton number (1–26), `"districts"` on the district number,
 `"municipalities"` on the municipality number — the ids every Swiss
 statistical dataset already carries:
 
-```{r map-layers}
+```{r map-layers, eval = FALSE}
 pv_choropleth(canton_data, map = "cantons", id = "canton", value = "share")
 pv_bubble_map(cities, lon = "lon", lat = "lat", size = "population")
 ```
@@ -198,7 +198,7 @@ commune you surveyed, boundaries from another country — can be handed
 over as an sf object; `join_id =` names the column holding each
 feature's id:
 
-```{r sf-map}
+```{r sf-map, eval = FALSE}
 pv_choropleth(results, map = my_sf_layer, join_id = "region_code",
               id = "region", value = "turnout")
 ```
@@ -211,7 +211,7 @@ for a manuscript. (This is the live version of the bundled `pv_fiscal`;
 column names are LUSTAT's own — `fa_jahr` the year, `gnr` the BFS
 municipality number, `ri` the resource index.)
 
-```{r story-fetch}
+```{r story-fetch, eval = FALSE}
 fa <- pv_fetch_lustat("fa-lu-ra")
 latest <- fa[fa$fa_jahr == max(fa$fa_jahr), ]
 ```
@@ -221,7 +221,7 @@ two ahead, so the newest years are projections, not accounts.)
 
 First the distribution — how unequal are the municipal tax bases?
 
-```{r story-chart}
+```{r story-chart, eval = FALSE}
 w1 <- pv_histogram(
   latest, x = "ri", bins = 20,
   title = "Most municipalities sit below the cantonal average",
@@ -235,7 +235,7 @@ Then the geography. The `gnr` column holds official BFS municipality
 numbers, and the bundled `pv_lucerne_map` boundaries carry the same ids,
 so the join is automatic:
 
-```{r story-map}
+```{r story-map, eval = FALSE}
 w2 <- pv_choropleth(
   latest, id = "gnr", value = "ri",
   palette = "diverging", center = 100,
@@ -250,7 +250,7 @@ And onto the page — `pv_save()` renders each chart for real in headless
 Chrome and writes a print-quality file (see
 `vignette("embedding-charts")` for sizing and formats):
 
-```{r story-save}
+```{r story-save, eval = FALSE}
 pv_save(w1, "fiscal-distribution.png")   # Word, slides
 pv_save(w2, "fiscal-map.pdf")            # LaTeX, true vector
 ```

@@ -212,7 +212,7 @@ pv_deliver <- function(d, source, licence, url) {
 
 pv_licence_bfs <- paste0(
   'opendata.swiss "OPEN BY" terms - free use, source citation required ',
-  '("Quelle: Bundesamt für Statistik").')
+  '("Quelle: Bundesamt f\u00fcr Statistik").')
 
 pv_licence_lustat <- paste0(
   'opendata.swiss "OPEN BY ASK" terms - free use with source citation ',
@@ -294,7 +294,7 @@ pv_fetch_bfs <- function(id, agency = NULL, refresh = FALSE) {
   pv_deliver(
     d,
     source = sprintf(
-      "Bundesamt für Statistik, dataflow %s, via stats.swiss",
+      "Bundesamt f\u00fcr Statistik, dataflow %s, via stats.swiss",
       attr(d, "pv_dataflow") %||% ref),
     licence = pv_licence_bfs,
     url = url)

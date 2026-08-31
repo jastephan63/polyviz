@@ -13,7 +13,7 @@ pv_map_zip_url <-
   "https://dam-api.bfs.admin.ch/hub/api/dam/assets/34367751/master"
 
 pv_licence_themakart <-
-  'Open use, source citation required ("© BFS, ThemaKart").'
+  'Open use, source citation required ("\u00a9 BFS, ThemaKart").'
 
 # Rounds every coordinate in a parsed GeoJSON geometry to 4 decimals
 # (~11 m) - the same slimming the bundled layers got, and well inside
@@ -118,7 +118,7 @@ pv_fetch_map <- function(layer = "municipalities", refresh = FALSE) {
   gj <- jsonlite::fromJSON(dat, simplifyVector = FALSE)
   pv_deliver(
     gj,
-    source = paste("Bundesamt für Statistik, Generalisierte",
+    source = paste("Bundesamt f\u00fcr Statistik, Generalisierte",
                    "Gemeindegrenzen (GG25, level G1, status 1 January 2025)"),
     licence = pv_licence_themakart,
     url = pv_map_zip_url)

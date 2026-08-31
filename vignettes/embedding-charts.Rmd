@@ -25,7 +25,7 @@ the chunks into your own session.
 
 The running example:
 
-```{r example}
+```{r example, eval = FALSE}
 library(polyviz)
 
 agg <- aggregate(revenue ~ region, pv_sales, sum)
@@ -50,7 +50,7 @@ a Chrome-based browser; `.html` needs neither.
 
 ### PNG — Word, Google Docs, slides
 
-```{r png}
+```{r png, eval = FALSE}
 pv_save(w, "revenue.png")
 ```
 
@@ -60,7 +60,7 @@ re-compresses images or cannot place vector graphics.
 
 ### SVG — the web and vector editing
 
-```{r svg}
+```{r svg, eval = FALSE}
 pv_save(w, "revenue.svg")
 ```
 
@@ -70,7 +70,7 @@ limit, and every element stays editable in Inkscape or Illustrator.
 
 ### PDF — LaTeX
 
-```{r pdf}
+```{r pdf, eval = FALSE}
 pv_save(w, "revenue.pdf")
 ```
 
@@ -80,7 +80,7 @@ chart with the font embedded — drop it straight into
 
 ### HTML — sharing the interactive version
 
-```{r html}
+```{r html, eval = FALSE}
 pv_save(w, "revenue.html")
 ```
 
@@ -97,7 +97,7 @@ either.
 per inch. A chart meant to fill a 6.5-inch text block is therefore
 624 pixels wide:
 
-```{r sizing}
+```{r sizing, eval = FALSE}
 pv_save(w, "revenue.pdf", width = 624, height = 390)
 ```
 
@@ -109,7 +109,7 @@ automatic orientation all react to it — so choose `width` and `height`
 for the shape you want on the page, and let `scale` carry the
 resolution. For a 300-dpi PNG, that is `scale = 300 / 96`:
 
-```{r print-scale}
+```{r print-scale, eval = FALSE}
 pv_save(w, "revenue.png", width = 624, height = 390, scale = 300 / 96)
 ```
 
@@ -140,7 +140,7 @@ One line of setup belongs in the document, because knitr otherwise
 reaches for its own generic widget screenshotter (the webshot package)
 before asking the chart how it wants to be printed:
 
-```{r knit-setup}
+```{r knit-setup, eval = FALSE}
 knitr::opts_chunk$set(screenshot.force = FALSE)
 ```
 
@@ -171,7 +171,7 @@ Shiny app can take any chart with them without asking you for the file.
 The control never appears inside a saved or captured chart. Turn it off
 per chart when it would distract:
 
-```{r downloads}
+```{r downloads, eval = FALSE}
 pv_bar(agg, "region", "revenue") |>
   pv_downloads(FALSE)
 ```

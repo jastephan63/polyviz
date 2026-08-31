@@ -22,4 +22,5 @@
 
 # pv_lucerne_map is a lazy-loaded dataset used as a default argument in
 # pv_choropleth(); declare it so the checker knows the binding is real.
-utils::globalVariables("pv_lucerne_map")
+utils::globalVariables(c("pv_lucerne_map", "pv_swiss_cantons",
+                         "pv_swiss_districts", "pv_swiss_lakes"))

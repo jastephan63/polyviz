@@ -1,0 +1,271 @@
+---
+title: "Swiss open data from R"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Swiss open data from R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+The datasets bundled with polyviz are snapshots — frozen on purpose, so
+examples and tests give the same answer every time. But all of them come
+from live, openly licensed Swiss government portals, and the package can
+talk to those portals directly: search the federal catalogue, download a
+dataset, and put it on a map, without leaving R. This vignette walks
+those doors one by one and ends with the full path from portal to paper.
+
+None of the chunks below run while the vignette builds — they all need
+the network — so copy them into your own session.
+
+```{r library}
+library(polyviz)
+```
+
+## Three doors to the data
+
+* **opendata.swiss** is the federal catalogue over (nearly) everything
+  Swiss public bodies publish. `pv_search_opendata()` queries it,
+  `pv_fetch_opendata()` downloads a dataset it lists.
+* **stats.swiss** is the Federal Statistical Office's own dissemination
+  platform. `pv_fetch_bfs()` pulls a dataflow from its SDMX API — the
+  richest door when you know the BFS publishes what you want.
+* **data.lustat.ch** hosts the open CSVs of LUSTAT Statistik Luzern,
+  the statistical office of Canton Lucerne. `pv_fetch_lustat()` fetches
+  one by name.
+
+All three run through the same download cache, and every fetch prints —
+and attaches to its result — where the data comes from and under which
+terms you may use it. That message is not decoration: open government
+data is almost always *open with obligations*, and the obligations
+travel with the data frame.
+
+## Finding a dataset
+
+Start at the catalogue. A search returns a compact data frame — one row
+per dataset, with the publisher, the licence terms, and the file formats
+on offer:
+
+```{r search}
+pv_search_opendata("Finanzausgleich Luzern", rows = 20)
+```
+
+The portal's search is generous — it matches any of the words — so scan
+the `title` and `id` columns for the dataset you actually mean. The `id`
+is the slug the fetcher takes, and the `licence` column is worth a
+glance before you commit to anything; more on the grades below.
+
+## Fetching it
+
+`pv_fetch_opendata()` looks the dataset up, picks its first CSV resource
+(or the one you name with `resource =` — a resource id, URL, or file
+name; datasets often bundle several tables), downloads it from the
+publisher's server, and parses it:
+
+```{r fetch-opendata}
+fiscal <- pv_fetch_opendata("finanzausgleich-kanton-luzern",
+                            resource = "fa-lu-ra.csv")
+#> Source: LUSTAT Statistics Lucerne, "Equalisation of resources" via
+#>   opendata.swiss (dataset "finanzausgleich-kanton-luzern")
+#> Licence: opendata.swiss OPEN BY ASK terms - free use with source
+#>   citation ("Quelle: LUSTAT Statistics Lucerne"); commercial use
+#>   requires the data owner's permission.
+```
+
+One rule is built in: **only openly licensed resources are delivered**.
+A resource published under a non-commercial or no-derivatives licence —
+or with no stated licence at all — is refused with a message pointing
+you at the dataset page, instead of being silently handed over.
+
+## What the licence lines mean
+
+opendata.swiss grades its datasets into four terms-of-use levels. All
+four are open data; they differ in what they oblige you to do:
+
+* **OPEN** — free use, no conditions.
+* **OPEN BY** — free use, but you must cite the source. Most BFS data
+  is published this way; the citation is
+  "Quelle: Bundesamt für Statistik".
+* **OPEN ASK** — free use; *commercial* use requires the data owner's
+  permission.
+* **OPEN BY ASK** — both: cite the source, and ask the owner before any
+  commercial use. **All LUSTAT data is published under these terms** —
+  cite "Quelle: LUSTAT Statistik Luzern", and if the use is commercial,
+  ask LUSTAT first.
+
+Whatever polyviz fetches, the exact terms are printed at fetch time and
+stay attached to the data frame, so a script can check them later:
+
+```{r attributes}
+attr(fiscal, "pv_source")
+attr(fiscal, "pv_licence")
+attr(fiscal, "pv_url")
+```
+
+The practical habit: put the citation in the `source =` line of every
+chart you make from fetched data. The examples below do.
+
+## Straight from the source portals
+
+When you already know the dataset, skip the catalogue. LUSTAT files are
+fetched by their file name on data.lustat.ch:
+
+```{r fetch-lustat}
+fa <- pv_fetch_lustat("fa-lu-ra")
+#> Source: LUSTAT Statistik Luzern, dataset "fa-lu-ra" (data.lustat.ch)
+#> Licence: opendata.swiss "OPEN BY ASK" terms - free use with source
+#>   citation ("Quelle: LUSTAT Statistik Luzern"); commercial use requires
+#>   the data owner's permission.
+```
+
+BFS dataflows on stats.swiss are fetched by their SDMX id.
+`pv_fetch_bfs()` requests the labelled CSV export and tidies it: every
+SDMX component becomes a column named by its lower-cased id holding the
+human-readable label, the underlying code sits in a matching `<id>_code`
+column, and the observation itself is `obs_value`:
+
+```{r fetch-bfs}
+pop <- pv_fetch_bfs("DF_SSV_POP_1930")
+#> Source: Bundesamt für Statistik, dataflow CH1.SSV:DF_SSV_POP_1930(2026.1.0),
+#>   via stats.swiss
+#> Licence: opendata.swiss "OPEN BY" terms - free use, source citation
+#>   required ("Quelle: Bundesamt für Statistik").
+```
+
+Two quirks of the city dataflows are worth knowing: the pseudo-city
+coded `"_ST"` is the all-cities total, and the population indicator
+mixes census years with current-period codes whose *label* carries the
+year. Rows whose indicator code starts with `"pop_ref_period"` and whose
+label is a bare four-digit year are the actual population counts:
+
+```{r bfs-filter}
+cities <- pop[startsWith(pop$ssv_pop_1930_code, "pop_ref_period") &
+                grepl("^\\d{4}$", pop$ssv_pop_1930) &
+                pop$ssv_swiss_city_code != "_ST", ]
+```
+
+## The cache
+
+Every download lands in a per-user cache
+(`tools::R_user_dir("polyviz", "cache")`). The first fetch hits the
+network; every later fetch of the same URL is instant and works offline
+— which also means a script re-run does not hammer a government server.
+
+```{r cache}
+pv_cache_status()   # one row per cached download: url, size, fetched
+pv_cache_clear()    # start over
+
+# force a fresh download of one dataset, e.g. after a yearly update
+fa <- pv_fetch_lustat("fa-lu-ra", refresh = TRUE)
+```
+
+## Maps to put it on
+
+The package bundles the country's statistical geography, processed from
+the BFS "Generalisierte Gemeindegrenzen" (open use, citation
+"© BFS, ThemaKart"): `pv_swiss_cantons` (26 cantons),
+`pv_swiss_districts` (143 districts), `pv_swiss_lakes` (the 22 largest
+lakes), and `pv_lucerne_map` (the 79 Lucerne municipalities). The one
+layer too big to ship — all ~2100 Swiss municipalities — is downloaded
+on first use and cached:
+
+```{r fetch-map}
+muni <- pv_fetch_map("municipalities")   # needs sf on the first call only
+```
+
+`pv_choropleth()` and `pv_bubble_map()` accept all of these by name, so
+you rarely touch the layer objects themselves. `map = "cantons"` joins
+on the BFS canton number (1–26), `"districts"` on the district number,
+`"municipalities"` on the municipality number — the ids every Swiss
+statistical dataset already carries:
+
+```{r map-layers}
+pv_choropleth(canton_data, map = "cantons", id = "canton", value = "share")
+pv_bubble_map(cities, lon = "lon", lat = "lat", size = "population")
+```
+
+The major lakes are drawn automatically on any map showing the whole
+country (`lakes = "auto"`); force them with `lakes = TRUE` or suppress
+them with `lakes = FALSE`. And a map that is not bundled at all — a
+commune you surveyed, boundaries from another country — can be handed
+over as an sf object; `join_id =` names the column holding each
+feature's id:
+
+```{r sf-map}
+pv_choropleth(results, map = my_sf_layer, join_id = "region_code",
+              id = "region", value = "turnout")
+```
+
+## From portal to paper
+
+The whole loop, end to end: fetch the live Lucerne fiscal-equalization
+data, chart the distribution, map the geography, and save both figures
+for a manuscript. (This is the live version of the bundled `pv_fiscal`;
+column names are LUSTAT's own — `fa_jahr` the year, `gnr` the BFS
+municipality number, `ri` the resource index.)
+
+```{r story-fetch}
+fa <- pv_fetch_lustat("fa-lu-ra")
+latest <- fa[fa$fa_jahr == max(fa$fa_jahr), ]
+```
+
+(One thing worth knowing about this dataset: LUSTAT publishes a year or
+two ahead, so the newest years are projections, not accounts.)
+
+First the distribution — how unequal are the municipal tax bases?
+
+```{r story-chart}
+w1 <- pv_histogram(
+  latest, x = "ri", bins = 20,
+  title = "Most municipalities sit below the cantonal average",
+  subtitle = sprintf("Resource index, %d (average = 100)",
+                     max(fa$fa_jahr)),
+  source = "Quelle: LUSTAT Statistik Luzern"
+)
+```
+
+Then the geography. The `gnr` column holds official BFS municipality
+numbers, and the bundled `pv_lucerne_map` boundaries carry the same ids,
+so the join is automatic:
+
+```{r story-map}
+w2 <- pv_choropleth(
+  latest, id = "gnr", value = "ri",
+  palette = "diverging", center = 100,
+  title = "Tax resources follow the lake",
+  subtitle = sprintf("Resource index by municipality, %d (average = 100)",
+                     max(fa$fa_jahr)),
+  source = "Quelle: LUSTAT Statistik Luzern; Grenzen: BFS ThemaKart"
+)
+```
+
+And onto the page — `pv_save()` renders each chart for real in headless
+Chrome and writes a print-quality file (see
+`vignette("embedding-charts")` for sizing and formats):
+
+```{r story-save}
+pv_save(w1, "fiscal-distribution.png")   # Word, slides
+pv_save(w2, "fiscal-map.pdf")            # LaTeX, true vector
+```
+
+Both figures carry their citation in the source line, which satisfies
+the "BY" half of LUSTAT's OPEN BY ASK terms. The "ASK" half is yours:
+these figures are fine in a paper, a thesis, or a public report — for a
+commercial product, ask LUSTAT for permission first.
+
+## Where to go next
+
+* The charts themselves — picking forms, options, small multiples —
+  are the subject of `vignette("polyviz-eda")`.
+* Export formats, print sizing, and knitting to Word or PDF are in
+  `vignette("embedding-charts")`.
+* Every dataset bundled with the package documents its own source and
+  licence on its help page — `?pv_fiscal`, `?pv_swiss_cantons`, and
+  friends.

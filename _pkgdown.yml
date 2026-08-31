@@ -51,6 +51,7 @@ reference:
   - pv_chord
   - pv_force
   - pv_choropleth
+  - pv_bubble_map
   - pv_race
 
 - title: Chart layers & linking
@@ -90,6 +91,20 @@ reference:
   - pv_db_tables
   - pv_query
   - pv_run_sql_file
+
+- title: Swiss open data
+  desc: >
+    Live access to the portals the bundled datasets come from - search
+    the opendata.swiss catalogue, fetch from the BFS and LUSTAT, pull
+    the country-wide boundary layers, and manage the shared download
+    cache. Every fetch states its source and licence terms.
+  contents:
+  - pv_search_opendata
+  - pv_fetch_opendata
+  - pv_fetch_bfs
+  - pv_fetch_lustat
+  - pv_fetch_map
+  - pv_cache_status
 
 - title: Analysis
   desc: >
@@ -133,6 +148,10 @@ reference:
   - pv_fiscal
   - pv_elections
   - pv_lucerne_map
+  - pv_swiss_cantons
+  - pv_swiss_districts
+  - pv_swiss_lakes
+  - pv_city_coords
   - pv_weather
 
 - title: Shiny

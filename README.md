@@ -6,13 +6,13 @@
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 24 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 25 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 24 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 25 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -37,9 +37,10 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_boxplot()` | `pv_violin()` | `pv_ridgeline()` |
 | `pv_beeswarm()` | `pv_donut()` | `pv_treemap()` |
 | `pv_sunburst()` — zoomable | `pv_pack()` — zoomable | `pv_heatmap()` |
-| `pv_calendar()` | `pv_choropleth()` | `pv_force()` |
-| `pv_chord()` | `pv_sankey()` | `pv_parallel()` — brushable |
-| `pv_race()` — animated | `pv_bump()` | `pv_dendrogram()` — from `hclust` |
+| `pv_calendar()` | `pv_choropleth()` | `pv_bubble_map()` |
+| `pv_force()` | `pv_chord()` | `pv_sankey()` |
+| `pv_parallel()` — brushable | `pv_race()` — animated | `pv_bump()` |
+| `pv_dendrogram()` — from `hclust` | | |
 
 ## Charts in papers and documents
 
@@ -84,7 +85,17 @@ pv_db_disconnect(con)
 df <- pv_set_labels(pv_sales, c(revenue = "Net revenue, EUR"))
 pv_write_sas(df, "sales.xpt")
 pv_labels(pv_read_sas("sales.xpt"))
+
+# Swiss open data, live from the official portals (downloads cached)
+pv_search_opendata("Finanzausgleich Luzern")        # the federal catalogue
+pv_fetch_opendata("finanzausgleich-kanton-luzern")  # fetch a dataset it lists
+pv_fetch_bfs("DF_SSV_POP_1930")   # a stats.swiss SDMX dataflow, tidied
+pv_fetch_lustat("fa-lu-ra")       # a LUSTAT Statistik Luzern CSV
 ```
+
+Every fetch prints the data's source and licence terms and attaches them
+to the result; resources without an open licence are refused rather than
+delivered. Portals, cache, and obligations: `vignette("swiss-open-data")`.
 
 ## Analysing it
 
@@ -101,17 +112,23 @@ pv_outliers(airquality$Ozone, method = "iqr")
 
 ## Bundled data
 
-Eight real open-government datasets ship with the package, covering the
+Twelve real open-government datasets ship with the package, covering the
 population, economy, territory, and weather of Switzerland:
 
-- `pv_city_population` — 181 Swiss cities at census years 1930–2024 (BFS)
+- `pv_city_population` — 180 Swiss cities at census years 1930–2024 (BFS)
 - `pv_city_sectors` — employment shares by economic sector per city (BFS/STATENT)
 - `pv_city_landuse` — land use in hectares, two hierarchy levels (BFS Arealstatistik)
 - `pv_commuters` — commuter flows between Canton Zug and its neighbours (Fachstelle Statistik Zug)
 - `pv_fiscal` — fiscal equalization of Lucerne municipalities (LUSTAT Statistik Luzern)
 - `pv_elections` — Lucerne municipal council candidacies and seats (LUSTAT Statistik Luzern)
-- `pv_lucerne_map` — municipal boundary polygons, 1.1.2025 (BFS ThemaKart)
+- `pv_lucerne_map` — municipal boundary polygons of Canton Lucerne, 1.1.2025 (BFS ThemaKart)
+- `pv_swiss_cantons` / `pv_swiss_districts` / `pv_swiss_lakes` — country-wide boundary layers for `pv_choropleth()` and `pv_bubble_map()` (BFS ThemaKart)
+- `pv_city_coords` — one WGS84 point per city, the bubble-map companion (derived from BFS ThemaKart)
 - `pv_weather` — daily temperature, precipitation, and sunshine in Lucerne, 2020–2025 (MeteoSwiss)
+
+The one layer too big to bundle — all ~2100 municipal boundaries — is
+downloaded and cached on first use by `pv_fetch_map("municipalities")`,
+or simply by passing `map = "municipalities"` to a geo chart.
 
 All are openly licensed with source citation required (see each dataset's
 help page for the exact attribution); the LUSTAT datasets additionally

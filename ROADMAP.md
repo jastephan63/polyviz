@@ -6,13 +6,13 @@ GitHub issue - the numbers below link to them.
 
 ## Chart types & options
 
-- [ ] Violin plot: add optional boxplot overlay and jittered raw points (#1)
-- [ ] Stacked and percent-stacked modes for `pv_bar` (plus horizontal orientation) (#2)
+- [x] Violin plot: add optional boxplot overlay and jittered raw points (#1) — shipped in 0.6.0
+- [x] Stacked and percent-stacked modes for `pv_bar` (plus horizontal orientation) (#2) — shipped in 0.6.0
 - [ ] Correlogram / scatterplot-matrix widget (`pv_pairs`) composing scatter, histogram, and correlation cells (#3)
 - [x] Dendrogram widget that accepts `hclust` objects directly — shipped in 0.3.0 as `pv_dendrogram()`
 - [x] Zoomable circular-packing widget (`pv_pack`) — shipped in 0.3.0
-- [ ] Connected-scatter option for `pv_line` (`show_points`, curve styles) (#4)
-- [ ] Brush-to-zoom (focus + context) option for `pv_line` and area charts (#5)
+- [x] Connected-scatter option for `pv_line` (`show_points`, curve styles) (#4) — shipped in 0.6.0
+- [x] Brush-to-zoom (focus + context) option for `pv_line` and area charts (#5) — shipped in 0.6.0
 - [ ] Contour-density mode for `pv_scatter` to handle overplotting on large data (#6)
 - [ ] Arc diagram as a label-friendly alternative network view (#7)
 - [ ] Optional texture/pattern fills as a colour-blindness accessibility channel (#8)

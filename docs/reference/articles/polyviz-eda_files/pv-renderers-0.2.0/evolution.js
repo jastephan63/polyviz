@@ -370,7 +370,13 @@
       return pv.truncate(d, truncN);
     });
 
-    var yAxis = g.append("g").call(d3.axisLeft(yb).tickSize(0));
+    /* Crowded row labels thin out the same way: 11px type needs about
+       14px of band to stay separate, so keep roughly one label per 14px
+       of height and let the cell tooltip carry the exact rows. */
+    var yMaxTicks = Math.max(2, Math.floor(ih / 14));
+    var yStep = Math.ceil(yCats.length / yMaxTicks);
+    var yAxis = g.append("g").call(d3.axisLeft(yb).tickSize(0)
+      .tickValues(yCats.filter(function (d, i) { return i % yStep === 0; })));
     pv.styleAxis(yAxis, ctx.theme, false);
     /* Row labels shorten to the character budget, and further to whatever
        the (possibly width-capped) margin really fits; the tooltip carries
@@ -408,9 +414,16 @@
     var xIndex = {};
     xCats.forEach(function (c, i) { xIndex[c] = i; });
 
+    /* The surface-coloured stroke on every cell is what makes the gaps
+       between cells. It scales with the cells themselves: the full 2px
+       on roomy grids, proportionally less as the bands shrink, and none
+       at all below 4px bands - there the gap would erase the fill, and a
+       dense grid reads best as a continuous colour field. */
+    var minBand = Math.min(xb.bandwidth(), yb.bandwidth());
+    var gapW = minBand < 4 ? 0 : Math.min(2, minBand / 6);
+
     /* Cells live in their own layer so a raised (hovered) cell can't cover
-       the value labels drawn after them. The 2px surface stroke is what
-       makes the gaps between cells. */
+       the value labels drawn after them. */
     var cellLayer = g.append("g");
     var cells = cellLayer.selectAll("rect.cell").data(data).enter()
       .append("rect")
@@ -421,7 +434,7 @@
       .attr("height", yb.bandwidth())
       .attr("fill", function (d) { return colorOf(d.value); })
       .attr("stroke", ctx.theme.ink.surface)
-      .attr("stroke-width", 2)
+      .attr("stroke-width", gapW)
       .attr("opacity", 0);
 
     /* Cells sweep in column by column. */
@@ -435,7 +448,6 @@
        TRUE squeezes down to a 9px font for 24-40px cells, but below 24px
        nothing fits at any honest size, so even TRUE prints nothing.
        FALSE never prints. */
-    var minBand = Math.min(xb.bandwidth(), yb.bandwidth());
     var showVals = opt(ctx.x.cellValues,
       xb.bandwidth() > 40 && yb.bandwidth() > 40);
     if (showVals && minBand >= 24) {
@@ -457,17 +469,21 @@
     }
 
     /* Hovering rings the cell in primary ink (raised so the ring isn't
-       hidden under its neighbours' strokes). */
+       hidden under its neighbours' strokes). The ring keeps a visible
+       width of its own - on dense grids the gap stroke is zero. */
     cells
       .on("pointerenter pointermove", function (event, d) {
-        d3.select(this).raise().attr("stroke", ctx.theme.ink.primary);
+        d3.select(this).raise()
+          .attr("stroke", ctx.theme.ink.primary)
+          .attr("stroke-width", Math.max(gapW, 1.25));
         pv.showTip(ctx, event,
           "<b>" + pv.esc(d.x) + " · " + pv.esc(d.y) + "</b><br>" +
           pv.esc(ctx.x.vlab || "value") + ": <b>" + ctx.fmt(d.value) +
           "</b>");
       })
       .on("pointerleave", function () {
-        d3.select(this).attr("stroke", ctx.theme.ink.surface);
+        d3.select(this).attr("stroke", ctx.theme.ink.surface)
+          .attr("stroke-width", gapW);
         pv.hideTip(ctx);
       });
   };

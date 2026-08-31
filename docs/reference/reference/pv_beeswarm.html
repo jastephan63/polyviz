@@ -9,7 +9,7 @@ axis is the value, and a collision layout (a d3 force simulation run to
 completion before anything is drawn) nudges overlapping dots apart so
 each one stays visible. Where a boxplot summarises and a histogram
 bins, a beeswarm keeps the individuals — the right choice when single
-cases have names worth hovering, up to a few hundred of them."><!-- dependencies from examples --><script src="libs/htmlwidgets-1.6.4/htmlwidgets.js"></script><script src="libs/d3-7.9.0/d3.v7.min.js"></script><script src="libs/d3-sankey-0.12.3/d3-sankey.min.js"></script><link href="libs/pv-fonts-0.2.0/inter.css" rel="stylesheet"><script src="libs/pv-common-0.2.0/pv-common.js"></script><script src="libs/pv-renderers-0.2.0/basic.js"></script><script src="libs/pv-renderers-0.2.0/relational.js"></script><script src="libs/pv-renderers-0.2.0/distribution.js"></script><script src="libs/pv-renderers-0.2.0/composition.js"></script><script src="libs/pv-renderers-0.2.0/evolution.js"></script><script src="libs/pv-renderers-0.2.0/flow.js"></script><script src="libs/pv-renderers-0.2.0/geo.js"></script><script src="libs/pv-renderers-0.2.0/hierarchy.js"></script><script src="libs/pv-renderers-0.2.0/motion.js"></script><script src="libs/pv-renderers-0.2.0/points.js"></script><script src="libs/pvchart-binding-0.3.0/pvchart.js"></script></head><body>
+cases have names worth hovering, up to a few hundred of them."><!-- dependencies from examples --><script src="libs/htmlwidgets-1.6.4/htmlwidgets.js"></script><script src="libs/d3-7.9.0/d3.v7.min.js"></script><script src="libs/d3-sankey-0.12.3/d3-sankey.min.js"></script><link href="libs/pv-fonts-0.2.0/inter.css" rel="stylesheet"><script src="libs/pv-common-0.2.0/pv-common.js"></script><script src="libs/pv-renderers-0.2.0/basic.js"></script><script src="libs/pv-renderers-0.2.0/relational.js"></script><script src="libs/pv-renderers-0.2.0/distribution.js"></script><script src="libs/pv-renderers-0.2.0/composition.js"></script><script src="libs/pv-renderers-0.2.0/evolution.js"></script><script src="libs/pv-renderers-0.2.0/flow.js"></script><script src="libs/pv-renderers-0.2.0/geo.js"></script><script src="libs/pv-renderers-0.2.0/hierarchy.js"></script><script src="libs/pv-renderers-0.2.0/motion.js"></script><script src="libs/pv-renderers-0.2.0/points.js"></script><script src="libs/pv-renderers-0.2.0/facet.js"></script><script src="libs/pvchart-binding-0.5.0/pvchart.js"></script></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -17,7 +17,7 @@ cases have names worth hovering, up to a few hundred of them."><!-- dependencies
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,7 +28,8 @@ cases have names worth hovering, up to a few hundred of them."><!-- dependencies
       <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/polyglot-backend.html">The polyglot backend</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
+    <li><a class="dropdown-item" href="../articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="../articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -90,7 +91,8 @@ cases have names worth hovering, up to a few hundred of them.</p>
 
 
 <dt id="arg-value">value<a class="anchor" aria-label="anchor" href="#arg-value"></a></dt>
-<dd><p>Name of the numeric column giving each dot's position.</p></dd>
+<dd><p>Name of the numeric column giving each dot's position.
+Rows with a missing value or group are dropped with a warning.</p></dd>
 
 
 <dt id="arg-group">group<a class="anchor" aria-label="anchor" href="#arg-group"></a></dt>

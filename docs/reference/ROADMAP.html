@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -18,7 +18,8 @@
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
+    <li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -50,29 +51,29 @@
 <ul class="task-list"><li><label><input type="checkbox">Violin plot: add optional boxplot overlay and jittered raw points</label></li>
 <li><label><input type="checkbox">Stacked and percent-stacked modes for <code>pv_bar</code> (plus horizontal orientation)</label></li>
 <li><label><input type="checkbox">Correlogram / scatterplot-matrix widget (<code>pv_pairs</code>) composing scatter, histogram, and correlation cells</label></li>
-<li><label><input type="checkbox">Dendrogram widget that accepts <code>hclust</code> objects directly</label></li>
-<li><label><input type="checkbox">Zoomable circular-packing widget (<code>pv_pack</code>)</label></li>
+<li><label><input type="checkbox" checked>Dendrogram widget that accepts <code>hclust</code> objects directly — shipped in 0.3.0 as <code><a href="reference/pv_dendrogram.html">pv_dendrogram()</a></code></label></li>
+<li><label><input type="checkbox" checked>Zoomable circular-packing widget (<code>pv_pack</code>) — shipped in 0.3.0</label></li>
 <li><label><input type="checkbox">Connected-scatter option for <code>pv_line</code> (<code>show_points</code>, curve styles)</label></li>
 <li><label><input type="checkbox">Brush-to-zoom (focus + context) option for <code>pv_line</code> and area charts</label></li>
 <li><label><input type="checkbox">Contour-density mode for <code>pv_scatter</code> to handle overplotting on large data</label></li>
 <li><label><input type="checkbox">Arc diagram as a label-friendly alternative network view</label></li>
 <li><label><input type="checkbox">Optional texture/pattern fills as a colour-blindness accessibility channel</label></li>
-<li><label><input type="checkbox">“Download as PNG” button option on every widget</label></li>
+<li><label><input type="checkbox" checked>“Download as PNG” button option on every widget — shipped in 0.5.0, as a hover control offering both SVG and 2x PNG, toggleable per chart with <code><a href="reference/pv_downloads.html">pv_downloads()</a></code>; <code><a href="reference/pv_save.html">pv_save()</a></code> covers PNG/SVG/PDF/HTML from R</label></li>
 <li><label><input type="checkbox">Canvas rendering fallback for scatters beyond ~5,000 points</label></li>
 </ul></div>
 <div class="section level2">
 <h2 id="data--analysis">Data &amp; analysis<a class="anchor" aria-label="anchor" href="#data--analysis"></a></h2>
 <ul class="task-list"><li><label><input type="checkbox">Add more LUSTAT / opendata.swiss datasets with documented examples</label></li>
-<li><label><input type="checkbox"><code><a href="reference/pv_report.html">pv_report()</a></code>: one call that builds a full HTML EDA report from a data frame</label></li>
+<li><label><input type="checkbox" checked><code><a href="reference/pv_report.html">pv_report()</a></code>: one call that builds a full HTML EDA report from a data frame — shipped in 0.4.0</label></li>
 <li><label><input type="checkbox">Correlation method options (Spearman, Kendall) for <code>pv_plot_corr</code> and heatmaps</label></li>
 <li><label><input type="checkbox">Python backend: add skewness/kurtosis and normality checks to <code>pv_profile</code></label></li>
 </ul></div>
 <div class="section level2">
 <h2 id="documentation--infrastructure">Documentation &amp; infrastructure<a class="anchor" aria-label="anchor" href="#documentation--infrastructure"></a></h2>
-<ul class="task-list"><li><label><input type="checkbox">GitHub Actions CI: R CMD check + testthat on every push</label></li>
-<li><label><input type="checkbox">pkgdown site published via GitHub Pages</label></li>
-<li><label><input type="checkbox">Vignette: “Exploring a dataset with polyviz” end-to-end walkthrough</label></li>
-<li><label><input type="checkbox">Vignette: “The polyglot backend” — how R drives SQL, SAS, Python, and d3</label></li>
+<ul class="task-list"><li><label><input type="checkbox" checked>GitHub Actions CI: R CMD check + testthat on every push — shipped in 0.4.0, extended in 0.5.0 with headless render tests of all 24 charts</label></li>
+<li><label><input type="checkbox" checked>pkgdown site published via GitHub Pages — shipped in 0.4.0 at /reference</label></li>
+<li><label><input type="checkbox" checked>Vignette: “Exploring a dataset with polyviz” end-to-end walkthrough — shipped in 0.4.0</label></li>
+<li><label><input type="checkbox" checked>Vignette: “The polyglot backend” — how R drives SQL, SAS, Python, and d3 — shipped in 0.4.0</label></li>
 <li><label><input type="checkbox">Shiny demo app in <code>inst/shiny</code> showcasing every widget with live controls</label></li>
 <li><label><input type="checkbox">CRAN submission preparation: spell check, URL checks, win-builder run</label></li>
 </ul></div>

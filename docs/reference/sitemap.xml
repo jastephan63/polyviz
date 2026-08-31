@@ -3,6 +3,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/LICENSE-text.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/LICENSE.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/ROADMAP.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/articles/embedding-charts.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/articles/index.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/articles/polyglot-backend.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/articles/polyviz-eda.html</loc></url>
@@ -11,6 +12,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/news/index.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/annotations.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/index.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/knit_print.pvchart.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/polyviz-package.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_annotate.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_area.html</loc></url>
@@ -33,6 +35,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_db_write.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_dendrogram.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_donut.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_downloads.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_elections.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_facet.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_fiscal.html</loc></url>
@@ -64,6 +67,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_run_sql_file.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_sales.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_sankey.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_save.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_scatter.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_set_labels.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_set_theme.html</loc></url>

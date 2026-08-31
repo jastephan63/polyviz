@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,7 +35,8 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
+<li><a class="dropdown-item" href="articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
+    <li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
   </ul>
 </li>
@@ -63,6 +64,7 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="polyviz">polyviz<a class="anchor" aria-label="anchor" href="#polyviz"></a>
 </h1></div>
+<p><a href="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p><strong>D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.</strong></p>
 <p>polyviz was born from loving <a href="https://d3js.org" class="external-link">d3.js</a> visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.</p>
 <p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 24 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
@@ -114,7 +116,7 @@
 <div class="section level2">
 <h2 id="the-charts">The charts<a class="anchor" aria-label="anchor" href="#the-charts"></a>
 </h2>
-<p>Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (<code><a href="reference/pvchart-shiny.html">pvchartOutput()</a></code> / <code><a href="reference/pvchart-shiny.html">renderPvchart()</a></code>). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit <code>TRUE</code>/<code>FALSE</code>/<code>"auto"</code> override. See each one live, explained, in the <a href="https://jastephan63.github.io/polyviz/" class="external-link">gallery</a>.</p>
+<p>Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (<code><a href="reference/pvchart-shiny.html">pvchartOutput()</a></code> / <code><a href="reference/pvchart-shiny.html">renderPvchart()</a></code>). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit <code>TRUE</code>/<code>FALSE</code>/<code>"auto"</code> override. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the <a href="https://jastephan63.github.io/polyviz/" class="external-link">gallery</a>.</p>
 <table class="table">
 <colgroup>
 <col width="33%">
@@ -173,6 +175,22 @@
 </table>
 </div>
 <div class="section level2">
+<h2 id="charts-in-papers-and-documents">Charts in papers and documents<a class="anchor" aria-label="anchor" href="#charts-in-papers-and-documents"></a>
+</h2>
+<p>Interactive is the default, but every chart also leaves the browser as a print-quality file — <code><a href="reference/pv_save.html">pv_save()</a></code> picks the format from the extension:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">revenue</span> <span class="op">~</span> <span class="va">region</span>, <span class="va">pv_sales</span>, <span class="va">sum</span><span class="op">)</span></span>
+<span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pv_bar.html">pv_bar</a></span><span class="op">(</span><span class="va">agg</span>, <span class="st">"region"</span>, <span class="st">"revenue"</span>, title <span class="op">=</span> <span class="st">"Revenue by region"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.png"</span><span class="op">)</span>   <span class="co"># crisp 2x raster — Word, Google Docs, slides</span></span>
+<span><span class="fu"><a href="reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.svg"</span><span class="op">)</span>   <span class="co"># standalone vector — web pages, Inkscape/Illustrator</span></span>
+<span><span class="fu"><a href="reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.pdf"</span><span class="op">)</span>   <span class="co"># true vector PDF — LaTeX</span></span>
+<span><span class="fu"><a href="reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.html"</span><span class="op">)</span>  <span class="co"># one self-contained interactive file — sharing</span></span></code></pre></div>
+<p>The capture formats render the chart for real in headless Chrome (the chromote package plus a Chrome-based browser required), with the entrance animation switched off and light mode forced by default — a save never catches a mid-animation frame or your machine’s dark theme. The <code>.html</code> file is assembled purely in R: no Chrome, no pandoc, interactivity intact.</p>
+<p>Knitting to Word or PDF needs no extra code: in any output format that can’t run d3, the chart becomes a print-quality PNG at the chunk’s <code>fig.width</code>/<code>fig.height</code>/<code>dpi</code> (put <code>knitr::opts_chunk$set(screenshot.force = FALSE)</code> in the setup chunk; chromote + Chrome required — without them the error saying what to install stands where the chart would be, or stops the knit). And every rendered chart carries a hover download button in its top-right corner — standalone SVG or 2x PNG — which <code>pv_downloads(w, FALSE)</code> hides.</p>
+<p>One habit to unlearn: <code>print(w)</code> in a non-interactive script displays nothing — there is no viewer to open. Save instead. Details, print sizing included, in <code><a href="articles/embedding-charts.html">vignette("embedding-charts")</a></code>.</p>
+</div>
+<div class="section level2">
 <h2 id="design">Design<a class="anchor" aria-label="anchor" href="#design"></a>
 </h2>
 <p>The look is research-backed, not taste-backed. The typeface is <a href="https://rsms.me/inter/" class="external-link">Inter</a> (bundled, SIL OFL) — the open-licence counterpart of the grotesques used by the FT, The Economist, and the NYT graphics desks — with true tabular numerals on every axis. The categorical palette is anchored on The Economist’s published web palette, then re-stepped in OKLCH colour space and slot-ordered by exhaustive search so that adjacent series remain distinguishable under the common colour-vision deficiencies, in light <strong>and</strong> dark mode. Chart anatomy follows newsroom craft: left-aligned title block, horizontal hairline gridlines only, a zero baseline, direct labels over legends, compact “12.8k” numbers on axes with exact values in tooltips, and a source line on every chart.</p>
@@ -180,7 +198,7 @@
 <div class="section level2">
 <h2 id="getting-data-in">Getting data in<a class="anchor" aria-label="anchor" href="#getting-data-in"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># One reader for everything — dispatches on the file extension</span></span>
 <span><span class="fu"><a href="reference/pv_read.html">pv_read</a></span><span class="op">(</span><span class="st">"results.csv"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/pv_read.html">pv_read</a></span><span class="op">(</span><span class="st">"trial.sas7bdat"</span><span class="op">)</span></span>
@@ -201,7 +219,7 @@
 <div class="section level2">
 <h2 id="analysing-it">Analysing it<a class="anchor" aria-label="anchor" href="#analysing-it"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># One-look data-quality summary (dimensions, missingness, value sketches)</span></span>
 <span><span class="fu"><a href="reference/pv_summary.html">pv_summary</a></span><span class="op">(</span><span class="va">airquality</span><span class="op">)</span></span>
 <span></span>

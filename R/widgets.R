@@ -32,20 +32,103 @@ pv_widget <- function(type, payload, width = NULL, height = NULL,
   )
 }
 
-# Fails early with a readable message if a chart is asked to use a column
-# that the data frame does not have.
+# Fails early with a readable message if a chart is handed something that
+# is not a data frame, or asked to use a column the data frame does not
+# have. A missing column's message lists what is available and, when the
+# name looks like a typo, offers the closest real column.
 check_columns <- function(data, cols) {
+  if (!is.data.frame(data)) {
+    got <- if (is.null(data)) "NULL" else paste0("a ", class(data)[[1]])
+    rlang::abort(sprintf("`data` must be a data frame (got %s).", got))
+  }
   cols <- cols[!vapply(cols, is.null, logical(1))]
   missing <- setdiff(unlist(cols), names(data))
   if (length(missing)) {
-    rlang::abort(sprintf("Column(s) not in `data`: %s",
-                         paste(missing, collapse = ", ")))
+    avail <- if (length(names(data))) {
+      paste(names(data), collapse = ", ")
+    } else {
+      "(none)"
+    }
+    near <- vapply(missing, function(m) {
+      d <- utils::adist(m, names(data), ignore.case = TRUE)
+      best <- which.min(d)
+      if (length(best) && d[best] <= 2 && d[best] < nchar(m)) {
+        names(data)[best]
+      } else {
+        NA_character_
+      }
+    }, character(1))
+    near <- unique(near[!is.na(near)])
+    hint <- if (length(near)) {
+      sprintf(" Did you mean %s?",
+              paste0("`", near, "`", collapse = ", "))
+    } else {
+      ""
+    }
+    rlang::abort(sprintf("Column(s) not in `data`: %s. Available: %s.%s",
+                         paste(missing, collapse = ", "), avail, hint))
   }
 }
 
+# Columns mapped to a numeric role must hold numbers. as.numeric() on a
+# factor would silently chart its level codes, and on a character column
+# it would chart NAs, so both are refused here by name.
+check_value_column <- function(data, col) {
+  v <- data[[col]]
+  if (is.factor(v) || is.character(v)) {
+    rlang::abort(sprintf(
+      "Column `%s` is %s, not numeric.",
+      col, if (is.factor(v)) "a factor" else "a character column"))
+  }
+}
+
+# Zero rows means nothing to draw. Every constructor refuses that early
+# with the same plain message, instead of crashing further down or
+# rendering an empty chart.
+check_nonempty <- function(data, arg = "data") {
+  if (!nrow(data)) {
+    rlang::abort(sprintf("`%s` has no rows; nothing to draw.", arg))
+  }
+}
+
+# Charts that draw individual values have nowhere to put a missing one,
+# so those rows are dropped with a warning that names the column.
+warn_dropped <- function(n, col) {
+  if (n > 0) {
+    rlang::warn(sprintf("Dropped %d row(s) with missing `%s` values.",
+                        n, col))
+  }
+}
+
+# Drops the rows flagged in `bad` from a payload data frame, warning with
+# the column's name. Losing every row that way is an error instead - a
+# fully missing column deserves more than a warning and a blank chart.
+drop_missing <- function(df, bad, col) {
+  if (!any(bad)) {
+    return(df)
+  }
+  if (all(bad)) {
+    rlang::abort(sprintf(
+      "`%s` has no non-missing values; nothing to draw.", col))
+  }
+  warn_dropped(sum(bad), col)
+  df <- df[!bad, , drop = FALSE]
+  rownames(df) <- NULL
+  df
+}
+
 chart_opts <- function(title, subtitle, mode, duration, source = NULL) {
+  if (!is.character(mode) || length(mode) != 1 || is.na(mode) ||
+      !mode %in% c("auto", "light", "dark")) {
+    rlang::abort('`mode` must be "auto", "light", or "dark".')
+  }
+  if (!is.numeric(duration) || length(duration) != 1 ||
+      !is.finite(duration) || duration < 0) {
+    rlang::abort(
+      "`duration` must be a single non-negative number of milliseconds.")
+  }
   list(title = title, subtitle = subtitle, mode = mode,
-       duration = duration, source = source)
+       duration = as.numeric(duration), source = source)
 }
 
 # Several chart options accept TRUE, FALSE, or "auto". "auto" is the
@@ -94,7 +177,10 @@ as_axis_values <- function(x) {
 #' baseline, and hovering any bar shows a tooltip. Give `series` to get
 #' grouped bars with a legend.
 #'
-#' @param data A data frame.
+#' @param data A data frame with one row per bar (per category, or per
+#'   category/series combination) — more than one is an error; aggregate
+#'   first. Rows with a missing category or value are dropped with a
+#'   warning.
 #' @param x Name of the category column.
 #' @param y Name of the numeric value column.
 #' @param series Optional name of a grouping column (grouped bars).
@@ -132,15 +218,30 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
                    duration = 500, source = NULL, width = NULL, height = NULL,
                    elementId = NULL) {
   check_columns(data, list(x, y, series))
+  check_nonempty(data)
+  check_value_column(data, y)
   check_flag(horizontal, "horizontal")
   check_flag(value_labels, "value_labels")
   if (isTRUE(horizontal) && !is.null(series)) {
     rlang::abort("`horizontal` bars support a single series only.")
   }
   df <- data.frame(x = as.character(data[[x]]), y = as.numeric(data[[y]]))
-  if (!is.null(series)) {
-    df$series <- as.character(data[[series]])
-  } else if (isTRUE(sort)) {
+  if (!is.null(series)) df$series <- as.character(data[[series]])
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  if (!is.null(series)) df <- drop_missing(df, is.na(df$series), series)
+  # Two rows for the same bar would draw one bar over the other, so
+  # refuse them here where the message can say what to do about it.
+  key <- paste(df$x, if (is.null(series)) "" else df$series, sep = "\r")
+  if (anyDuplicated(key)) {
+    rlang::abort(if (is.null(series)) {
+      paste("`data` has more than one row per category; aggregate it first,",
+            "or map the extra grouping with `series`.")
+    } else {
+      "`data` has more than one row per series/category combination; aggregate it first."
+    })
+  }
+  if (is.null(series) && isTRUE(sort)) {
     df <- df[order(-df$y), ]
   }
   pv_widget("bar", c(list(
@@ -156,7 +257,9 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
 #' tooltip that reads out every series at the hovered x position. Series
 #' are direct-labelled at the line ends.
 #'
-#' @param data A data frame.
+#' @param data A data frame with one row per x position per series —
+#'   more than one is an error; aggregate first. Rows with a missing x
+#'   or value are dropped with a warning.
 #' @param x Name of the x column — `Date`, numeric, or categorical.
 #' @param y Name of the numeric value column.
 #' @param series Optional name of a series column (one line per level).
@@ -176,10 +279,22 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
                     duration = 800, source = NULL, width = NULL, height = NULL,
                     elementId = NULL) {
   check_columns(data, list(x, y, series))
+  check_nonempty(data)
+  check_value_column(data, y)
   check_flag(legend, "legend")
   ax <- as_axis_values(data[[x]])
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  if (!is.null(series)) df <- drop_missing(df, is.na(df$series), series)
+  # Two rows for the same series at the same x have no defensible drawing
+  # order, so refuse them here where the message can say what to do.
+  if (anyDuplicated(paste(df$x, df$series, sep = "\r"))) {
+    rlang::abort(paste0(
+      "`data` has more than one row per series/x combination; aggregate it first.",
+      if (is.null(series)) " Or map the extra grouping with `series`."))
+  }
   # Points must be in drawing order within each line. For category axes we
   # keep the rows in the order they arrived (sorting "Jan, Feb, ..."
   # alphabetically would scramble them); dates and numbers sort naturally.
@@ -198,7 +313,8 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #' Scatter plot with per-point tooltips; optional colour (categorical) and
 #' size (numeric) encodings.
 #'
-#' @param data A data frame.
+#' @param data A data frame. Rows missing an x, y, or (when mapped) size
+#'   value are dropped with a warning.
 #' @param x,y Names of numeric columns.
 #' @param color Optional name of a categorical column (max 3 distinct
 #'   values keeps every pair distinguishable; more will error).
@@ -219,6 +335,10 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
                        height = NULL,
                        elementId = NULL) {
   check_columns(data, list(x, y, color, size, label))
+  check_nonempty(data)
+  check_value_column(data, x)
+  check_value_column(data, y)
+  if (!is.null(size)) check_value_column(data, size)
   check_flag(legend, "legend")
   if (!is.null(color)) {
     n_levels <- length(unique(data[[color]]))
@@ -233,6 +353,10 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   if (!is.null(color)) df$series <- as.character(data[[color]])
   if (!is.null(size)) df$size <- as.numeric(data[[size]])
   if (!is.null(label)) df$label <- as.character(data[[label]])
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  if (!is.null(size)) df <- drop_missing(df, is.na(df$size), size)
+  if (!is.null(color)) df <- drop_missing(df, is.na(df$series), color)
   pv_widget("scatter", c(list(
     data = df, xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
     sizelab = size,
@@ -263,7 +387,9 @@ pv_force <- function(nodes, links, id = "id", label = id, group = NULL,
                      duration = 0, source = NULL, width = NULL, height = NULL,
                      elementId = NULL) {
   check_columns(nodes, list(id, label, group))
+  check_nonempty(nodes, "nodes")
   check_columns(links, list("source", "target"))
+  if ("value" %in% names(links)) check_value_column(links, "value")
   nd <- data.frame(id = as.character(nodes[[id]]),
                    label = as.character(nodes[[label]]))
   if (!is.null(group)) nd$group <- as.character(nodes[[group]])
@@ -301,8 +427,14 @@ pv_chord <- function(matrix, labels = NULL,
                      duration = 600, source = NULL, width = NULL, height = NULL,
                      elementId = NULL) {
   m <- as.matrix(matrix)
+  if (!is.numeric(m)) {
+    rlang::abort("`matrix` must be numeric - each cell a flow size.")
+  }
   if (nrow(m) != ncol(m)) {
     rlang::abort("`matrix` must be square.")
+  }
+  if (!nrow(m)) {
+    rlang::abort("`matrix` has no rows; nothing to draw.")
   }
   labels <- labels %||% rownames(m) %||% paste0("G", seq_len(nrow(m)))
   pv_widget("chord", c(list(
@@ -321,6 +453,7 @@ pv_chord <- function(matrix, labels = NULL,
 #' @param levels Character vector of column names, outermost grouping
 #'   first, defining the hierarchy.
 #' @param value Name of the numeric column summed within each segment.
+#'   Values must be non-negative — a segment's size is an angle.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -332,8 +465,17 @@ pv_sunburst <- function(data, levels, value,
                         height = NULL,
                         elementId = NULL) {
   check_columns(data, list(levels, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   if (length(levels) < 1) {
     rlang::abort("`levels` needs at least one column name.")
+  }
+  # A negative value has no angle to sweep; the layout would silently
+  # come out wrong, so refuse it here.
+  if (any(data[[value]] < 0, na.rm = TRUE)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; sunburst segment sizes must be non-negative.",
+      value))
   }
   # Turn the flat table into the nested {name, children/value} tree that
   # d3.hierarchy expects: split the data by the first level column, then

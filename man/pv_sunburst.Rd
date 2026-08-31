@@ -24,7 +24,8 @@ pv_sunburst(
 \item{levels}{Character vector of column names, outermost grouping
 first, defining the hierarchy.}
 
-\item{value}{Name of the numeric column summed within each segment.}
+\item{value}{Name of the numeric column summed within each segment.
+Values must be non-negative — a segment's size is an angle.}
 
 \item{title, subtitle}{Optional chart heading text.}
 

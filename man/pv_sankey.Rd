@@ -21,7 +21,8 @@ pv_sankey(
 )
 }
 \arguments{
-\item{links}{A data frame of flows: one row per link.}
+\item{links}{A data frame of flows: one row per link. Repeating the
+same source/target pair is an error — aggregate those rows first.}
 
 \item{source}{Name of the column holding each link's origin node.}
 

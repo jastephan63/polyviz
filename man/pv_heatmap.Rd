@@ -25,7 +25,8 @@ pv_heatmap(
 )
 }
 \arguments{
-\item{data}{A data frame with at most one row per x/y cell.}
+\item{data}{A data frame with at most one row per x/y cell. Rows with
+a missing value are dropped with a warning — their cells stay blank.}
 
 \item{x}{Name of the column mapped to the matrix columns.}
 

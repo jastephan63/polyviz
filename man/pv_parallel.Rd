@@ -57,8 +57,8 @@ range — rows outside it fade out, and brushes on several axes combine
 so only rows passing all of them stay lit. Double-click an axis to
 clear its brush. Hovering a line raises it and reads out the full row.
 
-Rows with a missing value on any axis are dropped — a broken polyline
-would be unreadable.
+Rows with a missing value on any axis are dropped with a warning — a
+broken polyline would be unreadable.
 }
 \examples{
 # Land-use mix per city: share of each city's total area, in percent.

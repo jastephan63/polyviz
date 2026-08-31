@@ -26,7 +26,8 @@ pv_pack(
 first, defining the hierarchy. The first level takes the palette
 colours, so it allows at most 8 distinct groups.}
 
-\item{value}{Name of the numeric column summed within each circle.}
+\item{value}{Name of the numeric column summed within each circle.
+Values must be non-negative — a circle's size is an area.}
 
 \item{labels}{Write names inside the circles? \code{"auto"} (the default)
 labels exactly the circles the text honestly fits into at the

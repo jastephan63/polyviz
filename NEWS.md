@@ -1,3 +1,57 @@
+# polyviz 0.5.0
+
+Charts that work when they are not interactive, and a package that
+fails loudly instead of drawing something wrong.
+
+## Static export
+
+* `pv_save()` — save any chart as a file: `.png` (retina raster for
+  Word and slides), `.svg` (a standalone vector of the whole chart —
+  title, legend, and source line included — for the web and vector
+  editors), `.pdf` (true vector through Chrome's print engine, ready
+  for LaTeX), or `.html` (one fully self-contained file, built without
+  pandoc). Captures force the animation off and default to light mode,
+  so the file always shows the finished chart.
+* Knitting to Word or PDF now embeds a print-quality image of the
+  chart automatically (chromote and Chrome required); see the new
+  "Embedding polyviz charts in papers and documents" vignette.
+* Every rendered chart has a download control in its top-right corner
+  offering the same standalone SVG and a 2x PNG; turn it off per chart
+  with `pv_downloads(w, FALSE)`.
+* Headless browsers — knitr screenshots, `pv_save()`, test suites —
+  now always get the finished chart: the entry animation is skipped
+  and `mode = "auto"` resolves to light, so an automated capture can
+  no longer freeze a half-drawn or dark-themed frame.
+
+## Clear failures
+
+* Wrong input now stops in R with a plain message instead of drawing
+  something wrong: factor or character columns in numeric roles,
+  matrix or NULL data, misspelled columns (with a "did you mean"
+  hint), empty data, invalid `mode`/`duration` values, negative
+  values where areas or angles encode size (treemap, pack, sunburst,
+  stacked area), and duplicate category/x keys on bar, line, and
+  sankey. Rows with missing values are dropped with a warning that
+  says how many.
+* When rendering itself fails in the browser, the chart now shows
+  "polyviz: rendering failed" with the reason in the widget — no more
+  silent blank boxes — and empty payloads say "no data to display".
+
+## Big data
+
+* Heatmaps thin their row labels and scale their cell gaps on dense
+  grids, so a 150x150 matrix reads as a continuous colour field.
+* Scatter opacity and point size keep adapting past 10,000 points;
+  a 50,000-point cloud keeps its density structure visible.
+* Line charts with more series than the palette switch to a grey
+  spaghetti view with hover highlighting instead of recycling colours.
+
+## Infrastructure
+
+* Continuous integration now renders all 24 chart types in a headless
+  browser on every push and fails on any JavaScript error; the
+  rendered images are published as a build artifact.
+
 # polyviz 0.4.0
 
 Depth over breadth: layers, links, and infrastructure that work across

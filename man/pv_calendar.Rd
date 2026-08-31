@@ -26,7 +26,7 @@ pv_calendar(
 \code{as.Date()} understands (e.g. \code{"2024-01-31"} strings).}
 
 \item{value}{Name of the numeric column mapped to colour. Days whose
-value is missing are treated as absent.}
+value is missing are dropped with a warning and render as absent.}
 
 \item{years}{\code{NULL} (default) shows every year present in the data;
 an integer vector (e.g. \code{years = 2023:2025}) picks specific years

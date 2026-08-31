@@ -25,7 +25,8 @@ pv_violin(
 \arguments{
 \item{data}{A data frame.}
 
-\item{value}{Name of the numeric column whose distribution is drawn.}
+\item{value}{Name of the numeric column whose distribution is drawn.
+Rows with a missing value or group are dropped with a warning.}
 
 \item{group}{Name of the grouping column (one violin per level, max 8;
 every level needs at least 2 non-missing values for a density).}

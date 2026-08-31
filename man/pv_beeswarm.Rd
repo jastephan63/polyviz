@@ -23,7 +23,8 @@ pv_beeswarm(
 \arguments{
 \item{data}{A data frame.}
 
-\item{value}{Name of the numeric column giving each dot's position.}
+\item{value}{Name of the numeric column giving each dot's position.
+Rows with a missing value or group are dropped with a warning.}
 
 \item{group}{Optional name of a grouping column (one lane per level,
 max 8, coloured by lane). Omit it for a single central swarm.}

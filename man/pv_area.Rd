@@ -24,11 +24,13 @@ pv_area(
 )
 }
 \arguments{
-\item{data}{A data frame in long form: one row per series per x.}
+\item{data}{A data frame in long form: one row per series per x.
+Rows with a missing x or value are dropped with a warning.}
 
 \item{x}{Name of the x column — \code{Date}, numeric, or categorical.}
 
-\item{y}{Name of the numeric value column.}
+\item{y}{Name of the numeric value column. Values must be
+non-negative — stacked bands cannot represent a negative height.}
 
 \item{series}{Optional name of the series column, one band per level.
 At most 8 levels — beyond that, fold the small ones into an

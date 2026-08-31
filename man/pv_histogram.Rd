@@ -24,7 +24,8 @@ pv_histogram(
 \arguments{
 \item{data}{A data frame.}
 
-\item{x}{Name of the numeric column to bin.}
+\item{x}{Name of the numeric column to bin. Missing values are
+dropped with a warning.}
 
 \item{bins}{Number of equal-width bins, or \code{NULL} for R's Sturges
 default.}

@@ -24,7 +24,8 @@ pv_boxplot(
 \arguments{
 \item{data}{A data frame.}
 
-\item{value}{Name of the numeric column to summarise.}
+\item{value}{Name of the numeric column to summarise. Rows with a
+missing value or group are dropped with a warning.}
 
 \item{group}{Optional name of a grouping column (one box per level,
 max 8). Omit it for a single box.}

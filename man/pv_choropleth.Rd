@@ -34,7 +34,8 @@ Ids that match no feature are dropped with a warning; if none match
 at all, that is an error.}
 
 \item{value}{Name of the numeric column mapped to colour. Rows with a
-missing value are dropped — their regions read as "no data".}
+missing value are dropped with a warning — their regions read as
+"no data".}
 
 \item{palette}{\code{"sequential"} (default, for magnitudes) or
 \code{"diverging"} (for values around a reference point, which needs

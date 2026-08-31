@@ -25,7 +25,10 @@ pv_bar(
 )
 }
 \arguments{
-\item{data}{A data frame.}
+\item{data}{A data frame with one row per bar (per category, or per
+category/series combination) — more than one is an error; aggregate
+first. Rows with a missing category or value are dropped with a
+warning.}
 
 \item{x}{Name of the category column.}
 

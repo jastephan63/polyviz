@@ -25,7 +25,8 @@ pv_scatter(
 )
 }
 \arguments{
-\item{data}{A data frame.}
+\item{data}{A data frame. Rows missing an x, y, or (when mapped) size
+value are dropped with a warning.}
 
 \item{x, y}{Names of numeric columns.}
 

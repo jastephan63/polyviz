@@ -26,7 +26,8 @@ pv_treemap(
 first, defining the hierarchy. The first level takes the palette
 colours, so it allows at most 8 distinct groups.}
 
-\item{value}{Name of the numeric column summed within each cell.}
+\item{value}{Name of the numeric column summed within each cell.
+Values must be non-negative — a cell's size is an area.}
 
 \item{labels}{Write names inside the cells? \code{"auto"} (the default)
 labels exactly the cells the text honestly fits into; \code{TRUE}

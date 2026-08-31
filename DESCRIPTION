@@ -1,6 +1,6 @@
 Package: polyviz
 Title: Polyglot Data Analysis and 'D3'-Powered Visualisation
-Version: 0.4.0
+Version: 0.5.0
 Authors@R:
     person("Jake", "Stephan", email = "jake@stephan-j.com",
            role = c("aut", "cre"))
@@ -20,6 +20,7 @@ RoxygenNote: 7.3.2
 Depends:
     R (>= 4.1)
 Imports:
+    base64enc,
     crosstalk,
     DBI,
     ggplot2,
@@ -33,6 +34,7 @@ Imports:
     tools,
     utils
 Suggests:
+    chromote,
     reticulate,
     shiny,
     testthat (>= 3.0.0),

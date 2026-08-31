@@ -23,7 +23,9 @@ pv_line(
 )
 }
 \arguments{
-\item{data}{A data frame.}
+\item{data}{A data frame with one row per x position per series —
+more than one is an error; aggregate first. Rows with a missing x
+or value are dropped with a warning.}
 
 \item{x}{Name of the x column — \code{Date}, numeric, or categorical.}
 

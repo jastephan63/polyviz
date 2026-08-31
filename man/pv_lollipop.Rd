@@ -21,7 +21,8 @@ pv_lollipop(
 )
 }
 \arguments{
-\item{data}{A data frame with at most 40 rows (one per category).}
+\item{data}{A data frame with at most 40 rows (one per category).
+Rows with a missing category or value are dropped with a warning.}
 
 \item{x}{Name of the category column.}
 

@@ -28,7 +28,7 @@ Python is optional. If `reticulate` finds any Python ≥ 3.8, the profiling func
 
 ## The charts
 
-Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (`pvchartOutput()` / `renderPvchart()`). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit `TRUE`/`FALSE`/`"auto"` override. See each one live, explained, in the [gallery](https://jastephan63.github.io/polyviz/).
+Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (`pvchartOutput()` / `renderPvchart()`). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit `TRUE`/`FALSE`/`"auto"` override. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the [gallery](https://jastephan63.github.io/polyviz/).
 
 | | | |
 |---|---|---|
@@ -40,6 +40,26 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_calendar()` | `pv_choropleth()` | `pv_force()` |
 | `pv_chord()` | `pv_sankey()` | `pv_parallel()` — brushable |
 | `pv_race()` — animated | `pv_bump()` | `pv_dendrogram()` — from `hclust` |
+
+## Charts in papers and documents
+
+Interactive is the default, but every chart also leaves the browser as a print-quality file — `pv_save()` picks the format from the extension:
+
+```r
+agg <- aggregate(revenue ~ region, pv_sales, sum)
+w <- pv_bar(agg, "region", "revenue", title = "Revenue by region")
+
+pv_save(w, "revenue.png")   # crisp 2x raster — Word, Google Docs, slides
+pv_save(w, "revenue.svg")   # standalone vector — web pages, Inkscape/Illustrator
+pv_save(w, "revenue.pdf")   # true vector PDF — LaTeX
+pv_save(w, "revenue.html")  # one self-contained interactive file — sharing
+```
+
+The capture formats render the chart for real in headless Chrome (the chromote package plus a Chrome-based browser required), with the entrance animation switched off and light mode forced by default — a save never catches a mid-animation frame or your machine's dark theme. The `.html` file is assembled purely in R: no Chrome, no pandoc, interactivity intact.
+
+Knitting to Word or PDF needs no extra code: in any output format that can't run d3, the chart becomes a print-quality PNG at the chunk's `fig.width`/`fig.height`/`dpi` (put `knitr::opts_chunk$set(screenshot.force = FALSE)` in the setup chunk; chromote + Chrome required — without them the error saying what to install stands where the chart would be, or stops the knit). And every rendered chart carries a hover download button in its top-right corner — standalone SVG or 2x PNG — which `pv_downloads(w, FALSE)` hides.
+
+One habit to unlearn: `print(w)` in a non-interactive script displays nothing — there is no viewer to open. Save instead. Details, print sizing included, in `vignette("embedding-charts")`.
 
 ## Design
 

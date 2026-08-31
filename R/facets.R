@@ -40,6 +40,12 @@ facet_xtype <- function(x) {
 #' sorted by series — then the row order survives unchanged and `by`
 #' stays aligned.
 #'
+#' Bar and line charts refuse data with more than one row per category
+#' or x position. When your panels repeat those keys — the same cities
+#' in every year, say — map the panel variable with `series` as well,
+#' exactly as the example below does; each row is then unique and every
+#' panel keeps a single series.
+#'
 #' By default all panels share both axis ranges, which is what makes
 #' small multiples comparable: the global x and y domains are computed
 #' here across every panel and injected into the payload as `xlim`/

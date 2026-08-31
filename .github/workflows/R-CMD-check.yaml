@@ -27,6 +27,10 @@ jobs:
       # The bundled Swiss datasets carry UTF-8 place names; check in a
       # UTF-8 locale so they compare and print the way they do locally.
       LANG: en_US.UTF-8
+      # The runner ships Chrome, so the end-to-end render tests run as
+      # part of the check; with this set they drop one PNG per chart
+      # type here, and the step below publishes them for eyeballing.
+      POLYVIZ_RENDER_DIR: ${{ github.workspace }}/rendered-charts
 
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +43,8 @@ jobs:
           r-version: release
           use-public-rspm: true
 
+      # Installs all of the package's dependencies, Suggests included -
+      # chromote among them, which the render tests drive.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck
@@ -51,3 +57,15 @@ jobs:
         with:
           error-on: '"warning"'
           upload-snapshots: true
+
+      # The charts the render tests actually drew, one PNG per chart
+      # type, published as a build artifact so a human can look at them.
+      # always() keeps the upload on a failed check - that is exactly
+      # when the pictures matter - and if-no-files-found tolerates runs
+      # where the render tests were skipped.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendered-charts
+          path: ${{ github.workspace }}/rendered-charts
+          if-no-files-found: ignore

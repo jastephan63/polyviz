@@ -178,6 +178,27 @@ test_that("pv_trend refuses multi-series, category axes, and bad inputs", {
                "at least 4")
 })
 
+# ---- pv_downloads ----
+
+test_that("pv_downloads stores the flag the JavaScript side reads", {
+  w <- scatter_fixture()
+  # No flag in a fresh payload - the JavaScript default (enabled) rules.
+  expect_null(w$x$downloads)
+  expect_true(pv_downloads(w)$x$downloads)
+  expect_false(pv_downloads(w, FALSE)$x$downloads)
+  expect_equal(pv_downloads(w, "auto")$x$downloads, "auto")
+  # A later call replaces the flag - the last word in a pipe wins.
+  expect_false(pv_downloads(pv_downloads(w), FALSE)$x$downloads)
+})
+
+test_that("pv_downloads refuses bad flags and non-charts", {
+  w <- scatter_fixture()
+  expect_error(pv_downloads(w, "yes"), 'TRUE, FALSE, or "auto"')
+  expect_error(pv_downloads(w, NA), 'TRUE, FALSE, or "auto"')
+  expect_error(pv_downloads(w, c(TRUE, FALSE)), 'TRUE, FALSE, or "auto"')
+  expect_error(pv_downloads(data.frame(x = 1)), "polyviz chart")
+})
+
 # ---- pv_link ----
 
 test_that("pv_link attaches keys, group name, and the crosstalk libs", {

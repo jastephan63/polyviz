@@ -202,3 +202,27 @@ pv_annotate <- function(w, ...) {
   w$x$annotations <- c(w$x$annotations, lapply(anns, unclass))
   w
 }
+
+#' Toggle a chart's download control
+#'
+#' Every polyviz chart carries a small control in its top-right corner,
+#' shown while the pointer (or keyboard focus) is on the chart, that
+#' saves it as a standalone SVG or a high-resolution PNG - ready to drop
+#' into a paper or a slide deck. This modifier turns the control off for
+#' one chart, or back on.
+#'
+#' @param w A polyviz chart.
+#' @param enabled `TRUE` or `"auto"` shows the control (every chart's
+#'   default), `FALSE` hides it.
+#' @return The chart, with the setting attached - ready for more pipe
+#'   steps.
+#' @examples
+#' sales <- aggregate(revenue ~ region, pv_sales, sum)
+#' pv_bar(sales, x = "region", y = "revenue") |>
+#'   pv_downloads(FALSE)
+#' @export
+pv_downloads <- function(w, enabled = TRUE) {
+  check_pv_widget(w, "pv_downloads")
+  w$x$downloads <- check_flag(enabled, "enabled")
+  w
+}

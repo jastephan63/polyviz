@@ -36,7 +36,7 @@
 
 #' Swiss city populations since 1930
 #'
-#' Permanent resident population of 181 Swiss cities at census reference
+#' Permanent resident population of 180 Swiss cities at census reference
 #' years from 1930 to today. Nearly a century of urban growth — good for
 #' long time-series charts.
 #'
@@ -61,7 +61,7 @@
 
 #' Land use in Swiss cities
 #'
-#' Area in hectares by land-use category for 181 Swiss cities (survey
+#' Area in hectares by land-use category for 180 Swiss cities (survey
 #' period 2013–2025), grouped into Settlement, Cultivated, and Natural.
 #' Two hierarchy levels — good for treemaps and part-of-whole charts.
 #'
@@ -128,6 +128,76 @@
 #'   (GG25, generalisation level G1, reprojected to WGS84). Open use,
 #'   source citation required ("© BFS, ThemaKart").
 "pv_lucerne_map"
+
+#' Canton boundaries of Switzerland
+#'
+#' Boundary polygons of the 26 Swiss cantons (status 1 January 2025) as a
+#' GeoJSON FeatureCollection stored as a plain R list, ready for
+#' [pv_choropleth()]. Each feature carries `id` (the official BFS canton
+#' number, 1–26) and `name` (the canton's short name).
+#'
+#' @format A list mirroring GeoJSON: `type`, and `features` — one per
+#'   boundary polygon, with `properties` (`id`, `name`) and `geometry`
+#'   in WGS84 longitude/latitude.
+#' @source Bundesamt für Statistik, "Generalisierte Gemeindegrenzen"
+#'   (GG25, generalisation level G1, reprojected to WGS84). Open use,
+#'   source citation required ("© BFS, ThemaKart").
+#' @seealso [pv_swiss_districts], [pv_swiss_lakes], [pv_city_coords]
+"pv_swiss_cantons"
+
+#' District boundaries of Switzerland
+#'
+#' Boundary polygons of the 143 Swiss districts (status 1 January 2025)
+#' as a GeoJSON FeatureCollection stored as a plain R list, ready for
+#' [pv_choropleth()]. Each feature carries `id` (the official BFS
+#' district number) and `name`. Cantons that have no districts appear as
+#' one canton-sized feature (named "Kanton …" / "Canton de …"), exactly
+#' as BFS ships the layer.
+#'
+#' @format A list mirroring GeoJSON: `type`, and `features` — one per
+#'   boundary polygon, with `properties` (`id`, `name`) and `geometry`
+#'   in WGS84 longitude/latitude.
+#' @source Bundesamt für Statistik, "Generalisierte Gemeindegrenzen"
+#'   (GG25, generalisation level G1, reprojected to WGS84). Open use,
+#'   source citation required ("© BFS, ThemaKart").
+#' @seealso [pv_swiss_cantons], [pv_swiss_lakes]
+"pv_swiss_districts"
+
+#' Major lakes of Switzerland
+#'
+#' Outlines of the 22 largest Swiss lakes (status 1 January 2025) as a
+#' GeoJSON FeatureCollection stored as a plain R list. A background
+#' layer: each feature carries a `name` for the tooltip but no `id`, so
+#' the lakes never take part in a choropleth's data join. Appending them
+#' to another layer's features gives a map its water:
+#' `list(type = "FeatureCollection",
+#'       features = c(pv_swiss_cantons$features, pv_swiss_lakes$features))`.
+#'
+#' @format A list mirroring GeoJSON: `type`, and `features` — one per
+#'   lake, with `properties` (`name`) and `geometry` in WGS84
+#'   longitude/latitude.
+#' @source Bundesamt für Statistik, "Generalisierte Gemeindegrenzen"
+#'   (GG25, generalisation level G1, reprojected to WGS84). Open use,
+#'   source citation required ("© BFS, ThemaKart").
+#' @seealso [pv_swiss_cantons], [pv_swiss_districts]
+"pv_swiss_lakes"
+
+#' Coordinates of the Swiss cities
+#'
+#' One point per city of [pv_city_population]: the WGS84 centroid of the
+#' city's municipal territory, computed from the BFS GG25 boundary
+#' polygons (generalisation level G1, status 1 January 2025) in the
+#' metric LV95 plane and then reprojected. The demo companion for point
+#' and bubble maps — join it to [pv_city_population] by `city`.
+#'
+#' @format A data frame with 180 rows: `city` (matches
+#'   [pv_city_population]), `id` (the official BFS municipality number,
+#'   the same key the boundary layers use), `lon`, `lat` (WGS84 degrees,
+#'   rounded to 4 decimals, ~11 m).
+#' @source Derived from Bundesamt für Statistik, "Generalisierte
+#'   Gemeindegrenzen" (GG25). Open use, source citation required
+#'   ("© BFS, ThemaKart").
+"pv_city_coords"
 
 #' Daily weather in Lucerne
 #'

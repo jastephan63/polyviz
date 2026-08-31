@@ -36,6 +36,7 @@ Imports:
     utils
 Suggests:
     chromote,
+    curl,
     reticulate,
     sf,
     shiny,

@@ -121,3 +121,39 @@ test_that("bump renders without JavaScript errors", {
 test_that("beeswarm renders without JavaScript errors", {
   expect_chart_renders("beeswarm")
 })
+
+# The opt-in chart options ship extra drawing code the canonical charts
+# above never reach - stacked layouts, marker dots, curve interpolation,
+# the zoom strip, violin overlays. One variant per option keeps those
+# paths under the same render contract.
+
+test_that("every option variant builds its base chart type", {
+  expect_setequal(names(render_variants), c(
+    "bar_stacked", "bar_percent", "violin_overlays",
+    "line_markers", "line_zoom"))
+  for (id in names(render_variants)) {
+    w <- render_variants[[id]]()
+    expect_s3_class(w, "pvchart")
+    expect_identical(w$x$type, sub("_.*$", "", id))
+  }
+})
+
+test_that("stacked bars render without JavaScript errors", {
+  expect_chart_renders("bar_stacked")
+})
+
+test_that("percent-stacked bars render without JavaScript errors", {
+  expect_chart_renders("bar_percent")
+})
+
+test_that("violin with box and points renders without JavaScript errors", {
+  expect_chart_renders("violin_overlays")
+})
+
+test_that("line with markers and curve renders without JavaScript errors", {
+  expect_chart_renders("line_markers")
+})
+
+test_that("zoomed line renders without JavaScript errors", {
+  expect_chart_renders("line_zoom")
+})

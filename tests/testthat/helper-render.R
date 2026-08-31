@@ -156,6 +156,39 @@ render_charts <- list(
   }
 )
 
+# Option variants: the same renderers again, but with the opt-in chart
+# options switched on, so the headless run also executes those drawing
+# paths. Each name is "<type>_<variant>"; the part before the underscore
+# is the widget type the builder must produce.
+render_variants <- list(
+  bar_stacked = function() {
+    mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+    pv_bar(mix, x = "region", y = "revenue", series = "product",
+           stack = "stack", title = "Revenue by region and product")
+  },
+  bar_percent = function() {
+    mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+    pv_bar(mix, x = "region", y = "revenue", series = "product",
+           stack = "percent", title = "Product mix by region")
+  },
+  violin_overlays = function() {
+    pv_violin(pv_fiscal, value = "resource_per_capita", group = "year",
+              box = TRUE, points = TRUE,
+              title = "Tax resources with every municipality shown")
+  },
+  line_markers = function() {
+    pv_line(pv_city_population[pv_city_population$city %in%
+                                 c("Luzern", "Zug"), ],
+            x = "year", y = "population", series = "city",
+            show_points = TRUE, curve = "monotone",
+            title = "Census years as dots")
+  },
+  line_zoom = function() {
+    pv_line(pv_weather, x = "date", y = "temp_mean", zoom = TRUE,
+            title = "Six years of daily means")
+  }
+)
+
 # All PNGs from one test run land in the same directory, so a debugging
 # session can look at every capture side by side.
 render_out_dir <- local({
@@ -190,7 +223,7 @@ render_publish <- function(path) {
 # rendering differs across machines, so exact baselines would flake.
 expect_chart_renders <- function(id) {
   render_skip_if_no_chrome()
-  w <- render_charts[[id]]()
+  w <- c(render_charts, render_variants)[[id]]()
   path <- file.path(render_out_dir(), paste0(id, ".png"))
   expect_no_warning(pv_save(w, path, quiet = TRUE))
   expect_true(file.exists(path))

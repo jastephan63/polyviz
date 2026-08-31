@@ -71,10 +71,14 @@ test_that("date and category x axes share their domains properly", {
   f <- pv_line(dated, "d", "v", series = "g") |> pv_facet(dated$g)
   # A true date range, not a string sort, sent back as ISO strings.
   expect_equal(f$x$xlim, c("2023-01-15", "2024-06-30"))
-  # Category union in first-appearance order across the panels.
+  # Category union in first-appearance order across the panels. The
+  # categories overlap across panels, so - like a facetable area - the
+  # bars need a series that keeps one row per series/category pair;
+  # pv_bar refuses duplicate pairs.
   bars <- data.frame(cat = c("west", "east", "east", "north"),
-                     n = c(4, 2, 5, 3))
-  fb <- pv_bar(bars, "cat", "n") |> pv_facet(c("a", "a", "b", "b"))
+                     n = c(4, 2, 5, 3), s = c("s1", "s1", "s2", "s2"))
+  fb <- pv_bar(bars, "cat", "n", series = "s") |>
+    pv_facet(c("a", "a", "b", "b"))
   expect_equal(as.character(fb$x$xlim), c("west", "east", "north"))
   expect_equal(fb$x$ylim, c(0, 5))
 })
@@ -96,7 +100,7 @@ test_that("stacked areas share the tallest stack, normalised areas skip y", {
 })
 
 test_that("negative values pull the shared y floor below zero", {
-  df <- data.frame(cat = rep(c("a", "b"), 2), n = c(3, -2, 7, 1),
+  df <- data.frame(cat = c("a", "b", "c", "d"), n = c(3, -2, 7, 1),
                    g = rep(c("p1", "p2"), each = 2))
   f <- pv_bar(df, "cat", "n") |> pv_facet(df$g)
   expect_equal(f$x$ylim, c(-2, 7))

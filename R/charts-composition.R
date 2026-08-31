@@ -49,6 +49,8 @@ pv_donut <- function(data, category, value, inner_radius = 0.62,
                      duration = 650, source = NULL, width = NULL,
                      height = NULL, elementId = NULL) {
   check_columns(data, list(category, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   check_tristate(labels, "labels")
   if (!is.numeric(inner_radius) || length(inner_radius) != 1 ||
       is.na(inner_radius) || inner_radius < 0 || inner_radius > 0.85) {
@@ -91,6 +93,7 @@ pv_donut <- function(data, category, value, inner_radius = 0.62,
 #'   first, defining the hierarchy. The first level takes the palette
 #'   colours, so it allows at most 8 distinct groups.
 #' @param value Name of the numeric column summed within each cell.
+#'   Values must be non-negative — a cell's size is an area.
 #' @param labels Write names inside the cells? `"auto"` (the default)
 #'   labels exactly the cells the text honestly fits into; `TRUE`
 #'   squeezes labels into cells with about 20% less room than that (the
@@ -108,9 +111,18 @@ pv_treemap <- function(data, levels, value, labels = "auto",
                        duration = 550, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(levels, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   check_tristate(labels, "labels")
   if (length(levels) < 1) {
     rlang::abort("`levels` needs at least one column name.")
+  }
+  # A negative value has no area to fill; the layout would silently
+  # overflow its box, so refuse it here.
+  if (any(data[[value]] < 0, na.rm = TRUE)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; treemap cell areas must be non-negative.",
+      value))
   }
   n_top <- length(unique(as.character(data[[levels[[1]]]])))
   if (n_top > 8) {
@@ -151,6 +163,7 @@ pv_treemap <- function(data, levels, value, labels = "auto",
 #' ranking stays readable.
 #'
 #' @param data A data frame with at most 40 rows (one per category).
+#'   Rows with a missing category or value are dropped with a warning.
 #' @param x Name of the category column.
 #' @param y Name of the numeric value column.
 #' @param sort Sort categories by value, largest first?
@@ -172,14 +185,18 @@ pv_lollipop <- function(data, x, y, sort = TRUE, value_labels = "auto",
                         duration = 600, source = NULL, width = NULL,
                         height = NULL, elementId = NULL) {
   check_columns(data, list(x, y))
+  check_nonempty(data)
+  check_value_column(data, y)
   check_tristate(value_labels, "value_labels")
-  if (nrow(data) > 40) {
+  df <- data.frame(x = as.character(data[[x]]), y = as.numeric(data[[y]]))
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  if (nrow(df) > 40) {
     rlang::abort(sprintf(paste(
       "%d categories won't fit a readable lollipop (the limit is 40).",
       "Pre-filter to the categories you care about, e.g. the top 25."),
-      nrow(data)))
+      nrow(df)))
   }
-  df <- data.frame(x = as.character(data[[x]]), y = as.numeric(data[[y]]))
   if (isTRUE(sort)) {
     df <- df[order(-df$y), ]
   }

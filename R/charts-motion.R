@@ -32,6 +32,8 @@ motion_top_n <- function(top_n) {
 # absent at that time point.
 motion_ranked <- function(data, time, id, value) {
   check_columns(data, list(time, id, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   tv <- motion_time_values(data[[time]])
   df <- data.frame(t = tv$values,
                    id = as.character(data[[id]]),

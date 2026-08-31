@@ -27,15 +27,19 @@ test_that("beeswarm packs value, group, and label columns", {
   expect_equal(names(w2$x$data), "value")
 })
 
-test_that("beeswarm drops missing values and validates columns", {
+test_that("beeswarm drops missing values with a warning and validates columns", {
   f25 <- fiscal25()
   f25$resource_index[3] <- NA
-  w <- pv_beeswarm(f25, "resource_index", group = "side")
+  expect_warning(
+    w <- pv_beeswarm(f25, "resource_index", group = "side"),
+    "Dropped 1 row\\(s\\) with missing `resource_index` values")
   expect_equal(nrow(w$x$data), nrow(f25) - 1)
   # a missing group drops the row too - a dot needs a lane
   f25b <- fiscal25()
   f25b$side[5] <- NA
-  w2 <- pv_beeswarm(f25b, "resource_index", group = "side")
+  expect_warning(
+    w2 <- pv_beeswarm(f25b, "resource_index", group = "side"),
+    "Dropped 1 row\\(s\\) with missing `side` values")
   expect_equal(nrow(w2$x$data), nrow(f25b) - 1)
   expect_error(pv_beeswarm(f25, "municipality"), "numeric")
   expect_error(pv_beeswarm(f25, "nope"), "not in `data`")
@@ -49,7 +53,8 @@ test_that("beeswarm refuses more than 800 dots, advising aggregation", {
   expect_error(pv_beeswarm(big, "v"), "Aggregate")
   # missing values don't count toward the cap
   big$v[1:2] <- NA
-  w <- expect_pvchart(pv_beeswarm(big, "v"), "beeswarm")
+  expect_warning(w <- pv_beeswarm(big, "v"), "Dropped 2 row")
+  expect_pvchart(w, "beeswarm")
   expect_equal(nrow(w$x$data), 799)
 })
 

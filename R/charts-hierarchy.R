@@ -17,6 +17,7 @@
 #'   first, defining the hierarchy. The first level takes the palette
 #'   colours, so it allows at most 8 distinct groups.
 #' @param value Name of the numeric column summed within each circle.
+#'   Values must be non-negative — a circle's size is an area.
 #' @param labels Write names inside the circles? `"auto"` (the default)
 #'   labels exactly the circles the text honestly fits into at the
 #'   current zoom level; `TRUE` squeezes labels into circles with about
@@ -35,9 +36,18 @@ pv_pack <- function(data, levels, value, labels = "auto",
                     duration = 600, source = NULL, width = NULL,
                     height = NULL, elementId = NULL) {
   check_columns(data, list(levels, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   check_flag(labels, "labels")
   if (length(levels) < 1) {
     rlang::abort("`levels` needs at least one column name.")
+  }
+  # A negative value has no area to fill; the layout would silently
+  # come out wrong, so refuse it here.
+  if (any(data[[value]] < 0, na.rm = TRUE)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; circle areas must be non-negative.",
+      value))
   }
   n_top <- length(unique(as.character(data[[levels[[1]]]])))
   if (n_top > 8) {

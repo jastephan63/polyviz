@@ -89,10 +89,12 @@ test_that("choropleth warns on partly-missing ids and aborts on none", {
     "No value in `municipality_id` matches")
 })
 
-test_that("choropleth drops missing values and refuses duplicate ids", {
+test_that("choropleth drops missing values with a warning and refuses duplicate ids", {
   f <- fiscal25()
   f$resource_index[3] <- NA
-  w <- pv_choropleth(f, id = "municipality_id", value = "resource_index")
+  expect_warning(
+    w <- pv_choropleth(f, id = "municipality_id", value = "resource_index"),
+    "Dropped 1 row\\(s\\) with missing `resource_index` values")
   expect_equal(nrow(w$x$data), nrow(f) - 1)
   expect_false(as.character(f$municipality_id[3]) %in% w$x$data$id)
   # The NA row's domain influence goes with it.

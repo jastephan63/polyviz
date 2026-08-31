@@ -54,8 +54,10 @@ evolution_axis_title <- function(value, fallback, name) {
 #' the stack. Series/x combinations without a row count as zero.
 #'
 #' @param data A data frame in long form: one row per series per x.
+#'   Rows with a missing x or value are dropped with a warning.
 #' @param x Name of the x column — `Date`, numeric, or categorical.
-#' @param y Name of the numeric value column.
+#' @param y Name of the numeric value column. Values must be
+#'   non-negative — stacked bands cannot represent a negative height.
 #' @param series Optional name of the series column, one band per level.
 #'   At most 8 levels — beyond that, fold the small ones into an
 #'   `"Other"` level. Omit it for a single-series area.
@@ -88,11 +90,24 @@ pv_area <- function(data, x, y, series = NULL,
                     duration = 600, source = NULL, width = NULL,
                     height = NULL, elementId = NULL) {
   check_columns(data, list(x, y, series))
+  check_nonempty(data)
+  check_value_column(data, y)
   offset <- match.arg(offset)
   legend <- evolution_flag(legend, "legend")
   ax <- evolution_axis_values(data[[x]])
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  if (!is.null(series)) df <- drop_missing(df, is.na(df$series), series)
+  # Every offset piles the bands on top of each other, so a negative
+  # value would fold a band back over its neighbours - the stream's
+  # centred stack included. Refuse it rather than draw it wrong.
+  if (any(df$y < 0)) {
+    rlang::abort(sprintf(paste(
+      "`%s` has negative values, which stacked bands cannot draw.",
+      "Fix the data, or plot the series with pv_line()."), y))
+  }
   # Two rows for the same series at the same x would silently overwrite
   # each other in the stack pivot on the JavaScript side, so refuse them
   # here where the message can say what to do about it.
@@ -138,7 +153,8 @@ pv_area <- function(data, x, y, series = NULL,
 #' hovering rings a cell and shows the exact number, and a compact
 #' colour-scale legend sits in the header.
 #'
-#' @param data A data frame with at most one row per x/y cell.
+#' @param data A data frame with at most one row per x/y cell. Rows with
+#'   a missing value are dropped with a warning — their cells stay blank.
 #' @param x Name of the column mapped to the matrix columns.
 #' @param y Name of the column mapped to the matrix rows.
 #' @param value Name of the numeric column mapped to colour.
@@ -176,6 +192,8 @@ pv_heatmap <- function(data, x, y, value,
                        duration = 500, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(x, y, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   palette <- match.arg(palette)
   cell_values <- evolution_flag(cell_values, "cell_values")
   if (!is.numeric(truncate_labels) || length(truncate_labels) != 1 ||
@@ -187,12 +205,9 @@ pv_heatmap <- function(data, x, y, value,
   df <- data.frame(x = as.character(data[[x]]),
                    y = as.character(data[[y]]),
                    value = as.numeric(data[[value]]))
-  df <- df[!is.na(df$value), ]
-  # With every value missing there is nothing to colour, and range() below
-  # would return infinities; fail with a plain message instead.
-  if (nrow(df) == 0) {
-    rlang::abort("`value` has no non-missing values; nothing to draw.")
-  }
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  df <- drop_missing(df, is.na(df$value), value)
   if (anyDuplicated(paste(df$x, df$y, sep = "\r"))) {
     rlang::abort(
       "`data` has more than one row per x/y cell; aggregate it first.")
@@ -245,7 +260,7 @@ pv_heatmap <- function(data, x, y, value,
 #' @param date Name of the date column — `Date`, or anything
 #'   `as.Date()` understands (e.g. `"2024-01-31"` strings).
 #' @param value Name of the numeric column mapped to colour. Days whose
-#'   value is missing are treated as absent.
+#'   value is missing are dropped with a warning and render as absent.
 #' @param years `NULL` (default) shows every year present in the data;
 #'   an integer vector (e.g. `years = 2023:2025`) picks specific years
 #'   instead. Either way at most 6 year blocks are drawn — beyond that
@@ -264,6 +279,8 @@ pv_calendar <- function(data, date, value, years = NULL,
                         duration = 500, source = NULL, width = NULL,
                         height = NULL, elementId = NULL) {
   check_columns(data, list(date, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   d <- data[[date]]
   # The calendar needs real dates. Coerce anything as.Date() understands
   # (ISO strings, POSIXct); refuse with a plain message if that fails or
@@ -283,11 +300,10 @@ pv_calendar <- function(data, date, value, years = NULL,
   }
   df <- data.frame(date = d, value = as.numeric(data[[value]]))
   # A day with a missing value is the same as a day with no row: both
-  # render as the faint "absent" cell, so drop them here.
-  df <- df[!is.na(df$date) & !is.na(df$value), , drop = FALSE]
-  if (nrow(df) == 0) {
-    rlang::abort("`value` has no non-missing values; nothing to draw.")
-  }
+  # render as the faint "absent" cell, so drop them here - with a
+  # warning, so the absence never goes unnoticed on the R side.
+  df <- drop_missing(df, is.na(df$date), date)
+  df <- drop_missing(df, is.na(df$value), value)
   if (!is.null(years)) {
     ok <- is.numeric(years) && length(years) >= 1 && !anyNA(years) &&
       all(years == trunc(years))

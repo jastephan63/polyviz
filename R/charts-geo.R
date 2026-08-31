@@ -33,7 +33,8 @@
 #'   Ids that match no feature are dropped with a warning; if none match
 #'   at all, that is an error.
 #' @param value Name of the numeric column mapped to colour. Rows with a
-#'   missing value are dropped — their regions read as "no data".
+#'   missing value are dropped with a warning — their regions read as
+#'   "no data".
 #' @param palette `"sequential"` (default, for magnitudes) or
 #'   `"diverging"` (for values around a reference point, which needs
 #'   `center`).
@@ -55,6 +56,8 @@ pv_choropleth <- function(data, map = pv_lucerne_map, id, value,
                           duration = 500, source = NULL, width = NULL,
                           height = NULL, elementId = NULL) {
   check_columns(data, list(id, value))
+  check_nonempty(data)
+  check_value_column(data, value)
   palette <- match.arg(palette)
   # The map must at least look like a FeatureCollection before it is sent
   # across - d3 would otherwise fail with something unreadable.
@@ -79,11 +82,7 @@ pv_choropleth <- function(data, map = pv_lucerne_map, id, value,
 
   df <- data.frame(id = as.character(data[[id]]),
                    value = as.numeric(data[[value]]))
-  df <- df[!is.na(df$value), , drop = FALSE]
-  rownames(df) <- NULL
-  if (nrow(df) == 0) {
-    rlang::abort("`value` has no non-missing values; nothing to colour.")
-  }
+  df <- drop_missing(df, is.na(df$value), value)
   if (anyDuplicated(df$id)) {
     rlang::abort(
       "`data` has more than one row per region id; aggregate it first.")

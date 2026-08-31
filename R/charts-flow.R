@@ -17,7 +17,8 @@
 #' genuinely appears on both sides (say, a region people commute both to
 #' and from), disambiguate one occurrence, e.g. with a trailing space.
 #'
-#' @param links A data frame of flows: one row per link.
+#' @param links A data frame of flows: one row per link. Repeating the
+#'   same source/target pair is an error — aggregate those rows first.
 #' @param source Name of the column holding each link's origin node.
 #' @param target Name of the column holding each link's destination node.
 #' @param value Name of the numeric column holding the flow size
@@ -49,12 +50,20 @@ pv_sankey <- function(links, source = "source", target = "target",
                       duration = 600, note = NULL, width = NULL,
                       height = NULL, elementId = NULL) {
   check_columns(links, list(source, target, value))
+  check_nonempty(links, "links")
+  check_value_column(links, value)
   align <- match.arg(align)
   src <- as.character(links[[source]])
   tgt <- as.character(links[[target]])
   val <- as.numeric(links[[value]])
   if (anyNA(val) || any(val < 0)) {
     rlang::abort("`value` must be non-negative numbers with no missing values.")
+  }
+  # The same flow twice would draw as two overlapping ribbons that read
+  # as one thinner-than-real flow, so refuse it here.
+  if (anyDuplicated(paste(src, tgt, sep = "\r"))) {
+    rlang::abort(
+      "`links` has more than one row for the same source/target pair; aggregate it first.")
   }
 
   # Nodes in first-appearance order, reading each link left to right.
@@ -112,8 +121,8 @@ pv_sankey <- function(links, source = "source", target = "target",
 #' so only rows passing all of them stay lit. Double-click an axis to
 #' clear its brush. Hovering a line raises it and reads out the full row.
 #'
-#' Rows with a missing value on any axis are dropped — a broken polyline
-#' would be unreadable.
+#' Rows with a missing value on any axis are dropped with a warning — a
+#' broken polyline would be unreadable.
 #'
 #' @param data A data frame.
 #' @param columns Character vector of 2–8 numeric column names — one
@@ -140,6 +149,7 @@ pv_parallel <- function(data, columns, color = NULL, label = NULL,
                         duration = 500, source = NULL, width = NULL,
                         height = NULL, elementId = NULL) {
   check_columns(data, list(columns, color, label))
+  check_nonempty(data)
   if (length(columns) < 2 || length(columns) > 8) {
     rlang::abort("`columns` needs between 2 and 8 column names - one vertical axis each.")
   }
@@ -166,8 +176,17 @@ pv_parallel <- function(data, columns, color = NULL, label = NULL,
   names(df) <- paste0("v", seq_along(columns))
   if (!is.null(color)) df$series <- as.character(data[[color]])
   if (!is.null(label)) df$label <- as.character(data[[label]])
-  df <- df[stats::complete.cases(df[paste0("v", seq_along(columns))]), ,
-           drop = FALSE]
+  complete <- stats::complete.cases(df[paste0("v", seq_along(columns))])
+  if (!any(complete)) {
+    rlang::abort(
+      "Every row is missing a value on at least one axis; nothing to draw.")
+  }
+  if (any(!complete)) {
+    rlang::warn(sprintf(
+      "Dropped %d row(s) with missing values on the parallel axes.",
+      sum(!complete)))
+  }
+  df <- df[complete, , drop = FALSE]
   rownames(df) <- NULL
   pv_widget("parallel", c(list(
     data = df, columns = as.character(columns),

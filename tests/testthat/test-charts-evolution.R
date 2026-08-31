@@ -107,7 +107,9 @@ test_that("heatmap validates cells and drops missing values", {
   bad <- data.frame(a = "p", b = "q", v = 1)
   expect_error(pv_heatmap(bad, "a", "b", "nope"), "not in `data`")
   nas <- data.frame(a = c("p", "q"), b = c("r", "r"), v = c(1, NA))
-  expect_equal(nrow(pv_heatmap(nas, "a", "b", "v")$x$data), 1)
+  expect_warning(wn <- pv_heatmap(nas, "a", "b", "v"),
+                 "Dropped 1 row\\(s\\) with missing `v` values")
+  expect_equal(nrow(wn$x$data), 1)
   all_na <- data.frame(a = c("p", "q"), b = "r", v = NA_real_)
   expect_error(pv_heatmap(all_na, "a", "b", "v"), "non-missing")
 })
@@ -207,9 +209,10 @@ test_that("calendar caps the span at 6 year blocks with advice", {
   expect_error(pv_calendar(seven, "day", "v", years = 2019:2025), "max 6")
 })
 
-test_that("calendar drops missing values and refuses duplicate days", {
+test_that("calendar drops missing values with a warning and refuses duplicate days", {
   df <- data.frame(day = as.Date("2024-01-01") + 0:2, v = c(1, NA, 3))
-  w <- pv_calendar(df, "day", "v")
+  expect_warning(w <- pv_calendar(df, "day", "v"),
+                 "Dropped 1 row\\(s\\) with missing `v` values")
   expect_equal(nrow(w$x$data), 2)
   expect_false("2024-01-02" %in% w$x$data$date)
   all_na <- data.frame(day = as.Date("2024-01-01") + 0:1, v = NA_real_)

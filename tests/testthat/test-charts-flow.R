@@ -95,10 +95,12 @@ test_that("parallel caps colour levels at 3 like scatter", {
   expect_error(pv_parallel(wide, c("Buildings", "Forest"), color = "g4"), "3")
 })
 
-test_that("parallel drops rows with a missing axis value", {
+test_that("parallel drops rows with a missing axis value, warning", {
   wide <- landuse_wide()
   wide$Forest[2] <- NA
-  w <- pv_parallel(wide, c("Buildings", "Forest"), label = "city")
+  expect_warning(
+    w <- pv_parallel(wide, c("Buildings", "Forest"), label = "city"),
+    "Dropped 1 row\\(s\\) with missing values on the parallel axes")
   expect_equal(nrow(w$x$data), nrow(wide) - 1)
   expect_false(wide$city[2] %in% w$x$data$label)
 })

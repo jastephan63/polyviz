@@ -75,7 +75,8 @@ resolve_lab <- function(override, default) {
 #' the curve and the bars share one honest y axis.
 #'
 #' @param data A data frame.
-#' @param x Name of the numeric column to bin.
+#' @param x Name of the numeric column to bin. Missing values are
+#'   dropped with a warning.
 #' @param bins Number of equal-width bins, or `NULL` for R's Sturges
 #'   default.
 #' @param density Overlay a kernel density curve?
@@ -96,11 +97,13 @@ pv_histogram <- function(data, x, bins = NULL, density = FALSE,
                          duration = 500, source = NULL, width = NULL,
                          height = NULL, elementId = NULL) {
   check_columns(data, list(x))
+  check_nonempty(data)
   check_numeric_col(data, x)
   vals <- data[[x]][!is.na(data[[x]])]
   if (length(vals) < 2) {
     rlang::abort("`x` needs at least 2 non-missing values.")
   }
+  warn_dropped(sum(is.na(data[[x]])), x)
   bars <- pv_histbins(vals, bins)
   curve <- NULL
   if (isTRUE(density)) {
@@ -126,7 +129,8 @@ pv_histogram <- function(data, x, bins = NULL, density = FALSE,
 #' five numbers plus the group size.
 #'
 #' @param data A data frame.
-#' @param value Name of the numeric column to summarise.
+#' @param value Name of the numeric column to summarise. Rows with a
+#'   missing value or group are dropped with a warning.
 #' @param group Optional name of a grouping column (one box per level,
 #'   max 8). Omit it for a single box.
 #' @param points Also show the raw values as jittered points behind each
@@ -151,6 +155,7 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
                        duration = 600, source = NULL, width = NULL,
                        height = NULL, elementId = NULL) {
   check_columns(data, list(value, group))
+  check_nonempty(data)
   check_numeric_col(data, value)
   check_auto_flag(points, "points")
   grp <- if (is.null(group)) {
@@ -164,6 +169,10 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
   grp <- grp[keep]
   if (!length(vals)) {
     rlang::abort("`value` needs at least 1 non-missing value.")
+  }
+  warn_dropped(sum(is.na(data[[value]])), value)
+  if (!is.null(group)) {
+    warn_dropped(sum(!is.na(data[[value]]) & is.na(data[[group]])), group)
   }
   groups <- unique(grp)
   check_palette_fit(groups, if (is.null(group)) value else group)
@@ -205,6 +214,7 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
 #'
 #' @param data A data frame.
 #' @param value Name of the numeric column whose distribution is drawn.
+#'   Rows with a missing value or group are dropped with a warning.
 #' @param group Name of the grouping column (one violin per level, max 8;
 #'   every level needs at least 2 non-missing values for a density).
 #' @param box Overlay a slim Tukey box-and-whisker inside each violin?
@@ -233,6 +243,7 @@ pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
                       duration = 600, source = NULL, width = NULL,
                       height = NULL, elementId = NULL) {
   check_columns(data, list(value, group))
+  check_nonempty(data)
   check_numeric_col(data, value)
   check_auto_flag(box, "box")
   check_auto_flag(points, "points")
@@ -243,6 +254,8 @@ pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
   if (!length(vals)) {
     rlang::abort("`value` needs at least 2 non-missing values.")
   }
+  warn_dropped(sum(is.na(data[[value]])), value)
+  warn_dropped(sum(!is.na(data[[value]]) & is.na(data[[group]])), group)
   # Violins keep the groups in first-appearance order, like the boxplot -
   # the natural order for years and ordered categories.
   groups <- unique(grp)
@@ -288,6 +301,7 @@ pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
 #'
 #' @param data A data frame.
 #' @param value Name of the numeric column whose distribution is drawn.
+#'   Rows with a missing value or group are dropped with a warning.
 #' @param group Name of the grouping column (one ridge per level, max 8;
 #'   every level needs at least 2 non-missing values).
 #' @param xlab X-axis title. `NULL` (the default) uses the `value` column
@@ -306,6 +320,7 @@ pv_ridgeline <- function(data, value, group, xlab = NULL, ylab = NULL,
                          duration = 600, source = NULL, width = NULL,
                          height = NULL, elementId = NULL) {
   check_columns(data, list(value, group))
+  check_nonempty(data)
   check_numeric_col(data, value)
   grp <- as.character(data[[group]])
   keep <- !is.na(data[[value]]) & !is.na(grp)
@@ -316,6 +331,8 @@ pv_ridgeline <- function(data, value, group, xlab = NULL, ylab = NULL,
   if (!length(vals)) {
     rlang::abort("`value` needs at least 2 non-missing values.")
   }
+  warn_dropped(sum(is.na(data[[value]])), value)
+  warn_dropped(sum(!is.na(data[[value]]) & is.na(data[[group]])), group)
   # Ridges read best sorted by their centre, largest on top.
   meds <- sort(tapply(vals, grp, stats::median), decreasing = TRUE)
   groups <- names(meds)

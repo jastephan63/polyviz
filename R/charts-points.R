@@ -21,6 +21,7 @@
 #'
 #' @param data A data frame.
 #' @param value Name of the numeric column giving each dot's position.
+#'   Rows with a missing value or group are dropped with a warning.
 #' @param group Optional name of a grouping column (one lane per level,
 #'   max 8, coloured by lane). Omit it for a single central swarm.
 #' @param label Optional name of a column shown first in tooltips —
@@ -44,6 +45,7 @@ pv_beeswarm <- function(data, value, group = NULL, label = NULL,
                         duration = 500, source = NULL, width = NULL,
                         height = NULL, elementId = NULL) {
   check_columns(data, list(value, group, label))
+  check_nonempty(data)
   check_numeric_col(data, value)
   vals <- as.numeric(data[[value]])
   grp <- if (is.null(group)) NULL else as.character(data[[group]])
@@ -52,6 +54,10 @@ pv_beeswarm <- function(data, value, group = NULL, label = NULL,
   if (!is.null(grp)) keep <- keep & !is.na(grp)
   if (!any(keep)) {
     rlang::abort("`value` needs at least 1 non-missing value.")
+  }
+  warn_dropped(sum(is.na(vals)), value)
+  if (!is.null(grp)) {
+    warn_dropped(sum(!is.na(vals) & is.na(grp)), group)
   }
   # A swarm's promise is one visible dot per case. Past 800 the dots can
   # only shrink or pile up, so refuse and point at the summary charts.

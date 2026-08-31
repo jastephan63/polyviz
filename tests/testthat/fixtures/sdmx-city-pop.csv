@@ -1,0 +1,82 @@
+"STRUCTURE","STRUCTURE_ID","STRUCTURE_NAME","ACTION","SSV_SWISS_CITY","Schweizer Städte","SSV_CLASS_CITY","Gemeindegrössenklasse (Einwohner)","SSV_POP_1930","Ständige Wohnbevölkerung","OBS_VALUE","Observation value","OBS_STATUS","Observation Status","PERIOD","Time Period","EMBARGO_DATE","Date of publication","LAST_UPDATE","Update date","DB_STATE","State of the database","REGION_REF","Spatial reference","REGION_STATE","Date of spatial reference","DATASET_COMMENT","Bemerkungen"
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","117","Hinwil",2,"10 000-14 999","pop_ref_period_2000","2000",9157,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","_ST","Gesamtwert für Schweizer Städte",2,"10 000-14 999","pop_ref_period_1980","1980",550143,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","_ST","Gesamtwert für Schweizer Städte",3,"15 000-19 999","pop_ref_period_2000","2000",555311,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","pop_ref_period_1980","1980",78274,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","pop_ref_period_2000","2000",75425,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","pop_ref_period_1930","1930",52102,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","pop_ref_period-10","2014",81057,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","vpop_ref_period","Veränderung 2014-2024 (%)",6.4,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."
+"DATAFLOW","CH1.SSV:DF_SSV_POP_1930(2026.1.0)","Statistik der Schweizer Städte 2026, ständige Wohnbevölkerung ab 1930","I","1061","Luzern",5,"50 000-99 999","dens_pop_ref_period","Bevölkerungsdichte 2024",30,,"A","Normal value","31.12.2024",,"28.04.2026",,"28.04.2026",,,,"POLG","Communes","06.04.2025",,"DATASET_COMMENT","Quellen: BFS – Arealstatistik der Schweiz (AREA), Statistik der Bevölkerung und der Haushalte (STATPOP), Eidgenössische Volkszählung (VZ)
+
+Bevölkerungsdichte: ständige Wohnbevölkerung pro ha (Gesamtfläche)
+
+Bildung der Gemeinden Ostermundigen und Ittigen nach der Trennung von Bolligen per 1. Januar 1983
+
+Die Daten betreffen die 180 Städte der Publikation ""Statistik der Schweizer Städte"", bestehend aus 173 statistischen Städten und 7 weiteren Mitgliedern des Schweizerischen Städteverbands: Appenzell, Arosa, La Neuveville, Moutier, Murten, Willisau und Worb. 
+
+Die Bezugsbevölkerung der demografischen Bilanz ist die ""ständige Wohnbevölkerung"", zu der bis 2010 alle schweizerischen Staatsangehörigen mit einem Hauptwohnsitz in der Schweiz, sowie alle ausländischen Staatsangehörigen mit einer Anwesenheitsbewilligung für mindestens 12 Monate gehören. Mit der Einführung von STATPOP wurde die Bezugsbevölkerung neu definiert. Im Vergleich zu früher umfasst sie seit dem 1.1.2011 zusätzlich Personen im Asylprozess mit einer Gesamtaufenthaltsdauer von mindestens 12 Monaten."

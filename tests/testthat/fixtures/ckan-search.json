@@ -1,0 +1,67 @@
+{
+  "help": "https://ckan.opendata.swiss/api/3/action/help_show?name=package_search",
+  "success": true,
+  "result": {
+    "count": 2,
+    "results": [
+      {
+        "name": "finanzausgleich-kanton-luzern",
+        "title": {
+          "de": "Finanzausgleich Kanton Luzern",
+          "en": "Financial equalization canton of Lucerne",
+          "fr": "Péréquation financière canton de Lucerne",
+          "it": "Perequazione comunale del cantone di Lucerna"
+        },
+        "organization": {
+          "name": "lustat",
+          "title": {
+            "de": "LUSTAT Statistik Luzern",
+            "en": "LUSTAT Statistics Lucerne",
+            "fr": "LUSTAT statistique Lucerne",
+            "it": "LUSTAT statistica Lucerna"
+          }
+        },
+        "resources": [
+          {
+            "id": "a4a240d7-c617-445f-aae3-a76c9fc4c2ff",
+            "format": "CSV",
+            "rights": "https://opendata.swiss/terms-of-use#terms_by_ask",
+            "url": "https://www.data.lustat.ch/fa-lu-tla.csv"
+          },
+          {
+            "id": "0e13ec9c-9686-4e19-94c5-14f2a9a1efdd",
+            "format": "CSV",
+            "rights": "https://opendata.swiss/terms-of-use#terms_by_ask",
+            "url": "https://www.data.lustat.ch/fa-lu-ra.csv"
+          }
+        ]
+      },
+      {
+        "name": "zuger-finanzausgleich",
+        "title": {
+          "de": "Zuger Finanzausgleich"
+        },
+        "organization": {
+          "name": "kanton-zug",
+          "title": {
+            "de": "Kanton Zug"
+          }
+        },
+        "resources": [
+          {
+            "id": "5a24d4d3-3a4b-4c88-9e01-cf6d5e77e3a1",
+            "format": "CSV",
+            "rights": "https://opendata.swiss/terms-of-use#terms_by",
+            "url": "https://data.zg.ch/store/1/resource/833"
+          },
+          {
+            "id": "77e0c9c0-1c5d-4f0e-b3af-4e10c3c2ab7c",
+            "format": "JSON",
+            "rights": "https://opendata.swiss/terms-of-use#terms_by",
+            "url": "https://data.zg.ch/rowstore/dataset/6d2a3c89"
+          }
+        ]
+      }
+    ]
+  }
+}

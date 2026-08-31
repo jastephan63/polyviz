@@ -1,0 +1,25 @@
+{
+  "help": "https://ckan.opendata.swiss/api/3/action/help_show?name=package_show",
+  "success": true,
+  "result": {
+    "name": "geschuetzter-datensatz",
+    "license_id": null,
+    "title": {
+      "de": "Ein nicht offen lizenzierter Datensatz"
+    },
+    "organization": {
+      "name": "beispiel-organisation",
+      "title": {
+        "de": "Beispiel-Organisation"
+      }
+    },
+    "resources": [
+      {
+        "id": "c2f9de99-4c3b-4d38-9d5a-3a2e6a2b1a55",
+        "format": "CSV",
+        "rights": "NonCommercialAllowed-CommercialNotAllowed-ReferenceRequired",
+        "url": "https://example.org/geschuetzt.csv"
+      }
+    ]
+  }
+}

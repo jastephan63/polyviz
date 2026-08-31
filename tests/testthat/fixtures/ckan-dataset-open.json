@@ -1,0 +1,47 @@
+{
+  "help": "https://ckan.opendata.swiss/api/3/action/help_show?name=package_show",
+  "success": true,
+  "result": {
+    "name": "finanzausgleich-kanton-luzern",
+    "license_id": null,
+    "title": {
+      "de": "Finanzausgleich Kanton Luzern",
+      "en": "Financial equalization canton of Lucerne"
+    },
+    "organization": {
+      "name": "lustat",
+      "title": {
+        "de": "LUSTAT Statistik Luzern",
+        "en": "LUSTAT Statistics Lucerne"
+      }
+    },
+    "resources": [
+      {
+        "id": "9d0c5f7e-2f4b-45cf-8a94-0f1f7e3f0c11",
+        "format": "HTML",
+        "rights": "https://opendata.swiss/terms-of-use#terms_by_ask",
+        "url": "https://www.lustat.ch/daten"
+      },
+      {
+        "id": "a4a240d7-c617-445f-aae3-a76c9fc4c2ff",
+        "format": "CSV",
+        "rights": "https://opendata.swiss/terms-of-use#terms_by_ask",
+        "title": {
+          "de": "Topografischer Lastenausgleich",
+          "en": "Topographic cost compensation"
+        },
+        "url": "https://www.data.lustat.ch/fa-lu-tla.csv"
+      },
+      {
+        "id": "0e13ec9c-9686-4e19-94c5-14f2a9a1efdd",
+        "format": "CSV",
+        "rights": "https://opendata.swiss/terms-of-use#terms_by_ask",
+        "title": {
+          "de": "Ressourcenausgleich",
+          "en": "Resource equalization"
+        },
+        "url": "https://www.data.lustat.ch/fa-lu-ra.csv"
+      }
+    ]
+  }
+}

@@ -57,6 +57,36 @@ pv_violin(pv_fiscal, value = "resource_per_capita", group = "year",
           subtitle = "Tax resource potential per resident in CHF, by year",
           source = "Source: LUSTAT Statistik Luzern")
 
+## violin-points
+# explain: The violin's two overlays anchor its smooth silhouette to
+#   reality. box = TRUE (the default) draws a slim Tukey box inside each
+#   shape, pinning it to its exact median and quartiles; points = TRUE
+#   adds the raw values themselves, jittered no wider than the violin is
+#   at each value, so the cloud of dots traces the same outline the
+#   density claims. Reach for the dots when the audience should see that
+#   the data really is there and the groups are modest enough for every
+#   observation to read - "auto" draws them while no group holds more
+#   than 200 values, and TRUE forces them on, thinning any group past
+#   400 to a fixed-seed sample. Every one of 2023's 365 days lands here
+#   as one dot inside its season's shape: summer packed tightly around a
+#   median of 20.5 °C, winter reaching from -5 to +9, and autumn
+#   stretched widest of all - a warm September crowds the top of its
+#   violin while late November sinks toward freezing.
+local({
+  wx <- subset(pv_weather, format(date, "%Y") == "2023")
+  # Meteorological seasons; December counts toward the winter block.
+  m <- as.integer(format(wx$date, "%m"))
+  wx$season <- c("Winter", "Winter", "Spring", "Spring", "Spring",
+                 "Summer", "Summer", "Summer",
+                 "Autumn", "Autumn", "Autumn", "Winter")[m]
+  pv_violin(wx, value = "temp_mean", group = "season",
+            box = TRUE, points = TRUE,
+            xlab = NA, ylab = "Daily mean temperature (°C)",
+            title = "A year of days, sorted into seasons",
+            subtitle = "Every day of 2023 as a dot inside its season's distribution",
+            source = "Source: MeteoSwiss")
+})
+
 ## ridgeline
 # explain: A ridgeline chart stacks one density curve per group on
 #   overlapping baselines, so your eye can track how the shape of a

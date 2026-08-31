@@ -24,7 +24,9 @@ display_names <- c(
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
   violin = "Violin plot", calendar = "Calendar heatmap",
-  annotated = "Annotations & trends", facet = "Small multiples"
+  annotated = "Annotations & trends", facet = "Small multiples",
+  `bar-stacked` = "Stacked bars", `line-points` = "Connected scatter",
+  `line-zoom` = "Brush to zoom", `violin-points` = "Violin with raw points"
 )
 
 # Pull the id / explanation / code blocks out of one snippet file.

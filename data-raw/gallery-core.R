@@ -23,6 +23,54 @@ pv_bar(
   source = "Source: Bundesamt für Statistik – Arealstatistik"
 )
 
+## bar-stacked
+# explain: Hand the bar chart a series and stack = "percent", and it stops
+#   comparing sizes and starts comparing recipes: one bar per category, a
+#   segment per series level, every bar normalised to 100%. Reach for it
+#   when the question is what each whole is made of - here, city economies
+#   of very different sizes sit on equal footing because absolute
+#   employment is deliberately thrown away. (stack = "stack" is the
+#   halfway option: the segments pile up but keep their raw values, so
+#   each bar's full height is its total, printed at the bar's end.)
+#   Segments print their share wherever they have the room for it, the
+#   tooltip always has the exact numbers, and segments stack in the order
+#   the series first appear in the data - so the group to read most
+#   precisely belongs on the baseline. Zürich and Zug run on knowledge
+#   work and finance - nearly half of all jobs - Biel/Bienne is the
+#   industrial outlier with a quarter of its employment in industry and
+#   construction, and no public sector comes close to the capital's 38%.
+local({
+  # Fold the 19 NOGA sectors into five groups a reader can hold at once.
+  fold <- c(A = "Other", B = "Industry & construction",
+            C = "Industry & construction", D = "Industry & construction",
+            E = "Industry & construction", F = "Industry & construction",
+            G = "Trade, transport & hospitality",
+            H = "Trade, transport & hospitality",
+            I = "Trade, transport & hospitality",
+            J = "Knowledge & finance", K = "Knowledge & finance",
+            L = "Knowledge & finance", M = "Knowledge & finance",
+            N = "Knowledge & finance",
+            O = "Public, education & health",
+            P = "Public, education & health",
+            Q = "Public, education & health",
+            R = "Other", S = "Other")
+  cities <- c("Zürich", "Zug", "Lugano", "Genève", "Bern", "Biel/Bienne")
+  emp <- subset(pv_city_sectors, city %in% cities)
+  emp$group <- fold[emp$sector_code]
+  agg <- aggregate(share ~ city + group, emp, sum)
+  # Bars and segments both follow first-appearance order: cities ranked
+  # by knowledge share, and the knowledge segment on the baseline.
+  groups <- c("Knowledge & finance", "Public, education & health",
+              "Trade, transport & hospitality", "Industry & construction",
+              "Other")
+  agg <- agg[order(match(agg$city, cities), match(agg$group, groups)), ]
+  pv_bar(agg, x = "city", y = "share", series = "group", stack = "percent",
+         xlab = NA,
+         title = "What six city economies are made of",
+         subtitle = "Employment shares by broad sector group",
+         source = "Source: Bundesamt für Statistik – STATENT")
+})
+
 ## line
 # explain: The line chart shows how values evolve - polyviz draws each
 #   series in with a left-to-right animation, labels lines directly at
@@ -38,6 +86,62 @@ pv_line(
   subtitle = "Permanent resident population at census years since 1930",
   source = "Source: Bundesamt für Statistik – Statistik der Schweizer Städte"
 )
+
+## line-points
+# explain: Two options change what a line chart claims. show_points = TRUE
+#   marks every observation with a dot in its line's colour - the
+#   connected-scatter treatment. Reach for it when the data is a handful
+#   of real measurements rather than a continuous stream: the dots show
+#   where the knowledge actually sits, and the line owns up to being
+#   interpolation between them ("auto" makes that call from the data,
+#   drawing dots only when no series runs past 30 points and neighbours
+#   sit at least about 12px apart). curve = "monotone" then bends the
+#   interpolation into a smooth curve that still passes through every
+#   point without overshooting - right whenever the quantity genuinely
+#   moves smoothly between observations, as a temperature does; "step"
+#   instead holds each value flat until the next, the honest shape for
+#   rates that change at discrete moments. Twelve monthly averages per
+#   series here: Lucerne afternoons reach 25 °C from June to August, but
+#   even an August night cools to 15 °C, and January nights average just
+#   below freezing.
+local({
+  # Twelve monthly averages apiece for the daily highs and lows.
+  mon <- month.abb[as.integer(format(pv_weather$date, "%m"))]
+  clim <- rbind(
+    data.frame(month = mon, series = "Daily high",
+               temp = pv_weather$temp_max),
+    data.frame(month = mon, series = "Daily low",
+               temp = pv_weather$temp_min))
+  clim <- aggregate(temp ~ month + series, clim, function(v) round(mean(v), 1))
+  # A category x axis keeps the rows' arrival order, so put the months
+  # back into calendar order before charting.
+  clim <- clim[order(match(clim$month, month.abb)), ]
+  pv_line(clim, x = "month", y = "temp", series = "series",
+          show_points = TRUE, curve = "monotone",
+          xlab = NA, ylab = "°C",
+          title = "Lucerne's climate year",
+          subtitle = "Monthly averages of the daily high and low temperature, 2020–2025",
+          source = "Source: MeteoSwiss")
+})
+
+## line-zoom
+# explain: zoom = TRUE hangs a brush strip below a line (or stacked area)
+#   chart - a muted miniature of the whole series. Reach for it when a
+#   series is too long for its details to survive at full width: six
+#   years of daily temperatures is 2,192 points, so a typical screen
+#   spends less than a pixel per day and keeps only the seasonal
+#   sawtooth. Drag across the strip and the main panel narrows to that
+#   window - down to single weeks, where the day-to-day swings reappear -
+#   then double-click the strip to snap back to the full range. Somewhere
+#   in here: the hottest daily mean of the six years, 27.1 °C on 19 June
+#   2022, and the coldest, -6.3 °C in the February 2021 cold snap. The
+#   chart always opens at the full range, so a pv_save() capture always
+#   shows the complete series.
+pv_line(pv_weather, x = "date", y = "temp_mean", zoom = TRUE,
+        xlab = NA, ylab = "°C",
+        title = "Six years of Lucerne days",
+        subtitle = "Daily mean temperature — drag across the strip below to zoom in",
+        source = "Source: MeteoSwiss")
 
 ## scatter
 # explain: The scatter plot reveals the relationship between two numeric

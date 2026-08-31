@@ -13,6 +13,15 @@
  *                                  theme, builds the ctx object, dispatches,
  *                                  re-renders on resize and on theme change
  */
+
+/* A headless browser is a screenshot machine - knitr converting a
+   document, pv_save() capturing a file, a test suite. It gets the
+   finished chart straight away, with no entry animation for a capture
+   to race, and "auto" mode resolves to light, the printed page's
+   default. An explicit mode or duration from R still wins. */
+var pvHeadless = typeof navigator !== "undefined" &&
+  /HeadlessChrome/.test(navigator.userAgent || "");
+
 HTMLWidgets.widget({
   name: "pvchart",
   type: "output",
@@ -56,11 +65,72 @@ HTMLWidgets.widget({
   }
 });
 
+/* The payload field each chart family draws from. When that field is
+   missing or empty there is nothing to draw, and the widget should say
+   so plainly. Types not listed here are left to their renderer. */
+var pvDataKeys = {
+  bar: "data", line: "data", scatter: "data", histogram: "data",
+  area: "data", heatmap: "data", calendar: "data", donut: "data",
+  lollipop: "data", beeswarm: "data", parallel: "data", race: "data",
+  bump: "data", choropleth: "data",
+  force: "nodes", sankey: "nodes",
+  chord: "matrix",
+  sunburst: "root", pack: "root", treemap: "root",
+  dendrogram: "tree",
+  boxplot: "boxes", violin: "violins", ridgeline: "ridges",
+  facet: "panels"
+};
+
+function pvHasData(x) {
+  var key = pvDataKeys[x.type];
+  if (!key) return true;
+  var v = x[key];
+  if (v == null) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  /* Hierarchy roots and trees are objects; existing is enough here,
+     anything deeper is the renderer's business. */
+  return true;
+}
+
+/* Writes a short notice into a cleared widget. The colours are
+   hard-coded mid-tones that read on light and dark pages alike, because
+   the theme itself may be the thing that failed. */
+function pvNotice(el, text, isError) {
+  el.innerHTML = "";
+  var box = document.createElement("div");
+  box.textContent = text;
+  box.style.cssText =
+    "box-sizing:border-box;padding:14px 16px;" +
+    "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;" +
+    "font-size:12.5px;line-height:1.5;" +
+    "color:" + (isError ? "#b3564d" : "#8a8a88") + ";";
+  el.appendChild(box);
+}
+
 function pvRender(el, x, width, height, mq) {
   el.__pvLastX = x;
+  /* Whatever goes wrong below - a broken payload, a renderer bug -
+     becomes a visible message in the widget itself; a silently blank
+     box would look like the data's fault. The console keeps the
+     original error and its stack for the developer. */
+  try {
+    pvRenderChart(el, x, width, height, mq);
+  } catch (err) {
+    if (window.console && console.error) console.error(err);
+    pvNotice(el, "polyviz: rendering failed — " +
+      (err && err.message ? err.message : String(err)), true);
+  }
+}
+
+function pvRenderChart(el, x, width, height, mq) {
+  if (!pvHasData(x)) {
+    pvNotice(el, "polyviz: no data to display", false);
+    return;
+  }
   /* Pick the light or dark colour set. "auto" follows the viewer's own
      system preference; the R side can also force one mode. */
-  var mode = x.mode === "auto" ? (mq && mq.matches ? "dark" : "light") : x.mode;
+  var mode = x.mode === "auto" ?
+    (!pvHeadless && mq && mq.matches ? "dark" : "light") : x.mode;
   var ink = x.theme.ink[mode];
   /* Older payloads may not carry tooltip tokens; derive quiet defaults. */
   ink.tooltipBg = ink.tooltipBg || (mode === "dark" ? "#232322" : "#ffffff");
@@ -86,6 +156,13 @@ function pvRender(el, x, width, height, mq) {
     'system-ui, -apple-system, "Segoe UI", sans-serif');
 
   var header = pv.buildHeader(el, x, theme);
+  /* The hover control for saving the chart, on unless pv_downloads(FALSE)
+     turned it off. The header keeps clear of the corner it sits in, so
+     a title or a wide legend never runs underneath it. */
+  if (x.downloads !== false) {
+    pv.buildDownloadControl(el, x, theme);
+    header.style.paddingRight = "48px";
+  }
   /* The source/credit line sits at the very bottom, small and grey, the
      way FT and The Economist compose their charts. It's absolutely
      positioned so the SVG area doesn't have to know about it. */
@@ -107,7 +184,7 @@ function pvRender(el, x, width, height, mq) {
   var ctx = {
     el: el, x: x, theme: theme, tip: tip, header: header,
     width: width, height: innerH,
-    duration: x.duration == null ? 500 : x.duration,
+    duration: pvHeadless ? 0 : (x.duration == null ? 500 : x.duration),
     fmt: d3.format(",.2~f")
   };
 
@@ -148,7 +225,7 @@ function pvRender(el, x, width, height, mq) {
 
   var renderer = pvRenderers[x.type];
   if (!renderer) {
-    el.textContent = "polyviz: unknown chart type '" + x.type + "'";
+    pvNotice(el, "polyviz: unknown chart type '" + x.type + "'", true);
     return;
   }
   renderer(ctx);

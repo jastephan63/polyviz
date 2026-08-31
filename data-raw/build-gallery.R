@@ -119,7 +119,9 @@ page <- tags$html(lang = "en", tags$head(
       "Interactive d3.js visualisations driven entirely from R.",
       "Every chart below is live - hover, drag, click, and zoom -",
       "and runs on real Swiss open government data bundled with the",
-      "package. Install with",
+      "package. Every chart can also be taken along: hover it and the",
+      "button in its top-right corner downloads it as a standalone SVG",
+      "or a high-resolution PNG. Install with",
       'devtools::install_github("jastephan63/polyviz").'))
   ),
   toc,

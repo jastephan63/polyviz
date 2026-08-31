@@ -94,6 +94,10 @@ window.pv = (function () {
 
   pv.buildTooltip = function (el, theme) {
     var tip = document.createElement("div");
+    /* The class lets the svg exporter recognise the tooltip and leave
+       it out of exported charts, wherever in the widget it currently
+       lives (the facet renderer moves it between panels). */
+    tip.className = "pv-tooltip";
     tip.style.cssText =
       "position:absolute;pointer-events:none;opacity:0;z-index:10;" +
       "background:" + theme.ink.tooltipBg + ";color:" + theme.ink.tooltipText + ";" +
@@ -321,6 +325,469 @@ window.pv = (function () {
     if (!ctx.selected) return base;
     return ctx.selected.indexOf(String(key)) >= 0 ? base :
       (dim == null ? 0.12 : dim);
+  };
+
+  /* ---------- standalone svg export ----------
+     A rendered widget is an HTML sandwich: the title, subtitle, legend,
+     and source line are divs sitting around the plot's <svg>, so saving
+     just the svg would lose all of them. pv.toStandaloneSvg rebuilds the
+     whole chart as one self-contained SVG document by walking the live
+     DOM: text nodes become <text> at their measured positions, coloured
+     boxes (legend swatches, gradient scale bars) become <rect>, and each
+     plot <svg> is embedded where it sits. Both the R export function and
+     the in-browser download button go through here. */
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgNode(name) {
+    return document.createElementNS(SVG_NS, name);
+  }
+
+  function round2(v) {
+    return Math.round(v * 100) / 100;
+  }
+
+  /* An element's computed background-color is "rgba(0, 0, 0, 0)" when
+     nothing was set - only a real colour earns a rect. */
+  function realBg(c) {
+    return c && c !== "transparent" &&
+      c.indexOf("rgba(0, 0, 0, 0)") !== 0 ? c : null;
+  }
+
+  /* Split a CSS argument list on the commas between arguments, not the
+     ones inside colour functions like rgb(90, 166, 221). */
+  function splitCssArgs(s) {
+    var out = [], depth = 0, cur = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      if (c === "," && depth === 0) { out.push(cur.trim()); cur = ""; }
+      else cur += c;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+
+  /* Turn a computed linear-gradient background (the heatmap and map
+     colour-scale bars) into an SVG <linearGradient> in the document's
+     defs, and hand back a url(#...) fill for it. Every polyviz gradient
+     bar runs left to right, so the direction is fixed horizontal.
+     Returns null when the value isn't a stop list we understand. */
+  function gradientFill(state, backgroundImage) {
+    var m = backgroundImage.match(/linear-gradient\((.*)\)/);
+    if (!m) return null;
+    var args = splitCssArgs(m[1]);
+    if (args.length && /^(-?[\d.]+(deg|rad|turn)$|to\s)/.test(args[0])) {
+      args.shift();
+    }
+    var stops = [];
+    args.forEach(function (a) {
+      var sm = a.match(/^(.*?)\s+([\d.]+)%$/);
+      if (sm) stops.push({ color: sm[1], offset: sm[2] + "%" });
+    });
+    if (stops.length < 2) return null;
+    if (!state.defs) {
+      state.defs = svgNode("defs");
+      state.root.insertBefore(state.defs, state.root.firstChild);
+    }
+    var id = "pv-export-grad-" + (++state.gradients);
+    var grad = svgNode("linearGradient");
+    grad.setAttribute("id", id);
+    grad.setAttribute("x1", "0");
+    grad.setAttribute("y1", "0");
+    grad.setAttribute("x2", "1");
+    grad.setAttribute("y2", "0");
+    stops.forEach(function (st) {
+      var stop = svgNode("stop");
+      stop.setAttribute("offset", st.offset);
+      stop.setAttribute("stop-color", st.color);
+      grad.appendChild(stop);
+    });
+    state.defs.appendChild(grad);
+    return "url(#" + id + ")";
+  }
+
+  /* One rendered line box per entry: {text, rect}. Header text is a
+     single line, but the source line can wrap on narrow charts, and one
+     <text> per line is the only way SVG can reproduce that. The wrapped
+     case grows a range one character at a time and cuts a line every
+     time the browser starts a new line box. */
+  function textLines(node) {
+    var s = String(node.nodeValue);
+    var range = document.createRange();
+    range.selectNodeContents(node);
+    var whole = range.getBoundingClientRect();
+    if (!whole.width && !whole.height) return [];
+    if (range.getClientRects().length <= 1 || s.length > 400) {
+      return [{ text: s, rect: whole }];
+    }
+    var out = [], lineStart = 0;
+    for (var i = 1; i <= s.length; i++) {
+      range.setStart(node, lineStart);
+      range.setEnd(node, i);
+      if (range.getClientRects().length > 1) {
+        range.setEnd(node, i - 1);
+        out.push({ text: s.slice(lineStart, i - 1),
+          rect: range.getBoundingClientRect() });
+        lineStart = i - 1;
+      }
+    }
+    range.setStart(node, lineStart);
+    range.setEnd(node, s.length);
+    out.push({ text: s.slice(lineStart),
+      rect: range.getBoundingClientRect() });
+    return out;
+  }
+
+  function exportText(state, node) {
+    var parent = node.parentElement;
+    if (!parent || !String(node.nodeValue).trim()) return;
+    var cs = getComputedStyle(parent);
+    textLines(node).forEach(function (line) {
+      var text = line.text.replace(/\s+/g, " ").trim();
+      if (!text) return;
+      var t = svgNode("text");
+      t.setAttribute("x", round2(line.rect.left - state.base.left));
+      /* SVG places text by its baseline. For the fonts in play the
+         baseline sits at about 80% of the measured line box, and an
+         explicit y stays portable - dominant-baseline support is patchy
+         outside browsers. */
+      t.setAttribute("y", round2(line.rect.top - state.base.top +
+        line.rect.height * 0.8));
+      t.setAttribute("fill", cs.color);
+      t.setAttribute("font-size", cs.fontSize);
+      if (cs.fontWeight !== "400" && cs.fontWeight !== "normal") {
+        t.setAttribute("font-weight", cs.fontWeight);
+      }
+      if (cs.fontStyle && cs.fontStyle !== "normal") {
+        t.setAttribute("font-style", cs.fontStyle);
+      }
+      if (cs.letterSpacing && cs.letterSpacing !== "normal") {
+        t.setAttribute("letter-spacing", cs.letterSpacing);
+      }
+      if (cs.fontVariantNumeric && cs.fontVariantNumeric !== "normal") {
+        t.setAttribute("style",
+          "font-variant-numeric:" + cs.fontVariantNumeric + ";");
+      }
+      t.textContent = text;
+      state.root.appendChild(t);
+    });
+  }
+
+  /* A plot svg goes in whole, as a nested <svg> pinned to the spot it
+     occupies in the widget - that keeps its own coordinate system and
+     clip paths intact without touching any of its content. */
+  function exportPlotSvg(state, el) {
+    var r = el.getBoundingClientRect();
+    var clone = el.cloneNode(true);
+    clone.setAttribute("x", round2(r.left - state.base.left));
+    clone.setAttribute("y", round2(r.top - state.base.top));
+    if (!clone.getAttribute("width")) {
+      clone.setAttribute("width", round2(r.width));
+    }
+    if (!clone.getAttribute("height")) {
+      clone.setAttribute("height", round2(r.height));
+    }
+    state.root.appendChild(clone);
+  }
+
+  function exportWalk(state, node) {
+    if (node.nodeType === 3) { exportText(state, node); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName.toLowerCase();
+    if (tag === "svg") { exportPlotSvg(state, node); return; }
+    /* Interactive controls make no sense in a static file, and the
+       tooltip is chrome for the pointer, not part of the chart. */
+    if (tag === "button" || tag === "input" || tag === "select" ||
+        tag === "canvas" || tag === "script" || tag === "style") return;
+    if (node.classList && node.classList.contains("pv-tooltip")) return;
+    var cs = getComputedStyle(node);
+    if (cs.display === "none" || cs.visibility === "hidden" ||
+        parseFloat(cs.opacity) === 0) return;
+    var r = node.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      var fill = null;
+      if (cs.backgroundImage && cs.backgroundImage.indexOf("gradient") >= 0) {
+        fill = gradientFill(state, cs.backgroundImage);
+      }
+      if (!fill) fill = realBg(cs.backgroundColor);
+      if (fill) {
+        var rect = svgNode("rect");
+        rect.setAttribute("x", round2(r.left - state.base.left));
+        rect.setAttribute("y", round2(r.top - state.base.top));
+        rect.setAttribute("width", round2(r.width));
+        rect.setAttribute("height", round2(r.height));
+        var radius = parseFloat(cs.borderTopLeftRadius) || 0;
+        if (radius) rect.setAttribute("rx", round2(radius));
+        rect.setAttribute("fill", fill);
+        state.root.appendChild(rect);
+      }
+    }
+    for (var i = 0; i < node.childNodes.length; i++) {
+      /* A node the walk cannot handle is dropped, never fatal - an
+         export with one oddity missing beats no export. */
+      try { exportWalk(state, node.childNodes[i]); } catch (e) {}
+    }
+  }
+
+  /* Serialise a rendered widget (the root element htmlwidgets renders
+     into) as one standalone SVG document string: header, legend, plot,
+     and source line together, ready to drop into a paper. `x` is the
+     payload the widget was rendered from (falls back to the copy the
+     binding stores on the element) and `theme` the resolved colour set;
+     both may be null, the DOM itself carries everything essential. */
+  pv.toStandaloneSvg = function (el, x, theme) {
+    try {
+      x = x || el.__pvLastX || {};
+      var base = el.getBoundingClientRect();
+      var w = Math.round(base.width || el.offsetWidth || 640);
+      var h = Math.round(base.height || el.offsetHeight || 400);
+      var root = svgNode("svg");
+      root.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink",
+        "http://www.w3.org/1999/xlink");
+      root.setAttribute("width", w);
+      root.setAttribute("height", h);
+      root.setAttribute("viewBox", "0 0 " + w + " " + h);
+      var font = (x.theme && x.theme.font) ||
+        '"InterVariable", "Inter", system-ui, -apple-system, ' +
+        '"Segoe UI", sans-serif';
+      root.setAttribute("style", "font-family:" + font + ";");
+      var surface = (theme && theme.ink && theme.ink.surface) ||
+        realBg(getComputedStyle(el).backgroundColor) || "#ffffff";
+      var bg = svgNode("rect");
+      bg.setAttribute("width", w);
+      bg.setAttribute("height", h);
+      bg.setAttribute("fill", surface);
+      root.appendChild(bg);
+      var state = { root: root, base: base, defs: null, gradients: 0 };
+      for (var i = 0; i < el.childNodes.length; i++) {
+        try { exportWalk(state, el.childNodes[i]); } catch (e) {}
+      }
+      return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        new XMLSerializer().serializeToString(root);
+    } catch (e) {
+      /* Whatever went wrong, hand back a valid (if empty) document. */
+      return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<svg xmlns="' + SVG_NS + '" width="640" height="400"></svg>';
+    }
+  };
+
+  /* Rasterise a standalone SVG string to a PNG blob, `scale` times the
+     given pixel size, and pass the blob to `callback` (null when the
+     browser refuses). The svg loads through an <img>, which renders it
+     in an isolated document - page web fonts don't reach it, so the
+     font stack's system fallbacks carry the raster. */
+  pv.svgToPngBlob = function (svgString, width, height, scale, callback) {
+    scale = scale || 2;
+    var svgBlob = new Blob([svgString],
+      { type: "image/svg+xml;charset=utf-8" });
+    var url = URL.createObjectURL(svgBlob);
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        canvas.getContext("2d")
+          .drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (png) { callback(png); }, "image/png");
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        callback(null);
+      }
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      callback(null);
+    };
+    img.src = url;
+  };
+
+  /* Hand a file to the browser's save machinery: a temporary anchor
+     pointing at an object URL, clicked, then cleaned up. Text content
+     is wrapped in a blob of the given mime type first. */
+  pv.triggerDownload = function (data, filename, mimeType) {
+    var blob = data instanceof Blob ? data :
+      new Blob([data], { type: mimeType || "application/octet-stream" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    /* The revoke waits a beat: some browsers read the URL after the
+       click returns. */
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  };
+
+  /* ---------- download control ----------
+     A chart's in-page save UI: a small arrow button in the top-right
+     corner opening a two-entry menu, "Download SVG" and "Download PNG
+     (2x)", wired to the export helpers above. pvchart.js builds one per
+     chart unless the R side turned downloads off. Every painted surface
+     of the control - the button face, each menu entry - is a <button>,
+     which the SVG exporter skips by tag, and the wrappers around them
+     are transparent; on top of that the control hides itself for the
+     moment of serialisation. So it never shows up inside a saved
+     chart. */
+
+  /* Turns a chart title into a safe filename: lower-case ascii with
+     hyphens between words. Diacritics are stripped rather than dropped,
+     so "Bevölkerung" becomes "bevolkerung". Returns "" when nothing
+     usable is left. */
+  pv.slugify = function (s) {
+    s = String(s == null ? "" : s);
+    if (s.normalize) {
+      s = s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    }
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  };
+
+  pv.buildDownloadControl = function (el, x, theme) {
+    var ink = theme.ink;
+    var reducedMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    /* Touch screens have no hover to reveal the control with, so on
+       coarse pointers it simply stays visible. */
+    var coarse = window.matchMedia &&
+      window.matchMedia("(pointer: coarse)").matches;
+
+    var box = document.createElement("div");
+    box.className = "pv-download";
+    box.style.cssText =
+      "position:absolute;top:8px;right:8px;z-index:9;opacity:0;" +
+      (reducedMotion ? "" : "transition:opacity 140ms ease;");
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.title = "Download this chart";
+    btn.setAttribute("aria-label", "Download this chart");
+    btn.setAttribute("aria-haspopup", "true");
+    btn.setAttribute("aria-expanded", "false");
+    btn.style.cssText =
+      "display:flex;align-items:center;justify-content:center;" +
+      "width:26px;height:24px;padding:0;border-radius:6px;" +
+      "border:1px solid " + ink.baseline + ";" +
+      "background:" + ink.surface + ";color:" + ink.secondary + ";" +
+      "cursor:pointer;";
+    btn.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
+      '<path d="M6 1.2v6M3.3 4.9 6 7.6l2.7-2.7M1.9 10.4h8.2" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.4" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    box.appendChild(btn);
+
+    /* The menu wrapper only positions; each entry paints its own card.
+       That keeps every coloured surface on a <button>. */
+    var menu = document.createElement("div");
+    menu.style.cssText =
+      "position:absolute;top:100%;right:0;margin-top:4px;display:none;";
+    box.appendChild(menu);
+
+    function setOpen(open) {
+      menu.style.display = open ? "block" : "none";
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    btn.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      setOpen(menu.style.display === "none");
+    });
+    btn.addEventListener("mouseenter", function () {
+      btn.style.background = ink.grid;
+    });
+    btn.addEventListener("mouseleave", function () {
+      btn.style.background = ink.surface;
+    });
+
+    /* Base of the saved file's name: the chart's title when it has one,
+       the element id otherwise, a generic fallback last. */
+    function filename(ext) {
+      var base = pv.slugify(x.title) || pv.slugify(el.id) ||
+        "polyviz-chart";
+      return base + ext;
+    }
+
+    /* The control must never appear in its own export, so it steps out
+       of the DOM walk (which is synchronous) and back in right after. */
+    function snapshot() {
+      var prev = box.style.display;
+      box.style.display = "none";
+      var svg = pv.toStandaloneSvg(el, x, theme);
+      box.style.display = prev;
+      return svg;
+    }
+
+    function item(label, onPick) {
+      var it = document.createElement("button");
+      it.type = "button";
+      it.textContent = label;
+      it.style.cssText =
+        "display:block;width:100%;box-sizing:border-box;margin:0 0 3px 0;" +
+        "padding:6px 11px;border:1px solid " + ink.tooltipBorder + ";" +
+        "border-radius:7px;background:" + ink.tooltipBg + ";" +
+        "color:" + ink.tooltipText + ";font:inherit;font-size:12px;" +
+        "text-align:left;cursor:pointer;white-space:nowrap;" +
+        "box-shadow:0 4px 16px rgba(0,0,0,0.16);";
+      it.addEventListener("mouseenter", function () {
+        it.style.background = ink.grid;
+      });
+      it.addEventListener("mouseleave", function () {
+        it.style.background = ink.tooltipBg;
+      });
+      it.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        setOpen(false);
+        onPick();
+      });
+      menu.appendChild(it);
+    }
+
+    item("Download SVG", function () {
+      pv.triggerDownload(snapshot(), filename(".svg"),
+        "image/svg+xml;charset=utf-8");
+    });
+    item("Download PNG (2x)", function () {
+      var r = el.getBoundingClientRect();
+      var w = Math.round(r.width || el.offsetWidth || 640);
+      var h = Math.round(r.height || el.offsetHeight || 400);
+      pv.svgToPngBlob(snapshot(), w, h, 2, function (png) {
+        if (png) pv.triggerDownload(png, filename(".png"));
+      });
+    });
+
+    /* Reveal on hover or keyboard focus. The listeners go on the widget
+       element once - it survives re-renders, the control does not - and
+       find the current control through el.__pvDlBox each time. */
+    el.__pvDlBox = box;
+    if (coarse) {
+      box.style.opacity = 1;
+    } else if (!el.__pvDlWired) {
+      el.__pvDlWired = true;
+      var setVisible = function (on) {
+        var b = el.__pvDlBox;
+        if (!b || !b.parentNode) return;
+        b.style.opacity = on ? 1 : 0;
+        if (!on) {
+          var m = b.lastChild;
+          if (m) m.style.display = "none";
+          b.firstChild.setAttribute("aria-expanded", "false");
+        }
+      };
+      el.addEventListener("mouseenter", function () { setVisible(true); });
+      el.addEventListener("mouseleave", function () { setVisible(false); });
+      el.addEventListener("focusin", function () { setVisible(true); });
+      el.addEventListener("focusout", function (ev) {
+        /* Focus hopping between the button and a menu entry stays
+           inside the widget; only leaving it hides the control. */
+        if (!el.contains(ev.relatedTarget)) setVisible(false);
+      });
+    }
+    el.appendChild(box);
+    return box;
   };
 
   return pv;

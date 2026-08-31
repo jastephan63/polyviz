@@ -310,9 +310,18 @@
     var seriesNames = pv.uniq(data.map(function (d) { return d.series; }));
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
+    /* More series than the palette has hues would silently recycle
+       colours, so identity by colour is lost anyway. Such charts switch
+       to a spaghetti treatment instead: every line in the muted ink at
+       low opacity, and hover lifts one line at a time in the accent
+       colour with its name in the tooltip. */
+    var spaghetti = seriesNames.length > ctx.theme.palette.length;
+    var accent = ctx.theme.palette[0];
     /* "auto" keeps the old rule - a legend only when a real series
-       mapping produced more than one line; TRUE and FALSE override it. */
-    var showLegend = opt(ctx.x.legend,
+       mapping produced more than one line; TRUE and FALSE override it.
+       A spaghetti chart never gets one: with every line in the same ink
+       there is no colour for a legend to explain. */
+    var showLegend = !spaghetti && opt(ctx.x.legend,
       ctx.x.showLegend && seriesNames.length > 1);
     if (showLegend && seriesNames.length) {
       pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
@@ -388,13 +397,22 @@
       .x(function (d) { return xScale(d.x); })
       .y(function (d) { return y(d.y); });
 
+    /* Spaghetti lines get a layer of their own, so hover can raise one
+       line above its siblings without lifting it over the crosshair, the
+       marker dots, or the pointer surface drawn later. */
+    var lineLayer = spaghetti ? g.append("g") : g;
+    var pathBySeries = {};
     bySeries.forEach(function (s) {
-      var path = g.append("path").datum(s.points)
+      var path = lineLayer.append("path").datum(s.points)
         .attr("fill", "none")
-        .attr("stroke", color(s.name))
-        .attr("stroke-width", 2)
+        .attr("stroke", spaghetti ? ctx.theme.ink.muted : color(s.name))
+        .attr("stroke-width", spaghetti ? 1.5 : 2)
         .attr("stroke-linejoin", "round")
         .attr("d", line);
+      if (spaghetti) {
+        path.attr("stroke-opacity", 0.4);
+        pathBySeries[s.name] = path;
+      }
       /* The draw-in effect: dash the line with one dash as long as the whole
          path, start fully offset (invisible), then animate the offset to
          zero so the line appears to be drawn left to right. */
@@ -406,6 +424,27 @@
         .on("end", function () { path.attr("stroke-dasharray", null); });
 
       });
+
+    /* The one spaghetti line the pointer currently singles out. Moving to
+       another settles the old line back into the grey bundle and brings
+       the new one forward in the accent colour. */
+    var hotSeries = null;
+    function setHot(nm) {
+      if (nm === hotSeries) return;
+      if (hotSeries != null) {
+        pathBySeries[hotSeries]
+          .attr("stroke", ctx.theme.ink.muted)
+          .attr("stroke-width", 1.5)
+          .attr("stroke-opacity", 0.4);
+      }
+      hotSeries = nm;
+      if (nm != null) {
+        pathBySeries[nm].raise()
+          .attr("stroke", accent)
+          .attr("stroke-width", 2)
+          .attr("stroke-opacity", 1);
+      }
+    }
 
     /* Direct labels at the line ends. Series that finish near the same
        value would overlap, so sort the label positions and push any pair
@@ -483,10 +522,35 @@
       .attr("width", iw).attr("height", ih)
       .attr("fill", "transparent")
       .on("pointermove", function (event) {
-        var hits = hitsAt(d3.pointer(event, this)[0]);
+        var p = d3.pointer(event, this);
+        var hits = hitsAt(p[0]);
         if (!hits.length) return;
         var nearest = xScale(hits[0].x);
         cross.attr("x1", nearest).attr("x2", nearest).attr("opacity", 1);
+        if (spaghetti) {
+          /* Dozens of tooltip rows would be noise. Pick the one line
+             nearest the pointer vertically, lift it, and report it
+             alone - name, dot, and value. */
+          var best = hits[0];
+          hits.forEach(function (d) {
+            if (Math.abs(y(d.y) - p[1]) < Math.abs(y(best.y) - p[1])) {
+              best = d;
+            }
+          });
+          setHot(best.series);
+          var dotSel = dots.selectAll("circle").data([best]);
+          dotSel.enter().append("circle").attr("r", 4)
+            .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2)
+            .merge(dotSel)
+            .attr("cx", xScale(best.x)).attr("cy", y(best.y))
+            .attr("fill", accent);
+          dotSel.exit().remove();
+          var bestLabel = xtype === "date" ?
+            d3.timeFormat("%b %e, %Y")(best.x) : best.x;
+          pv.showTip(ctx, event, "<b>" + pv.esc(bestLabel) + "</b><br>" +
+            pv.swatchRow(accent, best.series, ctx.fmt(best.y)));
+          return;
+        }
         var sel = dots.selectAll("circle").data(hits);
         sel.enter().append("circle").attr("r", 4)
           .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2)
@@ -506,6 +570,7 @@
       .on("pointerleave", function () {
         cross.attr("opacity", 0);
         dots.selectAll("circle").remove();
+        if (spaghetti) { setHot(null); }
         pv.hideTip(ctx);
       })
       .on("click", function (event) {
@@ -541,10 +606,14 @@
     }
 
     /* Dense clouds need lighter ink: up to 150 points keep the usual
-       opacity, beyond that fade smoothly toward a floor of 0.3 so
-       overplotted regions still show their structure. */
-    var baseOpacity = data.length <= 150 ? 0.62 :
-      Math.max(0.3, 0.62 * Math.sqrt(150 / data.length));
+       opacity, beyond that fade with the square root of the count, and
+       past ~640 points (where that curve reaches 0.3) keep easing down
+       on a gentler curve - a 50k cloud lands near 0.08 - so heavily
+       overplotted cores still show their density structure. */
+    var nPts = data.length;
+    var baseOpacity = nPts <= 150 ? 0.62 :
+      nPts <= 640 ? 0.62 * Math.sqrt(150 / nPts) :
+      0.3 * Math.pow(640 / nPts, 0.3);
 
     /* Linked selection (pv_link): ctKeys is a row key per point. Points a
        group-wide selection leaves out drop to a faint ghost opacity. */
@@ -571,11 +640,20 @@
        replace the computed domains exactly as given - no nice(). */
     if (ctx.x.xlim) { xScale.domain(ctx.x.xlim); }
     if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
+    /* The default dot slims down in huge clouds too: past ~10k points it
+       shrinks smoothly toward 2.5px at 50k, so each mark stops being
+       mostly overlap. Its surface-coloured halo thins away on the same
+       curve - an opaque ring would paint over the neighbours the faded
+       fill is meant to let through. An explicit size mapping is the
+       user's own choice of radius and keeps its scale untouched. */
+    var autoR = nPts <= 10000 ? 4.5 :
+      Math.max(2.5, 4.5 * Math.pow(10000 / nPts, 0.37));
+    var ptStroke = Math.max(0, (autoR - 2.5) / 2);
     var r = hasSize ?
       d3.scaleSqrt()
         .domain(d3.extent(data, function (d) { return d.size; }))
         .range([3.5, 13]) :
-      function () { return 4.5; };
+      function () { return autoR; };
 
     pv.yGrid(g, y, iw, ctx.theme);
     g.append("g").attr("transform", "translate(0," + ih + ")")
@@ -622,7 +700,7 @@
         return hasSeries ? color(d.series) : ctx.theme.palette[0];
       })
       .attr("fill-opacity", ptOp)
-      .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1);
+      .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", ptStroke);
 
     pts.transition().duration(ctx.duration)
       .delay(function (d, i) { return Math.min(i * 6, 400); })
@@ -665,7 +743,7 @@
       .on("pointerleave", function (event, d) {
         d3.select(this)
           .attr("fill-opacity", ptOp(d))
-          .attr("stroke-width", 1)
+          .attr("stroke-width", ptStroke)
           .attr("r", hasSize ? r(d.size) : r());
         pv.hideTip(ctx);
       })

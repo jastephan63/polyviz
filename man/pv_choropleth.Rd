@@ -11,6 +11,8 @@ pv_choropleth(
   value,
   palette = c("sequential", "diverging"),
   center = NULL,
+  lakes = "auto",
+  join_id = NULL,
   title = NULL,
   subtitle = NULL,
   mode = "auto",
@@ -24,14 +26,22 @@ pv_choropleth(
 \arguments{
 \item{data}{A data frame with at most one row per region.}
 
-\item{map}{A GeoJSON FeatureCollection stored as an R list, with each
-feature carrying \code{properties$id} (join key) and \code{properties$name}
-(shown in tooltips). Defaults to \link{pv_lucerne_map}, the 79 Lucerne
-municipalities.}
+\item{map}{The map to colour. Either a layer name — \code{"lucerne"} (the
+79 Lucerne municipalities, the default layer), \code{"cantons"} (the 26
+cantons, joining on the BFS canton number), \code{"districts"} (the 143
+districts, joining on the BFS district number), or
+\code{"municipalities"} (all Swiss municipalities, downloaded and cached
+on first use via \code{\link[=pv_fetch_map]{pv_fetch_map()}}, joining on the BFS municipality
+number) — or a GeoJSON FeatureCollection stored as an R list with
+each feature carrying \code{properties$id} (join key) and
+\code{properties$name} (shown in tooltips), like \link{pv_lucerne_map} and
+the bundled Swiss layers; or an sf polygon object (needs the sf
+package), which is reprojected to WGS84 and joined on its \code{id}
+column — name a different column with \code{join_id}.}
 
 \item{id}{Name of the column joining \code{data} to the map's feature ids.
-Ids that match no feature are dropped with a warning; if none match
-at all, that is an error.}
+Ids that match no feature are dropped with a warning that counts
+them and shows a sample; if none match at all, that is an error.}
 
 \item{value}{Name of the numeric column mapped to colour. Rows with a
 missing value are dropped with a warning — their regions read as
@@ -44,6 +54,19 @@ missing value are dropped with a warning — their regions read as
 \item{center}{The reference value the diverging palette's neutral
 midpoint stands for (e.g. \code{100} for an index, \code{0} for a change).
 Required — and only allowed — when \code{palette = "diverging"}.}
+
+\item{lakes}{Draw the major Swiss lakes (\link{pv_swiss_lakes}) in a muted
+water tone? The country-wide layers' polygons include their lake
+surfaces, so the water paints over the region fills — the map
+convention of the boundaries' own publisher. \code{TRUE} always, \code{FALSE}
+never; \code{"auto"} (default) draws them exactly when the map shows the
+whole of Switzerland — the \code{"cantons"}, \code{"districts"}, and
+\code{"municipalities"} layers, or any map spanning over 3 degrees of
+longitude — and leaves regional maps (which usually carry their own
+water, like the Lucerne layer) alone.}
+
+\item{join_id}{Only for an sf \code{map}: name of the column holding each
+feature's id. Defaults to a column named \code{id}.}
 
 \item{title, subtitle}{Optional chart heading text.}
 
@@ -62,7 +85,7 @@ An htmlwidget.
 }
 \description{
 Regions of a map coloured by a numeric value — the chart for showing
-how a measure varies across space. The map arrives as a GeoJSON
+how a measure varies across space. The map is a GeoJSON
 FeatureCollection stored as a plain R list (the bundled
 \link{pv_lucerne_map} is the template: each feature carries
 \code{properties$id} and \code{properties$name}), and \code{data} joins onto it by
@@ -87,4 +110,7 @@ fiscal25 <- subset(pv_fiscal, year == 2025)
 pv_choropleth(fiscal25, id = "municipality_id", value = "resource_index",
               palette = "diverging", center = 100,
               title = "Fiscal strength of Lucerne municipalities")
+# A Switzerland-wide map joins on the canton number (1-26):
+cantons <- data.frame(canton = 1:26, share = runif(26, 20, 60))
+pv_choropleth(cantons, map = "cantons", id = "canton", value = "share")
 }

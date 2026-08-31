@@ -17,7 +17,7 @@ via stats.swiss. Open use, source citation required
 pv_city_population
 }
 \description{
-Permanent resident population of 181 Swiss cities at census reference
+Permanent resident population of 180 Swiss cities at census reference
 years from 1930 to today. Nearly a century of urban growth — good for
 long time-series charts.
 }

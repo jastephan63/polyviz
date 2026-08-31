@@ -1,3 +1,38 @@
+# polyviz 0.7.0
+
+Swiss open data, live from R — and maps of the whole country.
+
+## Fetching data
+
+* `pv_fetch_bfs()` and `pv_fetch_lustat()` download any dataset from
+  the stats.swiss and LUSTAT portals and return it as a tidy data
+  frame, with the source and licence printed on every fetch and
+  attached to the result (LUSTAT's open-by-ask terms included).
+* `pv_search_opendata()` and `pv_fetch_opendata()` search and download
+  from opendata.swiss; resources whose licence is not open are refused
+  with a plain message instead of delivered.
+* Downloads land in a local cache (`pv_cache_status()`,
+  `pv_cache_clear()`), so repeat fetches are instant and offline-safe.
+
+## Maps
+
+* Bundled Switzerland-wide layers: `pv_swiss_cantons`,
+  `pv_swiss_districts`, and `pv_swiss_lakes` (BFS ThemaKart, ~250KB
+  total), plus `pv_city_coords` — the 180 statistical cities with
+  their coordinates.
+* `pv_choropleth(map = )` now takes a bundled layer name, your own
+  `sf` object (reprojected automatically), or `"municipalities"`,
+  which `pv_fetch_map()` downloads once and caches. Mismatched joins
+  fail loudly, naming the unmatched ids. A `lakes` option draws the
+  water, which makes country-wide maps read as Switzerland at a
+  glance.
+* `pv_bubble_map()` — the 25th chart type: sized circles over a quiet
+  base map, with a circle-size legend, adaptive overlap opacity, and
+  the full chart chrome.
+
+A new vignette, "Swiss open data from R", walks the whole path:
+fetch a dataset, chart it, map it, and save the figure for a paper.
+
 # polyviz 0.6.0
 
 More control over the core charts: the four chart-option items from the

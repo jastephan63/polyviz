@@ -15,7 +15,7 @@ via stats.swiss. Open use, source citation required.
 pv_city_landuse
 }
 \description{
-Area in hectares by land-use category for 181 Swiss cities (survey
+Area in hectares by land-use category for 180 Swiss cities (survey
 period 2013–2025), grouped into Settlement, Cultivated, and Natural.
 Two hierarchy levels — good for treemaps and part-of-whole charts.
 }

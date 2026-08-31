@@ -1,6 +1,6 @@
 Package: polyviz
 Title: Polyglot Data Analysis and 'D3'-Powered Visualisation
-Version: 0.6.0
+Version: 0.7.0
 Authors@R:
     person("Jake", "Stephan", email = "jake@stephan-j.com",
            role = c("aut", "cre"))
@@ -28,6 +28,7 @@ Imports:
     haven,
     htmltools,
     htmlwidgets,
+    jsonlite,
     RSQLite,
     rlang,
     stats,
@@ -36,6 +37,7 @@ Imports:
 Suggests:
     chromote,
     reticulate,
+    sf,
     shiny,
     testthat (>= 3.0.0),
     withr,

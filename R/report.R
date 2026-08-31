@@ -189,9 +189,12 @@ pv_report <- function(data, file, title = deparse(substitute(data)),
       sub <- if (n_miss > 0) {
         sprintf("%d missing value%s", n_miss, if (n_miss == 1) "" else "s")
       }
-      # the chart title already names the column, so the x-axis title
-      # would only repeat it
-      report_size(pv_histogram(data, nm, title = nm, subtitle = sub,
+      # the subtitle above already counts the missing values, so they
+      # are dropped here quietly rather than letting pv_histogram warn
+      # about them a second time. The chart title already names the
+      # column, so the x-axis title would only repeat it.
+      clean <- data[!is.na(data[[nm]]), nm, drop = FALSE]
+      report_size(pv_histogram(clean, nm, title = nm, subtitle = sub,
                                xlab = NA, mode = mode), 330)
     })
     note <- if (length(num_cols) > length(shown)) {

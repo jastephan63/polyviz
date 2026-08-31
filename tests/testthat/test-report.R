@@ -20,8 +20,10 @@ test_that("airquality report has the expected headings and widgets", {
   dir <- withr::local_tempdir()
   path <- file.path(dir, "report.html")
   # called directly (not through a helper) so the default title comes
-  # from the actual argument expression
-  pv_report(airquality, path)
+  # from the actual argument expression. Ozone and Solar.R carry NAs,
+  # but the report counts them in the histogram subtitles and drops
+  # them before charting, so the build itself stays quiet.
+  expect_no_warning(pv_report(airquality, path))
   r <- list(dir = dir, path = path,
             html = paste(readLines(path, warn = FALSE), collapse = "\n"))
   expect_match(r$html, "<h1>airquality</h1>", fixed = TRUE)

@@ -10,6 +10,9 @@ pv_line(
   y,
   series = NULL,
   legend = "auto",
+  show_points = FALSE,
+  curve = c("linear", "monotone", "step"),
+  zoom = FALSE,
   xlab = NULL,
   ylab = NULL,
   title = NULL,
@@ -37,6 +40,34 @@ or value are dropped with a warning.}
 shows it, \code{FALSE} hides it (the direct labels at the line ends
 remain); \code{"auto"} (default) shows it exactly when a \code{series} mapping
 with more than one level exists.}
+
+\item{show_points}{Mark every observation with a dot on its line —
+the connected-scatter treatment. \code{TRUE} always, \code{FALSE} (default)
+never; \code{"auto"} shows the dots when the individual observations
+matter: no series longer than 30 points, with at least about 12
+horizontal pixels between neighbouring dots. Each dot takes its
+line's colour with the usual 2px surface ring, and the crosshair
+tooltip works exactly as before. Spaghetti charts (more series than
+the palette's 8 hues) never draw them — their lines share one muted
+ink, so per-point dots would only add noise.}
+
+\item{curve}{How the line travels between observations. \code{"linear"}
+(default) connects them with straight segments; \code{"monotone"} draws
+a smoothed curve that still passes through every point without
+overshooting it; \code{"step"} holds each value flat until the next
+observation — the honest shape for rates and thresholds that change
+at discrete moments.}
+
+\item{zoom}{Add a brush-to-zoom strip below the chart? \code{FALSE}
+(default) or \code{TRUE}; needs a date or numeric x axis. The strip is a
+muted miniature of the full series: dragging across it narrows the
+main panel to that x window, and double-clicking the strip (or
+clicking it outside the brushed window) restores the full range.
+The chart always opens at the full range, so any export shows the
+complete series; SVG and PDF exports leave the strip out entirely,
+while a PNG page capture keeps the muted strip in view.
+\code{\link[=pv_facet]{pv_facet()}} drops the strip quietly: its panels share axes, which
+a per-panel brush would break.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
 \code{NA} or \code{""} suppresses the title entirely; any other string

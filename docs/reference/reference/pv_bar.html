@@ -3,7 +3,7 @@
 baseline, and hovering any bar shows a tooltip. Give series to get
 grouped bars with a legend."><meta property="og:description" content="An animated bar chart rendered by the bundled D3.js — bars grow from the
 baseline, and hovering any bar shows a tooltip. Give series to get
-grouped bars with a legend."><!-- dependencies from examples --><script src="libs/htmlwidgets-1.6.4/htmlwidgets.js"></script><script src="libs/d3-7.9.0/d3.v7.min.js"></script><script src="libs/d3-sankey-0.12.3/d3-sankey.min.js"></script><link href="libs/pv-fonts-0.2.0/inter.css" rel="stylesheet"><script src="libs/pv-common-0.2.0/pv-common.js"></script><script src="libs/pv-renderers-0.2.0/basic.js"></script><script src="libs/pv-renderers-0.2.0/relational.js"></script><script src="libs/pv-renderers-0.2.0/distribution.js"></script><script src="libs/pv-renderers-0.2.0/composition.js"></script><script src="libs/pv-renderers-0.2.0/evolution.js"></script><script src="libs/pv-renderers-0.2.0/flow.js"></script><script src="libs/pv-renderers-0.2.0/geo.js"></script><script src="libs/pv-renderers-0.2.0/hierarchy.js"></script><script src="libs/pv-renderers-0.2.0/motion.js"></script><script src="libs/pv-renderers-0.2.0/points.js"></script><script src="libs/pv-renderers-0.2.0/facet.js"></script><script src="libs/pvchart-binding-0.5.0/pvchart.js"></script></head><body>
+grouped bars with a legend."><!-- dependencies from examples --><script src="libs/htmlwidgets-1.6.4/htmlwidgets.js"></script><script src="libs/d3-7.9.0/d3.v7.min.js"></script><script src="libs/d3-sankey-0.12.3/d3-sankey.min.js"></script><link href="libs/pv-fonts-0.2.0/inter.css" rel="stylesheet"><script src="libs/pv-common-0.2.0/pv-common.js"></script><script src="libs/pv-renderers-0.2.0/basic.js"></script><script src="libs/pv-renderers-0.2.0/relational.js"></script><script src="libs/pv-renderers-0.2.0/distribution.js"></script><script src="libs/pv-renderers-0.2.0/composition.js"></script><script src="libs/pv-renderers-0.2.0/evolution.js"></script><script src="libs/pv-renderers-0.2.0/flow.js"></script><script src="libs/pv-renderers-0.2.0/geo.js"></script><script src="libs/pv-renderers-0.2.0/hierarchy.js"></script><script src="libs/pv-renderers-0.2.0/motion.js"></script><script src="libs/pv-renderers-0.2.0/points.js"></script><script src="libs/pv-renderers-0.2.0/facet.js"></script><script src="libs/pvchart-binding-0.6.0/pvchart.js"></script></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -11,7 +11,7 @@ grouped bars with a legend."><!-- dependencies from examples --><script src="lib
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -61,6 +61,7 @@ grouped bars with a legend.</p>
 <span>  <span class="va">x</span>,</span>
 <span>  <span class="va">y</span>,</span>
 <span>  series <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  stack <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"none"</span>, <span class="st">"stack"</span>, <span class="st">"percent"</span><span class="op">)</span>,</span>
 <span>  sort <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  horizontal <span class="op">=</span> <span class="st">"auto"</span>,</span>
 <span>  value_labels <span class="op">=</span> <span class="st">"auto"</span>,</span>
@@ -97,7 +98,18 @@ warning.</p></dd>
 
 
 <dt id="arg-series">series<a class="anchor" aria-label="anchor" href="#arg-series"></a></dt>
-<dd><p>Optional name of a grouping column (grouped bars).</p></dd>
+<dd><p>Optional name of a grouping column — side-by-side bars by
+default, one segment per level when <code>stack</code> piles them up.</p></dd>
+
+
+<dt id="arg-stack">stack<a class="anchor" aria-label="anchor" href="#arg-stack"></a></dt>
+<dd><p>How to lay out the <code>series</code> levels within a category.
+<code>"none"</code> (default) draws them side by side; <code>"stack"</code> piles them
+into one bar per category whose full height is the total;
+<code>"percent"</code> stacks them normalised to 100%, turning the chart into
+composition per category. Both stacked modes need a <code>series</code>
+mapping, and values must be non-negative — a stacked segment cannot
+point down.</p></dd>
 
 
 <dt id="arg-sort">sort<a class="anchor" aria-label="anchor" href="#arg-sort"></a></dt>
@@ -107,10 +119,11 @@ warning.</p></dd>
 <dt id="arg-horizontal">horizontal<a class="anchor" aria-label="anchor" href="#arg-horizontal"></a></dt>
 <dd><p>Draw bars horizontally — the readable choice for long
 category names, with labels upright and the exact value at each bar's
-end. <code>TRUE</code> forces it (single-series only), <code>FALSE</code> forces vertical
-bars; <code>"auto"</code> (default) flips to horizontal when the chart is
-single-series and the category labels are too long to sit side by
-side under vertical bars.</p></dd>
+end. <code>TRUE</code> forces it (single-series or stacked only), <code>FALSE</code>
+forces vertical bars; <code>"auto"</code> (default) flips to horizontal when
+the chart draws one bar per category (single-series or stacked) and
+the category labels are too long to sit side by side under vertical
+bars.</p></dd>
 
 
 <dt id="arg-value-labels">value_labels<a class="anchor" aria-label="anchor" href="#arg-value-labels"></a></dt>
@@ -118,7 +131,11 @@ side under vertical bars.</p></dd>
 <code>FALSE</code> never; <code>"auto"</code> (default) shows values on vertical bars only
 when the chart is single-series with at most 12 bars wide enough to
 carry a number, and always on horizontal bars, which have the room
-at the bar ends.</p></dd>
+at the bar ends. In the stacked modes labels sit inside the
+segments — the value in <code>"stack"</code>, the share in <code>"percent"</code> — and
+only where a segment is big enough to carry the text; <code>"stack"</code>
+also prints each category's total at the bar's end. The tooltip
+always has the exact values.</p></dd>
 
 
 <dt id="arg-xlab-ylab">xlab, ylab<a class="anchor" aria-label="anchor" href="#arg-xlab-ylab"></a></dt>
@@ -159,7 +176,12 @@ bottom left — e.g. <code>"Source: Bundesamt für Statistik"</code>.</p></dd>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">sales</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">revenue</span> <span class="op">~</span> <span class="va">region</span>, <span class="va">pv_sales</span>, <span class="va">sum</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">pv_bar</span><span class="op">(</span><span class="va">sales</span>, x <span class="op">=</span> <span class="st">"region"</span>, y <span class="op">=</span> <span class="st">"revenue"</span>, title <span class="op">=</span> <span class="st">"Revenue by region"</span><span class="op">)</span></span></span>
 <div id="htmlwidget-1fb4450895fe099f74a1" style="width:700px;height:432.632880098888px;" class="pvchart html-widget"></div>
-<script type="application/json" data-for="htmlwidget-1fb4450895fe099f74a1">{"x":{"data":[{"x":"East","y":4681281.19},{"x":"North","y":5510015.44},{"x":"South","y":3846499.739999998},{"x":"West","y":4280677}],"xlab":"region","ylab":"revenue","horizontal":"auto","valueLabels":"auto","title":"Revenue by region","subtitle":null,"mode":"auto","duration":500,"source":null,"type":"bar","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script></code></pre></div>
+<script type="application/json" data-for="htmlwidget-1fb4450895fe099f74a1">{"x":{"data":[{"x":"East","y":4681281.19},{"x":"North","y":5510015.44},{"x":"South","y":3846499.739999998},{"x":"West","y":4280677}],"xlab":"region","ylab":"revenue","stack":"none","horizontal":"auto","valueLabels":"auto","title":"Revenue by region","subtitle":null,"mode":"auto","duration":500,"source":null,"type":"bar","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script><span class="r-in"><span><span class="co"># One bar per region, a segment per product, full height = the total:</span></span></span>
+<span class="r-in"><span><span class="va">mix</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">revenue</span> <span class="op">~</span> <span class="va">region</span> <span class="op">+</span> <span class="va">product</span>, <span class="va">pv_sales</span>, <span class="va">sum</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">pv_bar</span><span class="op">(</span><span class="va">mix</span>, x <span class="op">=</span> <span class="st">"region"</span>, y <span class="op">=</span> <span class="st">"revenue"</span>, series <span class="op">=</span> <span class="st">"product"</span>,</span></span>
+<span class="r-in"><span>       stack <span class="op">=</span> <span class="st">"stack"</span><span class="op">)</span></span></span>
+<div id="htmlwidget-10b3b7155e8045a1b2ad" style="width:700px;height:432.632880098888px;" class="pvchart html-widget"></div>
+<script type="application/json" data-for="htmlwidget-10b3b7155e8045a1b2ad">{"x":{"data":[{"x":"East","y":1113148.97,"series":"Aster","y0":0,"y1":1113148.97,"total":4681281.189999999},{"x":"East","y":1156775.42,"series":"Betula","y0":1113148.97,"y1":2269924.39,"total":4681281.189999999},{"x":"East","y":709198.0499999998,"series":"Cedrus","y0":2269924.39,"y1":2979122.439999999,"total":4681281.189999999},{"x":"East","y":805976.33,"series":"Dahlia","y0":2979122.439999999,"y1":3785098.77,"total":4681281.189999999},{"x":"East","y":896182.4200000002,"series":"Erica","y0":3785098.77,"y1":4681281.189999999,"total":4681281.189999999},{"x":"North","y":1328270.24,"series":"Aster","y0":0,"y1":1328270.24,"total":5510015.439999999},{"x":"North","y":1351085.13,"series":"Betula","y0":1328270.24,"y1":2679355.37,"total":5510015.439999999},{"x":"North","y":841368.7599999999,"series":"Cedrus","y0":2679355.37,"y1":3520724.129999999,"total":5510015.439999999},{"x":"North","y":963257.3099999999,"series":"Dahlia","y0":3520724.129999999,"y1":4483981.439999999,"total":5510015.439999999},{"x":"North","y":1026034,"series":"Erica","y0":4483981.439999999,"y1":5510015.439999999,"total":5510015.439999999},{"x":"South","y":951801.5300000001,"series":"Aster","y0":0,"y1":951801.5300000001,"total":3846499.74},{"x":"South","y":964646.5099999999,"series":"Betula","y0":951801.5300000001,"y1":1916448.04,"total":3846499.74},{"x":"South","y":572446.5099999999,"series":"Cedrus","y0":1916448.04,"y1":2488894.55,"total":3846499.74},{"x":"South","y":646995.9400000001,"series":"Dahlia","y0":2488894.55,"y1":3135890.49,"total":3846499.74},{"x":"South","y":710609.25,"series":"Erica","y0":3135890.49,"y1":3846499.74,"total":3846499.74},{"x":"West","y":1054265.9,"series":"Aster","y0":0,"y1":1054265.9,"total":4280677},{"x":"West","y":1063983.24,"series":"Betula","y0":1054265.9,"y1":2118249.14,"total":4280677},{"x":"West","y":634216.12,"series":"Cedrus","y0":2118249.14,"y1":2752465.26,"total":4280677},{"x":"West","y":718548.0499999998,"series":"Dahlia","y0":2752465.26,"y1":3471013.31,"total":4280677},{"x":"West","y":809663.6899999999,"series":"Erica","y0":3471013.31,"y1":4280677,"total":4280677}],"xlab":"region","ylab":"revenue","stack":"stack","horizontal":"auto","valueLabels":"auto","title":null,"subtitle":null,"mode":"auto","duration":500,"source":null,"type":"bar","theme":{"categorical":{"light":["#006ba2","#db444b","#3ebcd2","#b2b837","#a25a81","#dca61c","#1b9c8c","#d4a75d"],"dark":["#006ba2","#db444b","#11a2b8","#939807","#a25a81","#b78807","#1b9c8c","#b4883c"]},"sequential":{"light":["#cbe2f4","#b3cfe5","#9cbdd7","#86acc9","#6f9abb","#5989ac","#42789e","#2a6790","#095783","#00466c","#013655"],"dark":["#142634","#1f3546","#2a4559","#35566d","#426782","#4e7897","#5b8aad","#689dc4","#76afda","#83c3f2","#9fd5fe"]},"diverging":{"light":{"low":"#026fa8","mid":"#efece4","high":"#b94548"},"dark":{"low":"#5aa6dd","mid":"#383734","high":"#cd5f5f"}},"ink":{"light":{"surface":"#fbf9f5","primary":"#161511","secondary":"#57544b","muted":"#8b8779","grid":"#eae6dd","baseline":"#c9c4b6","tooltipBg":"#ffffff","tooltipText":"#161511","tooltipBorder":"#ddd8cc"},"dark":{"surface":"#1b1a18","primary":"#f6f4ef","secondary":"#c7c3b8","muted":"#8b8779","grid":"#2e2d29","baseline":"#45433d","tooltipBg":"#262522","tooltipText":"#f6f4ef","tooltipBorder":"#45433d"}},"font":"\"InterVariable\", \"Inter\", system-ui, -apple-system, \"Segoe UI\", sans-serif"}},"evals":[],"jsHooks":[]}</script></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

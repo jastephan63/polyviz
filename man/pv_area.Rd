@@ -11,6 +11,7 @@ pv_area(
   series = NULL,
   offset = c("stacked", "percent", "stream"),
   legend = "auto",
+  zoom = FALSE,
   xlab = NULL,
   ylab = NULL,
   title = NULL,
@@ -42,6 +43,17 @@ At most 8 levels — beyond that, fold the small ones into an
 draws the legend row (even for a single series), \code{FALSE} never draws
 it, and \code{"auto"} draws it exactly when the chart has more than one
 series.}
+
+\item{zoom}{Add a brush-to-zoom strip below the chart? \code{FALSE}
+(default) or \code{TRUE}; needs a date or numeric x axis. The strip is a
+muted silhouette of the full stack: dragging across it narrows the
+main panel to that x window, and double-clicking the strip (or
+clicking it outside the brushed window) restores the full range.
+The chart always opens at the full range, so any export shows the
+complete series; SVG and PDF exports leave the strip out entirely,
+while a PNG page capture keeps the muted strip in view.
+\code{\link[=pv_facet]{pv_facet()}} drops the strip quietly: its panels share axes, which
+a per-panel brush would break.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
 \code{NA} or \code{""} suppresses a title; any other string replaces it. The

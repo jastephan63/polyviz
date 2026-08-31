@@ -32,6 +32,22 @@
       ctx.height = Math.max(120, ctx.height - legendRow.offsetHeight - 7);
     }
 
+    /* Brush-to-zoom (zoom = TRUE from R, continuous x only), exactly as
+       on the line chart: the strip gets its room at the bottom before
+       the layout is measured, and an active brush window - kept on the
+       widget element itself, so it survives full re-renders - narrows
+       the x domain further down through the same explicit-domain path a
+       facet xlim uses. Inside a facet panel (the payload clone carries
+       the grid's subtype) the strip is dropped quietly: the panels
+       share axes, which per-panel brushes would break. */
+    var zoomOn = ctx.x.zoom === true && xtype !== "category" &&
+      ctx.x.subtype == null;
+    var zoomDomain = zoomOn ? (ctx.el.__pvZoomX || null) : null;
+    if (zoomOn) {
+      ctx.height = Math.max(120,
+        ctx.height - pv.ZOOM_STRIP_H - pv.ZOOM_STRIP_GAP);
+    }
+
     /* Pivot the long rows into one object per x position holding a value
        for every series. A series with no row at some x stays at zero -
        stacks can't have holes. */
@@ -111,6 +127,14 @@
       xScale.domain(xtype === "date" ?
         ctx.x.xlim.map(function (v) { return parse(v); }) : ctx.x.xlim);
     }
+    /* The zoom strip needs the full extent even while the main panel
+       shows a window, so remember the domain before the brush narrows
+       it. Date windows travel as millisecond numbers. */
+    var fullX = zoomOn ? xScale.domain() : null;
+    if (zoomDomain) {
+      xScale.domain(xtype === "date" ?
+        zoomDomain.map(function (v) { return new Date(v); }) : zoomDomain);
+    }
 
     if (offset !== "stream") { pv.yGrid(g, y, iw, ctx.theme); }
     var xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
@@ -153,9 +177,19 @@
       .y1(function (p) { return y(p[1]); })
       .curve(offset === "stream" ? d3.curveBasis : d3.curveMonotoneX);
 
+    /* A brushed window shows only a slice of the data, so the layers
+       are clipped to the plot; without zoom no clip exists at all. */
+    var layerHost = g;
+    if (zoomOn) {
+      var zoomClip = "pv-zoom-clip-" + Math.floor(Math.random() * 1e9);
+      svg.append("clipPath").attr("id", zoomClip)
+        .append("rect").attr("width", iw).attr("height", ih);
+      layerHost = g.append("g").attr("clip-path", "url(#" + zoomClip + ")");
+    }
+
     /* The 1.5px surface-coloured stroke draws a seam between layers so
        neighbouring bands never touch. */
-    var paths = g.selectAll("path.layer").data(layers).enter()
+    var paths = layerHost.selectAll("path.layer").data(layers).enter()
       .append("path")
       .attr("class", "layer")
       .attr("fill", function (l) { return color(l.key); })
@@ -188,13 +222,20 @@
       .attr("stroke-dasharray", "3,3").attr("opacity", 0);
     var dots = g.append("g");
     var xPos = pivot.map(function (r) { return xScale(r.x); });
+    /* Positions a brushed window pushed out of the plot can't be
+       crosshair targets; with the full domain everything is in range. */
+    var visIdx = [];
+    xPos.forEach(function (xp, i) {
+      if (xp >= -0.5 && xp <= iw + 0.5) visIdx.push(i);
+    });
 
     /* Which pivot row sits nearest the pointer's x, and which layer the
-       pointer is inside vertically - shared by hover and click. */
+       pointer is inside vertically - shared by hover and click. Returns
+       -1 when nothing is in view. */
     function nearestIdx(px) {
-      var idx = 0, best = Infinity;
-      xPos.forEach(function (xp, i) {
-        var dd = Math.abs(xp - px);
+      var idx = -1, best = Infinity;
+      visIdx.forEach(function (i) {
+        var dd = Math.abs(xPos[i] - px);
         if (dd < best) { best = dd; idx = i; }
       });
       return idx;
@@ -216,6 +257,7 @@
       .on("pointermove", function (event) {
         var p = d3.pointer(event, this);
         var idx = nearestIdx(p[0]);
+        if (idx < 0) return;
         cross.attr("x1", xPos[idx]).attr("x2", xPos[idx]).attr("opacity", 1);
 
         var hoverKey = layerUnder(p[1], idx);
@@ -265,6 +307,7 @@
            pointer sits inside a layer, that layer and its value there. */
         var p = d3.pointer(event, this);
         var idx = nearestIdx(p[0]);
+        if (idx < 0) return;
         var key = layerUnder(p[1], idx);
         var payload = { x: pivot[idx].key };
         if (key !== null) {
@@ -273,6 +316,37 @@
         }
         ctx.emit("click", payload);
       });
+
+    /* The context strip, below everything else and clear of the source
+       line (ctx.height already excludes the footer). Its margins match
+       the main panel's, so the brush lines up under the plot. */
+    if (zoomOn) {
+      pv.zoomStrip(ctx, {
+        left: m.left, right: m.right, xtype: xtype,
+        extent: fullX, zoom: zoomDomain,
+        draw: function (sg, sx, siw, sih) {
+          /* The miniature: the stack's outer envelope as one muted
+             silhouette - enough shape to aim a brush at, no more. */
+          var sy = d3.scaleLinear().domain(y.domain()).range([sih, 0]);
+          var env = pivot.map(function (row, i) {
+            return {
+              x: row.x,
+              y0: d3.min(layers, function (l) { return l[i][0]; }),
+              y1: d3.max(layers, function (l) { return l[i][1]; })
+            };
+          });
+          sg.append("path").datum(env)
+            .attr("fill", ctx.theme.ink.muted)
+            .attr("fill-opacity", 0.3)
+            .attr("d", d3.area()
+              .x(function (d) { return sx(d.x); })
+              .y0(function (d) { return sy(d.y0); })
+              .y1(function (d) { return sy(d.y1); })
+              .curve(offset === "stream" ? d3.curveBasis :
+                     d3.curveMonotoneX));
+        }
+      });
+    }
   };
 
   /* ---------- heatmap ---------- */

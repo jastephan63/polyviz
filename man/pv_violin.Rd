@@ -37,12 +37,15 @@ same as \code{TRUE} today, but reserved for a future data-driven rule.
 The box marks the quartiles and median so the shapes stay anchored
 to exact numbers.}
 
-\item{points}{Also show the raw values as jittered points behind each
-violin? \code{TRUE} always draws them (groups with more than 400 values
-are thinned to a fixed-seed sample of 400, exactly like
-\code{\link[=pv_boxplot]{pv_boxplot()}}), \code{FALSE} (the default) and \code{"auto"} draw none — a
-violin already shows the distribution's shape, so the cloud is
-opt-in here.}
+\item{points}{Also show the raw values as jittered points inside each
+violin? The dots stay within the silhouette — each one's sideways
+room is the violin's width at its own value — so the cloud traces
+the same shape the outline does. \code{TRUE} always draws them (groups
+with more than 400 values are thinned to a fixed-seed sample of
+400, exactly like \code{\link[=pv_boxplot]{pv_boxplot()}}), \code{FALSE} (the default) never
+does, and \code{"auto"} draws them only while every group holds at most
+200 values — few enough that the dots inside the narrow shape
+still read individually.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (the default) uses the \code{group}
 column name for x and the \code{value} column name for y; \code{NA} or \code{""}

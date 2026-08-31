@@ -1,3 +1,28 @@
+# polyviz 0.6.0
+
+More control over the core charts: the four chart-option items from the
+public roadmap, every one of them off by default so existing charts are
+untouched.
+
+* `pv_bar(stack = "stack")` piles a series into one bar per category —
+  2px gaps between segments, values labelled where they fit, the
+  category total at the bar's end; `stack = "percent"` normalises each
+  bar to 100% for composition comparisons. Both work horizontally. (#2)
+* `pv_line(show_points = TRUE)` marks every observation on the line
+  (`"auto"` turns markers on for short series), and
+  `curve = "monotone"` or `"step"` picks the interpolation — together
+  they give the connected scatter. (#4)
+* `pv_line(zoom = TRUE)` and `pv_area(zoom = TRUE)` add a muted
+  context strip under the chart: drag across it to zoom the main
+  panel, double-click to reset. Charts open at the full range, so
+  saved and exported figures always show the whole series. (#5)
+* `pv_violin(points = TRUE)` jitters the raw observations inside each
+  violin's silhouette with adaptive opacity, complementing the
+  boxplot overlay; `"auto"` shows them when groups are small. (#1)
+
+The live gallery gained four sections showing each option on the Swiss
+data, and the CI render tests now exercise all the new code paths.
+
 # polyviz 0.5.0
 
 Charts that work when they are not interactive, and a package that

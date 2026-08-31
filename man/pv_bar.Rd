@@ -9,6 +9,7 @@ pv_bar(
   x,
   y,
   series = NULL,
+  stack = c("none", "stack", "percent"),
   sort = FALSE,
   horizontal = "auto",
   value_labels = "auto",
@@ -34,22 +35,36 @@ warning.}
 
 \item{y}{Name of the numeric value column.}
 
-\item{series}{Optional name of a grouping column (grouped bars).}
+\item{series}{Optional name of a grouping column — side-by-side bars by
+default, one segment per level when \code{stack} piles them up.}
+
+\item{stack}{How to lay out the \code{series} levels within a category.
+\code{"none"} (default) draws them side by side; \code{"stack"} piles them
+into one bar per category whose full height is the total;
+\code{"percent"} stacks them normalised to 100\%, turning the chart into
+composition per category. Both stacked modes need a \code{series}
+mapping, and values must be non-negative — a stacked segment cannot
+point down.}
 
 \item{sort}{Sort bars by value, largest first? (Single-series only.)}
 
 \item{horizontal}{Draw bars horizontally — the readable choice for long
 category names, with labels upright and the exact value at each bar's
-end. \code{TRUE} forces it (single-series only), \code{FALSE} forces vertical
-bars; \code{"auto"} (default) flips to horizontal when the chart is
-single-series and the category labels are too long to sit side by
-side under vertical bars.}
+end. \code{TRUE} forces it (single-series or stacked only), \code{FALSE}
+forces vertical bars; \code{"auto"} (default) flips to horizontal when
+the chart draws one bar per category (single-series or stacked) and
+the category labels are too long to sit side by side under vertical
+bars.}
 
 \item{value_labels}{Print each bar's value on the chart. \code{TRUE} always,
 \code{FALSE} never; \code{"auto"} (default) shows values on vertical bars only
 when the chart is single-series with at most 12 bars wide enough to
 carry a number, and always on horizontal bars, which have the room
-at the bar ends.}
+at the bar ends. In the stacked modes labels sit inside the
+segments — the value in \code{"stack"}, the share in \code{"percent"} — and
+only where a segment is big enough to carry the text; \code{"stack"}
+also prints each category's total at the bar's end. The tooltip
+always has the exact values.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
 \code{NA} or \code{""} suppresses the title entirely; any other string
@@ -78,4 +93,8 @@ grouped bars with a legend.
 \examples{
 sales <- aggregate(revenue ~ region, pv_sales, sum)
 pv_bar(sales, x = "region", y = "revenue", title = "Revenue by region")
+# One bar per region, a segment per product, full height = the total:
+mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+pv_bar(mix, x = "region", y = "revenue", series = "product",
+       stack = "stack")
 }

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -43,6 +43,19 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.6.0" id="polyviz-060">polyviz 0.6.0<a class="anchor" aria-label="anchor" href="#polyviz-060"></a></h2>
+<p>More control over the core charts: the four chart-option items from the public roadmap, every one of them off by default so existing charts are untouched.</p>
+<ul><li>
+<code>pv_bar(stack = "stack")</code> piles a series into one bar per category — 2px gaps between segments, values labelled where they fit, the category total at the bar’s end; <code>stack = "percent"</code> normalises each bar to 100% for composition comparisons. Both work horizontally. (#2)</li>
+<li>
+<code>pv_line(show_points = TRUE)</code> marks every observation on the line (<code>"auto"</code> turns markers on for short series), and <code>curve = "monotone"</code> or <code>"step"</code> picks the interpolation — together they give the connected scatter. (#4)</li>
+<li>
+<code>pv_line(zoom = TRUE)</code> and <code>pv_area(zoom = TRUE)</code> add a muted context strip under the chart: drag across it to zoom the main panel, double-click to reset. Charts open at the full range, so saved and exported figures always show the whole series. (#5)</li>
+<li>
+<code>pv_violin(points = TRUE)</code> jitters the raw observations inside each violin’s silhouette with adaptive opacity, complementing the boxplot overlay; <code>"auto"</code> shows them when groups are small. (#1)</li>
+</ul><p>The live gallery gained four sections showing each option on the Swiss data, and the CI render tests now exercise all the new code paths.</p>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0" id="polyviz-050">polyviz 0.5.0<a class="anchor" aria-label="anchor" href="#polyviz-050"></a></h2>
 <p>Charts that work when they are not interactive, and a package that fails loudly instead of drawing something wrong.</p>

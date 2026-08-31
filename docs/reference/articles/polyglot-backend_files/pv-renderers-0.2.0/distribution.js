@@ -309,10 +309,14 @@
     var groups = violins.map(function (v) { return v.group; });
     var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
     /* "auto" keeps the slim box overlay on - the quartiles anchor the
-       shapes to exact numbers - while raw points default off: a violin
-       already shows the distribution's shape, so the cloud is opt-in. */
+       shapes to exact numbers - and shows the raw points only while
+       every group holds at most 200 values, few enough that the dots
+       inside the narrow silhouette still read individually. (v.n counts
+       every raw value, before the 400-per-group thinning.) */
     var showBox = opt(ctx.x.showBox, true);
-    var raw = opt(ctx.x.showPoints, false) ? (ctx.x.points || []) : [];
+    var maxN = d3.max(violins, function (v) { return v.n; });
+    var raw = opt(ctx.x.showPoints, maxN <= 200) ?
+      (ctx.x.points || []) : [];
 
     var m = { top: 12, right: 24, bottom: 52, left: 58 };
     var iw = ctx.width - m.left - m.right,
@@ -386,20 +390,6 @@
         .domain([0, d3.max(v.density, function (p) { return p.y; })])
         .range([0, xBand.bandwidth() * 0.85 / 2]);
 
-      /* Optional jittered raw values sit behind the shape and ghost
-         through its translucent fill. */
-      var mine = raw.filter(function (p) { return p.group === v.group; });
-      reveal(grp.selectAll("circle.raw").data(mine).enter()
-        .append("circle")
-        .attr("class", "raw")
-        .attr("cx", function (p, j) {
-          return cx + (hash(j) - 0.5) * xBand.bandwidth() * 0.5; })
-        .attr("cy", function (p) { return y(p.value); })
-        .attr("r", 3.5)
-        .attr("fill", c)
-        .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1),
-        delay, 0.35);
-
       var area = d3.area()
         .x0(function (p) { return cx - half(p.y); })
         .x1(function (p) { return cx + half(p.y); })
@@ -417,6 +407,47 @@
           .transition().delay(delay).duration(ctx.duration)
           .ease(d3.easeCubicOut)
           .attr("transform", "translate(0,0)");
+      }
+
+      /* Optional jittered raw values, drawn over the fill and kept
+         inside the silhouette: each dot's sideways room is the violin's
+         half-width at its own value, minus the dot itself, so the cloud
+         traces the same shape the outline does. The jitter comes from
+         hash(index), so it never shimmers between redraws. */
+      var mine = raw.filter(function (p) { return p.group === v.group; });
+      if (mine.length) {
+        /* Crowded violins need lighter ink - the scatter's rule, scaled
+           to one group: full strength up to 60 dots, beyond that fading
+           with the square root of the count, which lands near 0.21 at
+           the 400-per-group cap. */
+        var dotOp = mine.length <= 60 ? 0.55 :
+          0.55 * Math.sqrt(60 / mine.length);
+        /* The density's x values arrive sorted, so the local width at
+           any value is a straight-line interpolation between the two
+           samples that bracket it. */
+        var bisect = d3.bisector(function (p) { return p.x; }).left;
+        var halfAt = function (value) {
+          var d = v.density;
+          var k = bisect(d, value);
+          if (k <= 0) { return half(d[0].y); }
+          if (k >= d.length) { return half(d[d.length - 1].y); }
+          var a = d[k - 1], b = d[k];
+          var t = b.x === a.x ? 0 : (value - a.x) / (b.x - a.x);
+          return half(a.y + t * (b.y - a.y));
+        };
+        reveal(grp.selectAll("circle.raw").data(mine).enter()
+          .append("circle")
+          .attr("class", "raw")
+          .attr("cx", function (p, j) {
+            var room = Math.max(0, halfAt(p.value) - 3.5);
+            return cx + (hash(j) - 0.5) * 2 * room;
+          })
+          .attr("cy", function (p) { return y(p.value); })
+          .attr("r", 2.5)
+          .attr("fill", emph)
+          .attr("stroke", ctx.theme.ink.surface)
+          .attr("stroke-width", 0.75),
+          delay, dotOp);
       }
 
       if (showBox) {

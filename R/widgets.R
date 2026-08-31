@@ -183,19 +183,32 @@ as_axis_values <- function(x) {
 #'   warning.
 #' @param x Name of the category column.
 #' @param y Name of the numeric value column.
-#' @param series Optional name of a grouping column (grouped bars).
+#' @param series Optional name of a grouping column — side-by-side bars by
+#'   default, one segment per level when `stack` piles them up.
+#' @param stack How to lay out the `series` levels within a category.
+#'   `"none"` (default) draws them side by side; `"stack"` piles them
+#'   into one bar per category whose full height is the total;
+#'   `"percent"` stacks them normalised to 100%, turning the chart into
+#'   composition per category. Both stacked modes need a `series`
+#'   mapping, and values must be non-negative — a stacked segment cannot
+#'   point down.
 #' @param sort Sort bars by value, largest first? (Single-series only.)
 #' @param horizontal Draw bars horizontally — the readable choice for long
 #'   category names, with labels upright and the exact value at each bar's
-#'   end. `TRUE` forces it (single-series only), `FALSE` forces vertical
-#'   bars; `"auto"` (default) flips to horizontal when the chart is
-#'   single-series and the category labels are too long to sit side by
-#'   side under vertical bars.
+#'   end. `TRUE` forces it (single-series or stacked only), `FALSE`
+#'   forces vertical bars; `"auto"` (default) flips to horizontal when
+#'   the chart draws one bar per category (single-series or stacked) and
+#'   the category labels are too long to sit side by side under vertical
+#'   bars.
 #' @param value_labels Print each bar's value on the chart. `TRUE` always,
 #'   `FALSE` never; `"auto"` (default) shows values on vertical bars only
 #'   when the chart is single-series with at most 12 bars wide enough to
 #'   carry a number, and always on horizontal bars, which have the room
-#'   at the bar ends.
+#'   at the bar ends. In the stacked modes labels sit inside the
+#'   segments — the value in `"stack"`, the share in `"percent"` — and
+#'   only where a segment is big enough to carry the text; `"stack"`
+#'   also prints each category's total at the bar's end. The tooltip
+#'   always has the exact values.
 #' @param xlab,ylab Axis titles. `NULL` (default) uses the column names;
 #'   `NA` or `""` suppresses the title entirely; any other string
 #'   replaces it.
@@ -210,8 +223,13 @@ as_axis_values <- function(x) {
 #' @examples
 #' sales <- aggregate(revenue ~ region, pv_sales, sum)
 #' pv_bar(sales, x = "region", y = "revenue", title = "Revenue by region")
+#' # One bar per region, a segment per product, full height = the total:
+#' mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+#' pv_bar(mix, x = "region", y = "revenue", series = "product",
+#'        stack = "stack")
 #' @export
-pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
+pv_bar <- function(data, x, y, series = NULL,
+                   stack = c("none", "stack", "percent"), sort = FALSE,
                    horizontal = "auto", value_labels = "auto",
                    xlab = NULL, ylab = NULL,
                    title = NULL, subtitle = NULL, mode = "auto",
@@ -220,9 +238,15 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
   check_columns(data, list(x, y, series))
   check_nonempty(data)
   check_value_column(data, y)
+  stack <- match.arg(stack)
   check_flag(horizontal, "horizontal")
   check_flag(value_labels, "value_labels")
-  if (isTRUE(horizontal) && !is.null(series)) {
+  if (stack != "none" && is.null(series)) {
+    rlang::abort(sprintf(
+      '`stack = "%s"` needs a `series` mapping - the stacked segments are the series levels.',
+      stack))
+  }
+  if (isTRUE(horizontal) && !is.null(series) && stack == "none") {
     rlang::abort("`horizontal` bars support a single series only.")
   }
   df <- data.frame(x = as.character(data[[x]]), y = as.numeric(data[[y]]))
@@ -230,6 +254,15 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
   df <- drop_missing(df, is.na(df$x), x)
   df <- drop_missing(df, is.na(df$y), y)
   if (!is.null(series)) df <- drop_missing(df, is.na(df$series), series)
+  # Stacked segments pile on top of each other, so a negative value
+  # would fold a segment back over its neighbours. Refuse it rather
+  # than draw it wrong.
+  if (stack != "none" && any(df$y < 0)) {
+    rlang::abort(sprintf(paste(
+      "`%s` has negative values, which stacked bars cannot draw.",
+      "Fix the data, or keep the bars side by side (`stack = \"none\"`)."),
+      y))
+  }
   # Two rows for the same bar would draw one bar over the other, so
   # refuse them here where the message can say what to do about it.
   key <- paste(df$x, if (is.null(series)) "" else df$series, sep = "\r")
@@ -244,9 +277,37 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
   if (is.null(series) && isTRUE(sort)) {
     df <- df[order(-df$y), ]
   }
+  if (stack != "none") {
+    # The cumulative offsets are statistics, so they are computed here:
+    # each row gets the bounds of its segment (y0 to y1) plus the
+    # category total, and the JavaScript side only places rectangles.
+    # Stacking runs in first-appearance series order - the same order
+    # the palette is assigned in - so the bottom (or left) segment is
+    # always the first series.
+    series_names <- unique(df$series)
+    cat_names <- unique(df$x)
+    df <- df[order(match(df$x, cat_names), match(df$series, series_names)), ]
+    rownames(df) <- NULL
+    cum <- stats::ave(df$y, df$x, FUN = cumsum)
+    df$y0 <- cum - df$y
+    df$y1 <- cum
+    df$total <- stats::ave(df$y, df$x, FUN = sum)
+    if (stack == "percent") {
+      # Normalise each category to 1; the segment's share travels along
+      # for labels and tooltips. A category whose total is zero has no
+      # composition to show, so its segments stay flat at zero.
+      scale <- ifelse(df$total > 0, df$total, 1)
+      df$share <- ifelse(df$total > 0, df$y / scale, 0)
+      df$y0 <- ifelse(df$total > 0, df$y0 / scale, 0)
+      df$y1 <- ifelse(df$total > 0, df$y1 / scale, 0)
+    }
+  }
   pv_widget("bar", c(list(
-    data = df, xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
-    horizontal = horizontal, valueLabels = value_labels
+    data = df, xlab = axis_title(xlab, x),
+    # A percent axis explains itself, so the default y title falls away
+    # there; an explicit ylab still shows.
+    ylab = axis_title(ylab, if (stack == "percent") "" else y),
+    stack = stack, horizontal = horizontal, valueLabels = value_labels
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
@@ -267,6 +328,31 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
 #'   shows it, `FALSE` hides it (the direct labels at the line ends
 #'   remain); `"auto"` (default) shows it exactly when a `series` mapping
 #'   with more than one level exists.
+#' @param show_points Mark every observation with a dot on its line —
+#'   the connected-scatter treatment. `TRUE` always, `FALSE` (default)
+#'   never; `"auto"` shows the dots when the individual observations
+#'   matter: no series longer than 30 points, with at least about 12
+#'   horizontal pixels between neighbouring dots. Each dot takes its
+#'   line's colour with the usual 2px surface ring, and the crosshair
+#'   tooltip works exactly as before. Spaghetti charts (more series than
+#'   the palette's 8 hues) never draw them — their lines share one muted
+#'   ink, so per-point dots would only add noise.
+#' @param curve How the line travels between observations. `"linear"`
+#'   (default) connects them with straight segments; `"monotone"` draws
+#'   a smoothed curve that still passes through every point without
+#'   overshooting it; `"step"` holds each value flat until the next
+#'   observation — the honest shape for rates and thresholds that change
+#'   at discrete moments.
+#' @param zoom Add a brush-to-zoom strip below the chart? `FALSE`
+#'   (default) or `TRUE`; needs a date or numeric x axis. The strip is a
+#'   muted miniature of the full series: dragging across it narrows the
+#'   main panel to that x window, and double-clicking the strip (or
+#'   clicking it outside the brushed window) restores the full range.
+#'   The chart always opens at the full range, so any export shows the
+#'   complete series; SVG and PDF exports leave the strip out entirely,
+#'   while a PNG page capture keeps the muted strip in view.
+#'   [pv_facet()] drops the strip quietly: its panels share axes, which
+#'   a per-panel brush would break.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -274,6 +360,8 @@ pv_bar <- function(data, x, y, series = NULL, sort = FALSE,
 #' pv_line(monthly, x = "month", y = "revenue", series = "region")
 #' @export
 pv_line <- function(data, x, y, series = NULL, legend = "auto",
+                    show_points = FALSE,
+                    curve = c("linear", "monotone", "step"), zoom = FALSE,
                     xlab = NULL, ylab = NULL,
                     title = NULL, subtitle = NULL, mode = "auto",
                     duration = 800, source = NULL, width = NULL, height = NULL,
@@ -282,7 +370,20 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
   check_nonempty(data)
   check_value_column(data, y)
   check_flag(legend, "legend")
+  check_flag(show_points, "show_points")
+  curve <- match.arg(curve)
+  # Zoom is a plain on/off switch: there is no data-driven decision for
+  # the JavaScript side to make, so "auto" has no meaning here.
+  if (!isTRUE(zoom) && !isFALSE(zoom)) {
+    rlang::abort("`zoom` must be TRUE or FALSE.")
+  }
   ax <- as_axis_values(data[[x]])
+  # Brushing narrows a continuous window; a category axis has none.
+  if (isTRUE(zoom) && ax$xtype == "category") {
+    rlang::abort(sprintf(
+      "`zoom` needs a date or numeric x axis; `%s` is categorical, so there is no continuous window to brush.",
+      x))
+  }
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
   df <- drop_missing(df, is.na(df$x), x)
@@ -303,7 +404,8 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
   pv_widget("line", c(list(
     data = df, xtype = ax$xtype,
     xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
-    showLegend = !is.null(series), legend = legend
+    showLegend = !is.null(series), legend = legend,
+    showPoints = show_points, curve = curve, zoom = zoom
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

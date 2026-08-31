@@ -1,0 +1,197 @@
+---
+title: "Embedding polyviz charts in papers and documents"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Embedding polyviz charts in papers and documents}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+polyviz charts live in the browser, but papers, theses, and slide decks
+need files. This vignette covers the whole path from widget to page:
+the four export formats of `pv_save()`, how to size them for print, the
+knit path that makes Word and PDF documents work with no extra code, and
+the download button on every rendered chart. None of the code below runs
+while the vignette builds — most of it needs a local Chrome — so copy
+the chunks into your own session.
+
+The running example:
+
+```{r example}
+library(polyviz)
+
+agg <- aggregate(revenue ~ region, pv_sales, sum)
+w <- pv_bar(agg, "region", "revenue", title = "Revenue by region")
+```
+
+Printed at the console, `w` opens interactively in the Viewer. Note that
+this only happens in an interactive session — `print(w)` inside a
+non-interactive `Rscript` displays nothing, because there is no viewer
+to open. In a script, save the chart instead.
+
+## The four formats
+
+`pv_save()` picks the format from the file extension alone. For `.png`,
+`.svg`, and `.pdf` the chart is rendered for real: headless Chrome loads
+the same d3 pipeline the interactive widget uses, the entrance animation
+is switched off and the colour mode is pinned (light, unless you ask
+otherwise), and the settled result is captured once nothing is still
+drawing. A capture can never show a half-grown animation or inherit your
+machine's dark theme. These three formats need the chromote package and
+a Chrome-based browser; `.html` needs neither.
+
+### PNG — Word, Google Docs, slides
+
+```{r png}
+pv_save(w, "revenue.png")
+```
+
+A raster image at `scale` times the pixel size — the default `scale = 2`
+is a crisp "retina" capture. The right choice wherever the destination
+re-compresses images or cannot place vector graphics.
+
+### SVG — the web and vector editing
+
+```{r svg}
+pv_save(w, "revenue.svg")
+```
+
+One standalone SVG document with the title, legend, plot, and source
+line all included as vector shapes and real text. It scales without
+limit, and every element stays editable in Inkscape or Illustrator.
+
+### PDF — LaTeX
+
+```{r pdf}
+pv_save(w, "revenue.pdf")
+```
+
+A true vector PDF from Chrome's print engine, sized exactly to the
+chart with the font embedded — drop it straight into
+`\includegraphics{revenue.pdf}`.
+
+### HTML — sharing the interactive version
+
+```{r html}
+pv_save(w, "revenue.html")
+```
+
+The interactive widget as one self-contained file: every script,
+stylesheet, and font inlined, tooltips and the entrance animation
+intact. Email it, or put it on any static host. This format is built
+purely in R — it is the only one that works without Chrome, and unlike
+`htmlwidgets::saveWidget(selfcontained = TRUE)` it needs no pandoc
+either.
+
+## Sizing and scale for print
+
+`width` and `height` are CSS pixels, and print maps them at 96 pixels
+per inch. A chart meant to fill a 6.5-inch text block is therefore
+624 pixels wide:
+
+```{r sizing}
+pv_save(w, "revenue.pdf", width = 624, height = 390)
+```
+
+`height = NULL` (the default) uses the fixed height the widget was built
+with, if any, and 560 otherwise.
+
+The chart lays itself out for the CSS size — margins, label density,
+automatic orientation all react to it — so choose `width` and `height`
+for the shape you want on the page, and let `scale` carry the
+resolution. For a 300-dpi PNG, that is `scale = 300 / 96`:
+
+```{r print-scale}
+pv_save(w, "revenue.png", width = 624, height = 390, scale = 300 / 96)
+```
+
+Doubling `width` instead would sharpen nothing: it renders a genuinely
+wider chart, whose type then looks half as big on the page. SVG and PDF
+are resolution-independent and ignore `scale` altogether.
+
+## Embedded fonts, or smaller files
+
+By default (`embed_fonts = TRUE`) the bundled Inter font is inlined into
+`.svg` and `.html` output as a base64 data URI, so the file renders with
+the right type on any machine, in any viewer. The cost is size: the
+font adds roughly half a megabyte. `embed_fonts = FALSE` keeps the file
+small and falls back to a locally installed Inter (or the system font) —
+a reasonable trade when you post-process the SVG on a machine that has
+Inter installed anyway. `.png` and `.pdf` always carry their type and
+ignore the argument.
+
+## Knitting to Word and PDF
+
+A chart dropped into an R Markdown document needs no special treatment.
+When the document becomes HTML, the live interactive widget is embedded,
+as always. For every static format — Word, PDF via LaTeX, plain or
+GitHub-flavoured markdown, epub — the chart is rendered by `pv_save()`
+to a PNG at the chunk's figure size and included like any other figure.
+
+One line of setup belongs in the document, because knitr otherwise
+reaches for its own generic widget screenshotter (the webshot package)
+before asking the chart how it wants to be printed:
+
+```{r knit-setup}
+knitr::opts_chunk$set(screenshot.force = FALSE)
+```
+
+After that, an ordinary chunk does the right thing in every output
+format. The chunk's `fig.width` and `fig.height` (inches) set the
+chart's size, and `dpi` sets the capture resolution — knitr's default
+dpi is screen resolution, so ask for more in a document headed for
+print:
+
+````
+```{r revenue, fig.width = 6.5, fig.height = 4, dpi = 300}`r ''`
+pv_bar(agg, "region", "revenue", title = "Revenue by region")
+```
+````
+
+Charts built with `mode = "auto"` print light; a chart forced dark with
+`mode = "dark"` stays dark. The static path has the same requirements
+as `pv_save()`: the chromote package and a Chrome-based browser on the
+machine doing the knitting.
+
+## The download button
+
+Every rendered chart carries a small arrow button in its top-right
+corner, shown while the pointer (or keyboard focus) is on the chart and
+permanently on touch screens. It offers the chart as a standalone SVG
+or a 2x PNG, named after the chart's title — readers of a report or a
+Shiny app can take any chart with them without asking you for the file.
+The control never appears inside a saved or captured chart. Turn it off
+per chart when it would distract:
+
+```{r downloads}
+pv_bar(agg, "region", "revenue") |>
+  pv_downloads(FALSE)
+```
+
+## Troubleshooting
+
+* **The saved image is dark (or light) when you meant the opposite.**
+  A capture that went through `pv_save()` always pins the mode — light
+  unless you passed `mode = "dark"` — so an unexpected theme means the
+  explicit mode was lost on the way: usually knitr's own screenshotter
+  grabbed the live widget, which follows the machine's theme, because
+  `screenshot.force = FALSE` was missing from the setup chunk.
+* **The chart is missing from the knitted Word or PDF document** (or an
+  error naming chromote stands in its place). The knitting machine has
+  no chromote package or no Chrome-based browser; install both. Only
+  the `.html` format works without them.
+* **pandoc complaints.** pandoc only matters for
+  `htmlwidgets::saveWidget(selfcontained = TRUE)`; `pv_save()` builds
+  its self-contained `.html` without pandoc, so use it instead.
+* **A capture looks half-loaded.** `pv_save()` waits for the chart to
+  settle, but a chart that keeps fetching things can outlast the wait —
+  raise `delay`. If a JavaScript error broke the render, `pv_save()`
+  warns quoting the error; treat that warning as the explanation.

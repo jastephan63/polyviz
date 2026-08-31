@@ -1,10 +1,17 @@
 /*
- * Geographic renderers: the choropleth map.
+ * Geographic renderers: the choropleth and the bubble map.
  * See basic.js for the ctx contract. Projection and path drawing come
  * from the d3-geo functions bundled with d3 v7; the map itself travels
  * in the payload as a GeoJSON FeatureCollection.
  */
 (function () {
+
+  /* Resolves a TRUE/FALSE/"auto" option sent from R - the same helper
+     the cartesian renderers carry. Explicit values win; "auto" (or an
+     old payload without the field) takes the render-time decision. */
+  function opt(v, autoDecision) {
+    return v === "auto" || v == null ? autoDecision : !!v;
+  }
 
   /* GeoJSON (RFC 7946) winds outer rings counterclockwise, but d3-geo
      works on the sphere with the opposite convention - a ring wound the
@@ -43,6 +50,60 @@
     };
   }
 
+  /* A feature's id or name, if it has a usable one. Background
+     features (the lakes in the bundled Lucerne map) carry empty
+     properties, which jsonlite serialises as {} - so only plain
+     strings and numbers count as present. */
+  function propOf(f, key) {
+    var v = f.properties && f.properties[key];
+    return typeof v === "string" || typeof v === "number" ? v : null;
+  }
+
+  /* Compact numbers for legend labels: three significant digits with
+     an SI suffix past 10k ("23.3M"), at most two decimals below - the
+     legend rounds, the tooltips carry the precision. */
+  function legFmt(v) {
+    return Math.abs(v) >= 10000 ?
+      d3.format(".3~s")(v) : d3.format(",.2~f")(v);
+  }
+
+  /* The water tone: the theme's surface nudged toward the sequential
+     ramp's low-mid blue - quiet enough to read as geography, desaturated
+     enough not to pass for a data colour on the blue sequential ramp.
+     `t` is how far to lean in: the fill stays pale, the shoreline goes
+     deeper so lakes read as drawn objects, not pale data regions. */
+  function waterTone(theme, t) {
+    var seq = theme.sequential || [];
+    return d3.interpolateRgb(theme.ink.surface, seq[2] || "#9cbdd7")(t);
+  }
+
+  /* Paints the lakes layer the R side attached (ctx.x.lakes), through
+     the same projection as the base map. The country-wide region
+     polygons include their lake surfaces, so the water goes OVER the
+     region fills - the ThemaKart convention - and under everything
+     interactive: the group ignores the pointer, and a hovered region
+     rises only within its own group, staying beneath the water. Lakes
+     shared with the neighbours (Lago Maggiore, Lac Léman) reach past
+     the fitted extent, so the layer is clipped to the plot box. */
+  function drawLakes(ctx, svg, g, path, iw, ih) {
+    if (!ctx.x.lakes) return;
+    var lakes = rewind(ctx.x.lakes);
+    var clipId = "pv-lake-clip-" + Math.floor(Math.random() * 1e9);
+    svg.append("clipPath").attr("id", clipId)
+      .append("rect").attr("width", iw).attr("height", ih);
+    g.append("g")
+      .attr("clip-path", "url(#" + clipId + ")")
+      .attr("pointer-events", "none")
+      .selectAll("path.lake").data(lakes.features).enter()
+      .append("path")
+      .attr("class", "lake")
+      .attr("d", path)
+      .attr("fill", waterTone(ctx.theme, 0.45))
+      .attr("stroke", waterTone(ctx.theme, 0.8))
+      .attr("stroke-width", 0.75)
+      .attr("stroke-linejoin", "round");
+  }
+
   pvRenderers.choropleth = function (ctx) {
     var geo = rewind(ctx.x.map);
     var domain = ctx.x.domain;
@@ -55,14 +116,6 @@
     var valueById = {};
     ctx.x.data.forEach(function (d) { valueById[String(d.id)] = d.value; });
 
-    /* A feature's id or name, if it has a usable one. Background
-       features (the lakes in the bundled Lucerne map) carry empty
-       properties, which jsonlite serialises as {} - so only plain
-       strings and numbers count as present. */
-    function propOf(f, key) {
-      var v = f.properties && f.properties[key];
-      return typeof v === "string" || typeof v === "number" ? v : null;
-    }
     function valueOf(f) {
       var id = propOf(f, "id");
       return id === null ? undefined : valueById[String(id)];
@@ -83,14 +136,6 @@
       var t = d3.scaleLinear().domain(domain).range([0, 1]).clamp(true);
       colorOf = function (v) { return ramp(t(v)); };
     }
-
-    /* Compact numbers for the legend ends: three significant digits with
-       an SI suffix past 10k ("23.3M"), at most two decimals below - the
-       legend rounds, the tooltips carry the precision. */
-    var legFmt = function (v) {
-      return Math.abs(v) >= 10000 ?
-        d3.format(".3~s")(v) : d3.format(",.2~f")(v);
-    };
 
     /* The map's legend is its colour scale: a small gradient bar in the
        header with the domain ends labelled - and, for diverging, a tick
@@ -174,7 +219,11 @@
       });
     }
 
-    var regions = g.selectAll("path.region").data(geo.features).enter()
+    /* The regions live in a group of their own, so the hover raise
+       further down lifts a region above its neighbours but never above
+       the lakes drawn after them. */
+    var regions = g.append("g")
+      .selectAll("path.region").data(geo.features).enter()
       .append("path")
       .attr("class", "region")
       .attr("d", path)
@@ -190,6 +239,10 @@
         return propOf(f, "id") === null && propOf(f, "name") === null ?
           "none" : null;
       });
+
+    /* The Swiss lakes, when the R side attached them. Appended after the
+       regions so the water stays visible over the coloured fills. */
+    drawLakes(ctx, svg, g, path, iw, ih);
 
     /* Linked selection (pv_link): regions key on their id, as a string.
        While a selection exists - made here by clicking, or anywhere
@@ -278,6 +331,182 @@
         d3.select(this).call(restStroke);
         pv.hideTip(ctx);
       });
+  };
+
+  /* ---------- bubble map ---------- */
+
+  /* The largest "nice" number (1, 2, or 5 times a power of ten) not
+     above v - the reference values of the circle-size legend, so the
+     legend says "200k", never "421.3k". */
+  function niceBelow(v) {
+    var p = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+    var m = v / p;
+    return (m >= 5 ? 5 : m >= 2 ? 2 : 1) * p;
+  }
+
+  pvRenderers.bubblemap = function (ctx) {
+    var geo = rewind(ctx.x.map);
+    var data = ctx.x.data;
+    var hasSeries = data.length && data[0].series !== undefined;
+    var seriesNames = hasSeries ?
+      pv.uniq(data.map(function (d) { return d.series; })) : [];
+    var color = d3.scaleOrdinal().domain(seriesNames)
+      .range(ctx.theme.palette);
+    /* "auto" shows the legend row exactly when a colour mapping exists;
+       TRUE and FALSE override it - the scatter's rule. */
+    var showLegend = opt(ctx.x.legend, hasSeries);
+    if (showLegend && seriesNames.length) {
+      pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
+      ctx.height = Math.max(120, ctx.height - 26);
+    }
+
+    /* No axes - the margins are breathing room, as on the choropleth. */
+    var m = { top: 8, right: 16, bottom: 10, left: 16 };
+    var iw = Math.max(50, ctx.width - m.left - m.right),
+        ih = Math.max(80, ctx.height - m.top - m.bottom);
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var projection = d3.geoMercator().fitSize([iw, ih], geo);
+    var path = d3.geoPath(projection);
+
+    /* The base map is context, not data: a quiet neutral fill with
+       hairline surface-coloured borders, the lakes over it, and no
+       pointer events anywhere - hovers belong to the circles. */
+    g.append("g").attr("pointer-events", "none")
+      .selectAll("path.region").data(geo.features).enter()
+      .append("path")
+      .attr("class", "region")
+      .attr("d", path)
+      .attr("fill", ctx.theme.ink.grid)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 1)
+      .attr("stroke-linejoin", "round");
+    drawLakes(ctx, svg, g, path, iw, ih);
+
+    /* Circle area encodes the value: a sqrt radius scale anchored at
+       zero, with the top radius following the map's pixel size so the
+       biggest bubble stays in proportion on small and large charts. */
+    var vmax = d3.max(data, function (d) { return d.size; }) || 1;
+    var rMax = Math.max(10, Math.min(30, 0.055 * Math.min(iw, ih)));
+    var r = d3.scaleSqrt().domain([0, vmax]).range([0, rMax]);
+
+    /* Crowded maps overlap - lighten every fill as the count grows so
+       stacked circles keep reading as circles, never below 0.4. */
+    var n = data.length;
+    var fillOp = n <= 30 ? 0.7 : Math.max(0.4, 0.7 * Math.sqrt(30 / n));
+
+    function fillOf(d) {
+      return hasSeries ? color(d.series) : ctx.theme.palette[0];
+    }
+
+    /* Big circles first, so every smaller neighbour stays on top and
+       hoverable; each point keeps its projected pixel position. */
+    var pts = data.slice().sort(function (a, b) { return b.size - a.size; });
+    pts.forEach(function (d) {
+      var p = projection([d.lon, d.lat]);
+      d.px = p[0];
+      d.py = p[1];
+    });
+
+    var circles = g.append("g")
+      .selectAll("circle.pt").data(pts).enter()
+      .append("circle")
+      .attr("class", "pt")
+      .attr("cx", function (d) { return d.px; })
+      .attr("cy", function (d) { return d.py; })
+      .attr("r", function (d) { return r(d.size); })
+      .attr("fill", fillOf)
+      .attr("fill-opacity", fillOp)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 2);
+
+    /* Entrance: circles grow from nothing, biggest first - skipped
+       entirely at duration 0, where the final state must exist
+       synchronously. */
+    if (ctx.duration > 0) {
+      circles.attr("r", 0)
+        .transition().duration(Math.min(400, ctx.duration))
+        .delay(function (d, i) { return Math.min(i * 8, 400); })
+        .ease(d3.easeCubicOut)
+        .attr("r", function (d) { return r(d.size); });
+    }
+
+    /* A circle's datum as a plain object, for the Shiny round-trip. */
+    function ptDatum(d) {
+      var out = { lon: d.lon, lat: d.lat, size: d.size };
+      if (hasSeries) { out.series = d.series; }
+      if (d.label !== undefined) { out.label = d.label; }
+      return out;
+    }
+
+    /* Hovering a circle brings it to full strength with a primary-ink
+       ring; the tooltip names the point and gives the exact value. */
+    circles
+      .on("pointerenter pointermove", function (event, d) {
+        d3.select(this)
+          .attr("fill-opacity", Math.min(1, fillOp + 0.25))
+          .attr("stroke", ctx.theme.ink.primary);
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", ptDatum(d));
+        }
+        var rows = [];
+        if (d.label !== undefined) {
+          rows.push("<b>" + pv.esc(d.label) + "</b>");
+        }
+        if (hasSeries) {
+          rows.push(pv.swatchRow(color(d.series), "group",
+            pv.esc(d.series)));
+        }
+        rows.push(pv.esc(ctx.x.sizelab || "size") + ": <b>" +
+          ctx.fmt(d.size) + "</b>");
+        pv.showTip(ctx, event, rows.join("<br>"));
+      })
+      .on("pointerleave", function () {
+        d3.select(this)
+          .attr("fill-opacity", fillOp)
+          .attr("stroke", ctx.theme.ink.surface);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", ptDatum(d));
+      });
+
+    /* The size legend: nested reference circles in the bottom-right
+       corner, bottom-aligned the way the circles themselves sit on the
+       map, each with a leader line to its value. Two or three "nice"
+       values cover the range; references too small to read are left
+       out. */
+    var refs = pv.uniq([vmax, vmax / 3, vmax / 10].map(niceBelow))
+      .filter(function (v) { return r(v) >= 3; })
+      .slice(0, 3);
+    if (refs.length >= 2) {
+      var rTop = r(refs[0]);
+      var cxL = iw - rTop - 44;
+      var byL = ih - 4;
+      var leg = g.append("g").attr("pointer-events", "none");
+      refs.forEach(function (v) {
+        leg.append("circle")
+          .attr("cx", cxL).attr("cy", byL - r(v)).attr("r", r(v))
+          .attr("fill", "none")
+          .attr("stroke", ctx.theme.ink.muted)
+          .attr("stroke-width", 1);
+        leg.append("line")
+          .attr("x1", cxL).attr("x2", cxL + rTop + 5)
+          .attr("y1", byL - 2 * r(v)).attr("y2", byL - 2 * r(v))
+          .attr("stroke", ctx.theme.ink.muted)
+          .attr("stroke-width", 0.75)
+          .attr("stroke-dasharray", "2,2");
+        leg.append("text")
+          .attr("x", cxL + rTop + 8).attr("y", byL - 2 * r(v))
+          .attr("dominant-baseline", "middle")
+          .attr("fill", ctx.theme.ink.muted)
+          .style("font-size", "10.5px")
+          .style("font-variant-numeric", "tabular-nums")
+          .text(legFmt(v));
+      });
+    }
   };
 
 })();

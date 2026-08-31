@@ -5,7 +5,8 @@ articles:
   embedding-charts: embedding-charts.html
   polyglot-backend: polyglot-backend.html
   polyviz-eda: polyviz-eda.html
-last_built: 2026-08-31T18:01Z
+  swiss-open-data: swiss-open-data.html
+last_built: 2026-08-31T19:52Z
 urls:
   reference: https://jastephan63.github.io/polyviz/reference/reference
   article: https://jastephan63.github.io/polyviz/reference/articles

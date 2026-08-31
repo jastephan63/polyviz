@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,7 @@
 <li><a class="dropdown-item" href="articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
     <li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
+    <li><a class="dropdown-item" href="articles/swiss-open-data.html">Swiss open data from R</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -67,7 +68,7 @@
 <p><a href="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p><strong>D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.</strong></p>
 <p>polyviz was born from loving <a href="https://d3js.org" class="external-link">d3.js</a> visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.</p>
-<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 24 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
+<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 25 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
 <p>Behind the R interface, the package deliberately spans four backend languages:</p>
 <table class="table">
 <colgroup>
@@ -84,7 +85,7 @@
 <tr>
 <td><strong>JavaScript (D3 v7)</strong></td>
 <td><code>inst/htmlwidgets/</code></td>
-<td>Renders all 24 interactive chart types</td>
+<td>Renders all 25 interactive chart types</td>
 </tr>
 <tr>
 <td><strong>SQL</strong></td>
@@ -155,21 +156,26 @@
 <tr>
 <td><code><a href="reference/pv_calendar.html">pv_calendar()</a></code></td>
 <td><code><a href="reference/pv_choropleth.html">pv_choropleth()</a></code></td>
-<td><code><a href="reference/pv_force.html">pv_force()</a></code></td>
+<td><code><a href="reference/pv_bubble_map.html">pv_bubble_map()</a></code></td>
 </tr>
 <tr>
+<td><code><a href="reference/pv_force.html">pv_force()</a></code></td>
 <td><code><a href="reference/pv_chord.html">pv_chord()</a></code></td>
 <td><code><a href="reference/pv_sankey.html">pv_sankey()</a></code></td>
-<td>
-<code><a href="reference/pv_parallel.html">pv_parallel()</a></code> — brushable</td>
 </tr>
 <tr>
+<td>
+<code><a href="reference/pv_parallel.html">pv_parallel()</a></code> — brushable</td>
 <td>
 <code><a href="reference/pv_race.html">pv_race()</a></code> — animated</td>
 <td><code><a href="reference/pv_bump.html">pv_bump()</a></code></td>
+</tr>
+<tr>
 <td>
 <code><a href="reference/pv_dendrogram.html">pv_dendrogram()</a></code> — from <code>hclust</code>
 </td>
+<td></td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -214,7 +220,14 @@
 <span><span class="co"># SAS: round-trip datasets with variable labels intact</span></span>
 <span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/pv_set_labels.html">pv_set_labels</a></span><span class="op">(</span><span class="va">pv_sales</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>revenue <span class="op">=</span> <span class="st">"Net revenue, EUR"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/pv_write_sas.html">pv_write_sas</a></span><span class="op">(</span><span class="va">df</span>, <span class="st">"sales.xpt"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="reference/pv_labels.html">pv_labels</a></span><span class="op">(</span><span class="fu"><a href="reference/pv_read_sas.html">pv_read_sas</a></span><span class="op">(</span><span class="st">"sales.xpt"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/pv_labels.html">pv_labels</a></span><span class="op">(</span><span class="fu"><a href="reference/pv_read_sas.html">pv_read_sas</a></span><span class="op">(</span><span class="st">"sales.xpt"</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Swiss open data, live from the official portals (downloads cached)</span></span>
+<span><span class="fu"><a href="reference/pv_search_opendata.html">pv_search_opendata</a></span><span class="op">(</span><span class="st">"Finanzausgleich Luzern"</span><span class="op">)</span>        <span class="co"># the federal catalogue</span></span>
+<span><span class="fu"><a href="reference/pv_fetch_opendata.html">pv_fetch_opendata</a></span><span class="op">(</span><span class="st">"finanzausgleich-kanton-luzern"</span><span class="op">)</span>  <span class="co"># fetch a dataset it lists</span></span>
+<span><span class="fu"><a href="reference/pv_fetch_bfs.html">pv_fetch_bfs</a></span><span class="op">(</span><span class="st">"DF_SSV_POP_1930"</span><span class="op">)</span>   <span class="co"># a stats.swiss SDMX dataflow, tidied</span></span>
+<span><span class="fu"><a href="reference/pv_fetch_lustat.html">pv_fetch_lustat</a></span><span class="op">(</span><span class="st">"fa-lu-ra"</span><span class="op">)</span>       <span class="co"># a LUSTAT Statistik Luzern CSV</span></span></code></pre></div>
+<p>Every fetch prints the data’s source and licence terms and attaches them to the result; resources without an open licence are refused rather than delivered. Portals, cache, and obligations: <code><a href="articles/swiss-open-data.html">vignette("swiss-open-data")</a></code>.</p>
 </div>
 <div class="section level2">
 <h2 id="analysing-it">Analysing it<a class="anchor" aria-label="anchor" href="#analysing-it"></a>
@@ -232,10 +245,10 @@
 <div class="section level2">
 <h2 id="bundled-data">Bundled data<a class="anchor" aria-label="anchor" href="#bundled-data"></a>
 </h2>
-<p>Eight real open-government datasets ship with the package, covering the population, economy, territory, and weather of Switzerland:</p>
+<p>Twelve real open-government datasets ship with the package, covering the population, economy, territory, and weather of Switzerland:</p>
 <ul>
 <li>
-<code>pv_city_population</code> — 181 Swiss cities at census years 1930–2024 (BFS)</li>
+<code>pv_city_population</code> — 180 Swiss cities at census years 1930–2024 (BFS)</li>
 <li>
 <code>pv_city_sectors</code> — employment shares by economic sector per city (BFS/STATENT)</li>
 <li>
@@ -247,10 +260,15 @@
 <li>
 <code>pv_elections</code> — Lucerne municipal council candidacies and seats (LUSTAT Statistik Luzern)</li>
 <li>
-<code>pv_lucerne_map</code> — municipal boundary polygons, 1.1.2025 (BFS ThemaKart)</li>
+<code>pv_lucerne_map</code> — municipal boundary polygons of Canton Lucerne, 1.1.2025 (BFS ThemaKart)</li>
+<li>
+<code>pv_swiss_cantons</code> / <code>pv_swiss_districts</code> / <code>pv_swiss_lakes</code> — country-wide boundary layers for <code><a href="reference/pv_choropleth.html">pv_choropleth()</a></code> and <code><a href="reference/pv_bubble_map.html">pv_bubble_map()</a></code> (BFS ThemaKart)</li>
+<li>
+<code>pv_city_coords</code> — one WGS84 point per city, the bubble-map companion (derived from BFS ThemaKart)</li>
 <li>
 <code>pv_weather</code> — daily temperature, precipitation, and sunshine in Lucerne, 2020–2025 (MeteoSwiss)</li>
 </ul>
+<p>The one layer too big to bundle — all ~2100 municipal boundaries — is downloaded and cached on first use by <code>pv_fetch_map("municipalities")</code>, or simply by passing <code>map = "municipalities"</code> to a geo chart.</p>
 <p>All are openly licensed with source citation required (see each dataset’s help page for the exact attribution); the LUSTAT datasets additionally require the data owner’s permission for commercial use. Three simulated datasets (<code>pv_sales</code>, <code>pv_network</code>, <code>pv_flows</code>) remain for examples that need shapes the real data doesn’t provide.</p>
 </div>
 <div class="section level2">

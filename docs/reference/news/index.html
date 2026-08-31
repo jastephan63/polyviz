@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,6 +21,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
     <li><a class="dropdown-item" href="../articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="../articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
+    <li><a class="dropdown-item" href="../articles/swiss-open-data.html">Swiss open data from R</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -43,6 +44,27 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.0" id="polyviz-070">polyviz 0.7.0<a class="anchor" aria-label="anchor" href="#polyviz-070"></a></h2>
+<p>Swiss open data, live from R — and maps of the whole country.</p>
+<div class="section level3">
+<h3 id="fetching-data-0-7-0">Fetching data<a class="anchor" aria-label="anchor" href="#fetching-data-0-7-0"></a></h3>
+<ul><li>
+<code><a href="../reference/pv_fetch_bfs.html">pv_fetch_bfs()</a></code> and <code><a href="../reference/pv_fetch_lustat.html">pv_fetch_lustat()</a></code> download any dataset from the stats.swiss and LUSTAT portals and return it as a tidy data frame, with the source and licence printed on every fetch and attached to the result (LUSTAT’s open-by-ask terms included).</li>
+<li>
+<code><a href="../reference/pv_search_opendata.html">pv_search_opendata()</a></code> and <code><a href="../reference/pv_fetch_opendata.html">pv_fetch_opendata()</a></code> search and download from opendata.swiss; resources whose licence is not open are refused with a plain message instead of delivered.</li>
+<li>Downloads land in a local cache (<code><a href="../reference/pv_cache_status.html">pv_cache_status()</a></code>, <code><a href="../reference/pv_cache_status.html">pv_cache_clear()</a></code>), so repeat fetches are instant and offline-safe.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="maps-0-7-0">Maps<a class="anchor" aria-label="anchor" href="#maps-0-7-0"></a></h3>
+<ul><li>Bundled Switzerland-wide layers: <code>pv_swiss_cantons</code>, <code>pv_swiss_districts</code>, and <code>pv_swiss_lakes</code> (BFS ThemaKart, ~250KB total), plus <code>pv_city_coords</code> — the 180 statistical cities with their coordinates.</li>
+<li>
+<code>pv_choropleth(map = )</code> now takes a bundled layer name, your own <code>sf</code> object (reprojected automatically), or <code>"municipalities"</code>, which <code><a href="../reference/pv_fetch_map.html">pv_fetch_map()</a></code> downloads once and caches. Mismatched joins fail loudly, naming the unmatched ids. A <code>lakes</code> option draws the water, which makes country-wide maps read as Switzerland at a glance.</li>
+<li>
+<code><a href="../reference/pv_bubble_map.html">pv_bubble_map()</a></code> — the 25th chart type: sized circles over a quiet base map, with a circle-size legend, adaptive overlap opacity, and the full chart chrome.</li>
+</ul><p>A new vignette, “Swiss open data from R”, walks the whole path: fetch a dataset, chart it, map it, and save the figure for a paper.</p>
+</div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0" id="polyviz-060">polyviz 0.6.0<a class="anchor" aria-label="anchor" href="#polyviz-060"></a></h2>
 <p>More control over the core charts: the four chart-option items from the public roadmap, every one of them off by default so existing charts are untouched.</p>

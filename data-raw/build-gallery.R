@@ -22,6 +22,8 @@ display_names <- c(
   heatmap = "Heatmap", sankey = "Sankey diagram",
   parallel = "Parallel coordinates", pack = "Circle packing",
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
+  `choropleth-cantons` = "Country-wide choropleth",
+  `bubble-map` = "Bubble map",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
   violin = "Violin plot", calendar = "Calendar heatmap",
   annotated = "Annotations & trends", facet = "Small multiples",

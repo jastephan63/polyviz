@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,6 +21,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
     <li><a class="dropdown-item" href="articles/polyglot-backend.html">The polyglot backend</a></li>
     <li><a class="dropdown-item" href="articles/polyviz-eda.html">Exploring a dataset with polyviz</a></li>
+    <li><a class="dropdown-item" href="articles/swiss-open-data.html">Swiss open data from R</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -48,13 +49,13 @@
 <p>The daily development queue. Each item is scoped to be one focused session: implement, test, document, then commit. Items get ticked off as they land. Every open item is tracked as a GitHub issue - the numbers below link to them.</p>
 <div class="section level2">
 <h2 id="chart-types--options">Chart types &amp; options<a class="anchor" aria-label="anchor" href="#chart-types--options"></a></h2>
-<ul class="task-list"><li><label><input type="checkbox">Violin plot: add optional boxplot overlay and jittered raw points (#1)</label></li>
-<li><label><input type="checkbox">Stacked and percent-stacked modes for <code>pv_bar</code> (plus horizontal orientation) (#2)</label></li>
+<ul class="task-list"><li><label><input type="checkbox" checked>Violin plot: add optional boxplot overlay and jittered raw points (#1) — shipped in 0.6.0</label></li>
+<li><label><input type="checkbox" checked>Stacked and percent-stacked modes for <code>pv_bar</code> (plus horizontal orientation) (#2) — shipped in 0.6.0</label></li>
 <li><label><input type="checkbox">Correlogram / scatterplot-matrix widget (<code>pv_pairs</code>) composing scatter, histogram, and correlation cells (#3)</label></li>
 <li><label><input type="checkbox" checked>Dendrogram widget that accepts <code>hclust</code> objects directly — shipped in 0.3.0 as <code><a href="reference/pv_dendrogram.html">pv_dendrogram()</a></code></label></li>
 <li><label><input type="checkbox" checked>Zoomable circular-packing widget (<code>pv_pack</code>) — shipped in 0.3.0</label></li>
-<li><label><input type="checkbox">Connected-scatter option for <code>pv_line</code> (<code>show_points</code>, curve styles) (#4)</label></li>
-<li><label><input type="checkbox">Brush-to-zoom (focus + context) option for <code>pv_line</code> and area charts (#5)</label></li>
+<li><label><input type="checkbox" checked>Connected-scatter option for <code>pv_line</code> (<code>show_points</code>, curve styles) (#4) — shipped in 0.6.0</label></li>
+<li><label><input type="checkbox" checked>Brush-to-zoom (focus + context) option for <code>pv_line</code> and area charts (#5) — shipped in 0.6.0</label></li>
 <li><label><input type="checkbox">Contour-density mode for <code>pv_scatter</code> to handle overplotting on large data (#6)</label></li>
 <li><label><input type="checkbox">Arc diagram as a label-friendly alternative network view (#7)</label></li>
 <li><label><input type="checkbox">Optional texture/pattern fills as a colour-blindness accessibility channel (#8)</label></li>

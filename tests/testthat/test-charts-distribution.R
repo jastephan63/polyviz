@@ -135,12 +135,13 @@ test_that("violin box and points flags are tri-state and shape the payload", {
   expect_true(w$x$showBox)
   expect_false(w$x$showPoints)
   expect_null(w$x$points)
-  # "auto" travels as-is for the JavaScript side to resolve
+  # "auto" travels as-is, and every pv_fiscal year holds well under 200
+  # values, so the jitter sample ships ready for the JavaScript side
   w2 <- pv_violin(pv_fiscal, "resource_per_capita", group = "year",
                   box = "auto", points = "auto")
   expect_equal(w2$x$showBox, "auto")
   expect_equal(w2$x$showPoints, "auto")
-  expect_null(w2$x$points)
+  expect_equal(nrow(w2$x$points), nrow(pv_fiscal))
   # points = TRUE ships the jitter sample, capped at 400 per group
   w3 <- pv_violin(pv_fiscal, "resource_per_capita", group = "year",
                   points = TRUE)
@@ -149,6 +150,27 @@ test_that("violin box and points flags are tri-state and shape the payload", {
   # anything else is refused up front
   expect_error(pv_violin(pv_fiscal, "resource_per_capita", group = "year",
                          box = "yes"), "TRUE, FALSE, or \"auto\"")
+})
+
+test_that("violin auto points hide for big groups; TRUE thins to 400", {
+  # one group over the 200-value auto threshold: no payload at all -
+  # the JavaScript side would hide the dots anyway
+  big <- data.frame(v = as.numeric(1:500),
+                    g = rep(c("a", "b"), c(300, 200)))
+  w <- pv_violin(big, "v", group = "g", points = "auto")
+  expect_equal(w$x$showPoints, "auto")
+  expect_null(w$x$points)
+  # forced on, the big group is thinned to a fixed-seed sample of 400
+  w2 <- pv_violin(rbind(big, big), "v", group = "g", points = TRUE)
+  perg <- table(w2$x$points$group)
+  expect_equal(as.integer(perg[["a"]]), 400)
+  expect_equal(as.integer(perg[["b"]]), 400)
+  # same call, same sample - and the caller's RNG stream is untouched
+  set.seed(1); before <- runif(1)
+  w3 <- pv_violin(rbind(big, big), "v", group = "g", points = TRUE)
+  set.seed(1); after <- runif(1)
+  expect_equal(w2$x$points$value, w3$x$points$value)
+  expect_equal(before, after)
 })
 
 test_that("violin validates groups like its distribution siblings", {

@@ -37,18 +37,6 @@ sample_fixed <- function(x, size) {
   sample(x, size)
 }
 
-# Adaptive flags have three states: TRUE, FALSE, or "auto". "auto" defers
-# the decision to the JavaScript side, which sees the real data and pixel
-# sizes at render time and decides there.
-check_auto_flag <- function(value, name) {
-  ok <- isTRUE(value) || isFALSE(value) ||
-    (is.character(value) && length(value) == 1 && !is.na(value) &&
-       value == "auto")
-  if (!ok) {
-    rlang::abort(sprintf("`%s` must be TRUE, FALSE, or \"auto\".", name))
-  }
-}
-
 # Axis-title overrides share one rule: NULL keeps the default (usually the
 # column name), NA or "" suppresses the title entirely, and anything else
 # is used verbatim.
@@ -157,7 +145,7 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
   check_columns(data, list(value, group))
   check_nonempty(data)
   check_numeric_col(data, value)
-  check_auto_flag(points, "points")
+  check_flag(points, "points")
   grp <- if (is.null(group)) {
     # No grouping: one box, labelled with the column it summarises.
     rep(value, nrow(data))
@@ -222,12 +210,15 @@ pv_boxplot <- function(data, value, group = NULL, points = "auto",
 #'   same as `TRUE` today, but reserved for a future data-driven rule.
 #'   The box marks the quartiles and median so the shapes stay anchored
 #'   to exact numbers.
-#' @param points Also show the raw values as jittered points behind each
-#'   violin? `TRUE` always draws them (groups with more than 400 values
-#'   are thinned to a fixed-seed sample of 400, exactly like
-#'   [pv_boxplot()]), `FALSE` (the default) and `"auto"` draw none — a
-#'   violin already shows the distribution's shape, so the cloud is
-#'   opt-in here.
+#' @param points Also show the raw values as jittered points inside each
+#'   violin? The dots stay within the silhouette — each one's sideways
+#'   room is the violin's width at its own value — so the cloud traces
+#'   the same shape the outline does. `TRUE` always draws them (groups
+#'   with more than 400 values are thinned to a fixed-seed sample of
+#'   400, exactly like [pv_boxplot()]), `FALSE` (the default) never
+#'   does, and `"auto"` draws them only while every group holds at most
+#'   200 values — few enough that the dots inside the narrow shape
+#'   still read individually.
 #' @param xlab,ylab Axis titles. `NULL` (the default) uses the `group`
 #'   column name for x and the `value` column name for y; `NA` or `""`
 #'   suppresses the title; any other string replaces it.
@@ -245,8 +236,8 @@ pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
   check_columns(data, list(value, group))
   check_nonempty(data)
   check_numeric_col(data, value)
-  check_auto_flag(box, "box")
-  check_auto_flag(points, "points")
+  check_flag(box, "box")
+  check_flag(points, "points")
   grp <- as.character(data[[group]])
   keep <- !is.na(data[[value]]) & !is.na(grp)
   vals <- data[[value]][keep]
@@ -274,11 +265,13 @@ pv_violin <- function(data, value, group, box = TRUE, points = FALSE,
     list(group = gname, n = s$n, median = s$median, q1 = s$q1, q3 = s$q3,
          lo = s$lo, hi = s$hi, density = pv_kde(v))
   })
-  # Raw points ship only when they will certainly be drawn: TRUE. With
-  # FALSE or "auto" (which resolves to hidden for violins) the payload
-  # would be dead weight.
+  # "auto" is resolved by the JavaScript side, but its rule (no group
+  # larger than 200 values) needs only the data, so when auto is certain
+  # to hide the points the sample is skipped here — same bargain as the
+  # boxplot, no shipping invisible dots.
   pts <- NULL
-  if (isTRUE(points)) {
+  if (isTRUE(points) ||
+      (identical(points, "auto") && max(counts) <= 200)) {
     pts <- do.call(rbind, lapply(groups, function(gname) {
       v <- vals[grp == gname]
       if (length(v) > 400) v <- sample_fixed(v, 400)

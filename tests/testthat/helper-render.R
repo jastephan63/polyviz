@@ -137,6 +137,13 @@ render_charts <- list(
                   palette = "diverging", center = 100,
                   title = "Lucerne's wealth wears a lakeside ring")
   },
+  bubblemap = function() {
+    cities <- merge(pv_city_coords,
+                    pv_city_population[pv_city_population$year == 2024, ],
+                    by = "city")
+    pv_bubble_map(cities, lon = "lon", lat = "lat", size = "population",
+                  label = "city", title = "Where urban Switzerland lives")
+  },
   race = function() {
     pv_race(pv_city_population, time = "year", id = "city",
             value = "population", top_n = 12,
@@ -186,6 +193,23 @@ render_variants <- list(
   line_zoom = function() {
     pv_line(pv_weather, x = "date", y = "temp_mean", zoom = TRUE,
             title = "Six years of daily means")
+  },
+  # The two country-wide geo paths, on bundled layers only - the
+  # municipality layer would need a network fetch, which tests never do.
+  choropleth_cantons = function() {
+    # The BFS issues municipality numbers in cantonal blocks, so each
+    # city's canton number is a findInterval() lookup away.
+    blocks <- c(1, 301, 1001, 1201, 1301, 1401, 1501, 1601, 1701, 2001,
+                2401, 2701, 2761, 2901, 3001, 3101, 3201, 3501, 4001,
+                4401, 5001, 5401, 6001, 6401, 6601, 6701)
+    cities <- merge(pv_city_population[pv_city_population$year == 2024, ],
+                    pv_city_coords[, c("city", "id")], by = "city")
+    urban <- aggregate(
+      list(population = cities$population),
+      list(canton = findInterval(cities$id, blocks)), sum)
+    pv_choropleth(urban, map = "cantons", id = "canton",
+                  value = "population",
+                  title = "Where urban Switzerland lives")
   }
 )
 

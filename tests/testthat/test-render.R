@@ -18,7 +18,7 @@ test_that("every chart type has a render check", {
     "area", "heatmap", "calendar",
     "sankey", "parallel",
     "pack", "dendrogram",
-    "choropleth", "race", "bump", "beeswarm"))
+    "choropleth", "bubblemap", "race", "bump", "beeswarm"))
   for (id in names(render_charts)) {
     w <- render_charts[[id]]()
     expect_s3_class(w, "pvchart")
@@ -110,6 +110,10 @@ test_that("choropleth renders without JavaScript errors", {
   expect_chart_renders("choropleth")
 })
 
+test_that("bubblemap renders without JavaScript errors", {
+  expect_chart_renders("bubblemap")
+})
+
 test_that("race renders without JavaScript errors", {
   expect_chart_renders("race")
 })
@@ -130,7 +134,8 @@ test_that("beeswarm renders without JavaScript errors", {
 test_that("every option variant builds its base chart type", {
   expect_setequal(names(render_variants), c(
     "bar_stacked", "bar_percent", "violin_overlays",
-    "line_markers", "line_zoom"))
+    "line_markers", "line_zoom",
+    "choropleth_cantons"))
   for (id in names(render_variants)) {
     w <- render_variants[[id]]()
     expect_s3_class(w, "pvchart")
@@ -157,3 +162,12 @@ test_that("line with markers and curve renders without JavaScript errors", {
 test_that("zoomed line renders without JavaScript errors", {
   expect_chart_renders("line_zoom")
 })
+
+# The country-wide geo paths: the cantons layer with its lakes overlay
+# under the choropleth, and the bubble map renderer end to end. Both run
+# on bundled layers only - no test may touch the network.
+
+test_that("cantons choropleth renders without JavaScript errors", {
+  expect_chart_renders("choropleth_cantons")
+})
+

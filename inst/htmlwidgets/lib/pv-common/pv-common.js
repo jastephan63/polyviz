@@ -792,3 +792,130 @@ window.pv = (function () {
 
   return pv;
 })();
+
+/*
+ * Brush-to-zoom context strip, shared by the line and area renderers.
+ * The strip is a second, subdued drawing of the whole series below the
+ * main panel, wearing a d3.brushX: dragging across it narrows the main
+ * panel's x domain (through the same explicit-domain override the facet
+ * renderer's xlim uses), and double-clicking it - or clicking outside
+ * the brushed window - restores the full range. The active window lives
+ * on the widget element itself (el.__pvZoomX), so it survives the full
+ * re-renders that resizes and theme changes trigger.
+ */
+(function () {
+
+  /* The strip is pointer chrome, like the tooltip and the download
+     control: it must never appear inside a saved chart. The exporter
+     walk skips hidden elements before it descends into them, so every
+     .pv-zoom wrapper steps out of the DOM for the (synchronous)
+     serialisation and back in right after - the same trick the download
+     control plays on itself. */
+  var serialise = pv.toStandaloneSvg;
+  pv.toStandaloneSvg = function (el, x, theme) {
+    var strips = el && el.querySelectorAll ?
+      el.querySelectorAll(".pv-zoom") : [];
+    var shown = [];
+    for (var i = 0; i < strips.length; i++) {
+      shown.push(strips[i].style.display);
+      strips[i].style.display = "none";
+    }
+    var out = serialise(el, x, theme);
+    for (var j = 0; j < strips.length; j++) {
+      strips[j].style.display = shown[j];
+    }
+    return out;
+  };
+
+  /* The pixel height a renderer must reserve for the strip: a small gap
+     to sit clear of the main panel's x axis title, then the strip. */
+  pv.ZOOM_STRIP_H = 46;
+  pv.ZOOM_STRIP_GAP = 4;
+
+  /* Builds the strip below whatever the renderer has drawn. The caller
+     hands over its own margins (so the strip's x range lines up exactly
+     under the main plot), the axis type with the FULL x extent (the
+     domain before any brush narrowed it), the currently active window,
+     and a draw callback that paints the chart-specific muted miniature.
+     Only date and number axes ever get here - a category axis has no
+     continuous window to brush, and the R side refuses it. */
+  pv.zoomStrip = function (ctx, o) {
+    var box = document.createElement("div");
+    box.className = "pv-zoom";
+    box.style.cssText = "margin-top:" + pv.ZOOM_STRIP_GAP + "px;";
+    var svg = d3.select(box).append("svg")
+      .attr("width", ctx.width).attr("height", pv.ZOOM_STRIP_H)
+      .style("display", "block");
+    var iw = Math.max(10, ctx.width - o.left - o.right);
+    var ih = pv.ZOOM_STRIP_H - 8;
+    var g = svg.append("g")
+      .attr("transform", "translate(" + o.left + ",4)");
+
+    var sx = (o.xtype === "date" ? d3.scaleTime() : d3.scaleLinear())
+      .domain(o.extent).range([0, iw]);
+    /* Date windows travel as millisecond numbers (JSON-safe, and finer
+       than the day-level ISO strings the data itself uses). */
+    var toX = o.xtype === "date" ?
+      function (v) { return new Date(v); } : Number;
+
+    o.draw(g, sx, iw, ih);
+
+    function redraw() {
+      /* The whole widget re-renders, exactly as a crosstalk selection
+         or a resize would - that is what routes the new window through
+         the renderer's explicit-domain path. A brush update must not
+         replay the entry animation, so the payload's duration is
+         silenced for just this synchronous render. */
+      var x = ctx.el.__pvLastX || ctx.x;
+      var keep = x.duration;
+      x.duration = 0;
+      window.pvRender(ctx.el, x,
+        ctx.el.offsetWidth || ctx.width, ctx.el.offsetHeight,
+        window.matchMedia ?
+          window.matchMedia("(prefers-color-scheme: dark)") : null);
+      x.duration = keep;
+    }
+
+    function onEnd(event) {
+      /* brush.move (restoring the window below) fires this too, with no
+         sourceEvent; reacting to it would loop the re-render. */
+      if (!event.sourceEvent) return;
+      var z = null;
+      /* A window under 2px is a click, not a selection: reset. */
+      if (event.selection &&
+          event.selection[1] - event.selection[0] >= 2) {
+        var lo = sx.invert(event.selection[0]);
+        var hi = sx.invert(event.selection[1]);
+        z = o.xtype === "date" ? [+lo, +hi] : [lo, hi];
+      }
+      var had = ctx.el.__pvZoomX;
+      ctx.el.__pvZoomX = z;
+      /* Only a changed window earns a re-render: a zero-move click on
+         the selection hands back the same window, and re-rendering then
+         would tear the strip out from under a double-click. */
+      if (JSON.stringify(z) !== JSON.stringify(had || null)) redraw();
+    }
+
+    var brush = d3.brushX().extent([[0, 0], [iw, ih]]).on("end", onEnd);
+    var gb = g.append("g").attr("class", "brush").call(brush);
+    /* d3's stock brush chrome is loud; restyle it to the quiet ink. */
+    gb.select(".selection")
+      .attr("fill", ctx.theme.ink.muted).attr("fill-opacity", 0.18)
+      .attr("stroke", ctx.theme.ink.baseline);
+    gb.on("dblclick.pvzoom", function () {
+      if (ctx.el.__pvZoomX) {
+        ctx.el.__pvZoomX = null;
+        redraw();
+      }
+    });
+    /* A re-render (resize, theme flip, the brush itself) rebuilds the
+       strip from scratch, so the active window is painted back on. */
+    if (o.zoom) {
+      gb.call(brush.move, [sx(toX(o.zoom[0])), sx(toX(o.zoom[1]))]);
+    }
+
+    ctx.el.appendChild(box);
+    return box;
+  };
+
+})();

@@ -66,6 +66,16 @@ evolution_axis_title <- function(value, fallback, name) {
 #'   draws the legend row (even for a single series), `FALSE` never draws
 #'   it, and `"auto"` draws it exactly when the chart has more than one
 #'   series.
+#' @param zoom Add a brush-to-zoom strip below the chart? `FALSE`
+#'   (default) or `TRUE`; needs a date or numeric x axis. The strip is a
+#'   muted silhouette of the full stack: dragging across it narrows the
+#'   main panel to that x window, and double-clicking the strip (or
+#'   clicking it outside the brushed window) restores the full range.
+#'   The chart always opens at the full range, so any export shows the
+#'   complete series; SVG and PDF exports leave the strip out entirely,
+#'   while a PNG page capture keeps the muted strip in view.
+#'   [pv_facet()] drops the strip quietly: its panels share axes, which
+#'   a per-panel brush would break.
 #' @param xlab,ylab Axis titles. `NULL` (default) uses the column names;
 #'   `NA` or `""` suppresses a title; any other string replaces it. The
 #'   default y title only appears on `offset = "stacked"` (a percent axis
@@ -85,7 +95,7 @@ evolution_axis_title <- function(value, fallback, name) {
 #' @export
 pv_area <- function(data, x, y, series = NULL,
                     offset = c("stacked", "percent", "stream"),
-                    legend = "auto", xlab = NULL, ylab = NULL,
+                    legend = "auto", zoom = FALSE, xlab = NULL, ylab = NULL,
                     title = NULL, subtitle = NULL, mode = "auto",
                     duration = 600, source = NULL, width = NULL,
                     height = NULL, elementId = NULL) {
@@ -94,7 +104,18 @@ pv_area <- function(data, x, y, series = NULL,
   check_value_column(data, y)
   offset <- match.arg(offset)
   legend <- evolution_flag(legend, "legend")
+  # Zoom is a plain on/off switch: there is no data-driven decision for
+  # the JavaScript side to make, so "auto" has no meaning here.
+  if (!isTRUE(zoom) && !isFALSE(zoom)) {
+    rlang::abort("`zoom` must be TRUE or FALSE.")
+  }
   ax <- evolution_axis_values(data[[x]])
+  # Brushing narrows a continuous window; a category axis has none.
+  if (isTRUE(zoom) && ax$xtype == "category") {
+    rlang::abort(sprintf(
+      "`zoom` needs a date or numeric x axis; `%s` is categorical, so there is no continuous window to brush.",
+      x))
+  }
   df <- data.frame(x = ax$values, y = as.numeric(data[[y]]))
   df$series <- if (is.null(series)) "value" else as.character(data[[series]])
   df <- drop_missing(df, is.na(df$x), x)
@@ -137,7 +158,7 @@ pv_area <- function(data, x, y, series = NULL,
     # falls away for percent and stream offsets unless set explicitly.
     ylab = evolution_axis_title(
       ylab, if (offset == "stacked") y else "", "ylab"),
-    series = series_names, offset = offset, legend = legend
+    series = series_names, offset = offset, legend = legend, zoom = zoom
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

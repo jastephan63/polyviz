@@ -89,6 +89,38 @@ test_that("area resolves axis-title overrides in the payload", {
                        xlab = c("a", "b")), "single string")
 })
 
+test_that("area zoom is a plain switch and needs a continuous x axis", {
+  agglo <- subset(pv_city_population, city %in% c("Luzern", "Emmen"))
+  # The default keeps the old rendering: no strip.
+  expect_false(pv_area(agglo, "year", "population", series = "city")$x$zoom)
+  expect_true(pv_area(agglo, "year", "population", series = "city",
+                      zoom = TRUE)$x$zoom)
+  # No "auto" here - there is no data-driven decision to defer.
+  expect_error(pv_area(agglo, "year", "population", zoom = "auto"),
+               "TRUE or FALSE")
+  cats <- data.frame(m = month.abb[1:4], v = 1:4)
+  expect_error(pv_area(cats, "m", "v", zoom = TRUE), "categorical")
+})
+
+test_that("area zoom renders and keeps the strip out of the SVG export", {
+  render_skip_if_no_chrome()
+  agglo <- subset(pv_city_population,
+                  city %in% c("Luzern", "Emmen", "Kriens", "Horw", "Ebikon"))
+  w <- pv_area(agglo, "year", "population", series = "city", zoom = TRUE)
+  png <- tempfile(fileext = ".png")
+  expect_no_warning(pv_save(w, png, quiet = TRUE))
+  expect_gt(file.size(png), 20000)
+  unlink(png)
+  svg_path <- tempfile(fileext = ".svg")
+  expect_no_warning(pv_save(w, svg_path, quiet = TRUE))
+  svg <- paste(readLines(svg_path, warn = FALSE), collapse = "\n")
+  # The root document plus the one embedded plot - no strip svg, and no
+  # trace of the brush chrome.
+  expect_equal(lengths(regmatches(svg, gregexpr("<svg", svg))), 2L)
+  expect_false(grepl("overlay", svg, fixed = TRUE))
+  unlink(svg_path)
+})
+
 test_that("heatmap builds and picks its colour domain in R", {
   emp <- subset(pv_city_sectors,
                 city %in% c("Luzern", "Winterthur", "Bern"))

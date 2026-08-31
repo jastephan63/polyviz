@@ -64,6 +64,16 @@ reference:
   - pv_facet
   - pv_link
 
+- title: Papers & export
+  desc: >
+    Getting charts out of the browser and onto a page - print-quality
+    PNG/SVG/PDF and self-contained HTML files, plus the in-chart
+    download control. (Knitting to Word or PDF needs no function call
+    at all - a chart in a chunk becomes a figure by itself.)
+  contents:
+  - pv_save
+  - pv_downloads
+
 - title: Data in & out
   desc: >
     One reader that dispatches on file extension, plus direct access to

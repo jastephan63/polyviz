@@ -56,24 +56,37 @@ reference:
 
 - title: Chart layers & linking
   desc: >
-    Pipe-able modifiers - annotations, fitted trends, small multiples,
-    and crosstalk selection linking - that layer onto an existing chart.
+    Pipe-able modifiers - annotations, fitted trends, texture fills,
+    small multiples, and crosstalk selection linking - that layer onto
+    an existing chart.
   contents:
   - pv_annotate
   - annotations
   - pv_trend
+  - pv_textures
   - pv_facet
   - pv_link
 
 - title: Papers & export
   desc: >
     Getting charts out of the browser and onto a page - print-quality
-    PNG/SVG/PDF and self-contained HTML files, plus the in-chart
-    download control. (Knitting to Word or PDF needs no function call
-    at all - a chart in a chunk becomes a figure by itself.)
+    PNG/SVG/PDF, animated GIFs of the race, self-contained HTML files,
+    whole PowerPoint decks, plus the in-chart download control.
+    (Knitting to Word or PDF needs no function call at all - a chart in
+    a chunk becomes a figure by itself.)
   contents:
   - pv_save
+  - pv_deck
   - pv_downloads
+
+- title: Alt text
+  desc: >
+    Every chart carries a generated description of itself, for screen
+    readers and knitted documents - read it, or replace it with your
+    own words.
+  contents:
+  - pv_alt_text
+  - pv_alt
 
 - title: Data in & out
   desc: >
@@ -119,16 +132,20 @@ reference:
   - pv_plot_missing
   - pv_report
 
-- title: Theming
+- title: Theming & locale
   desc: >
     The packaged colour tokens, palette accessors and ggplot2 scales,
-    and the session theme API with its accessibility checker.
+    the session theme API with its accessibility checker, the
+    print-first paper theme, and locale-aware number and date
+    formatting.
   contents:
   - pv_colors
   - pv_palette
   - pv_set_theme
   - pv_reset_theme
+  - pv_theme_paper
   - pv_check_palette
+  - pv_locale
   - scale_colour_pv
   - theme_polyviz
 

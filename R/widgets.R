@@ -15,6 +15,14 @@ pv_widget <- function(type, payload, width = NULL, height = NULL,
     ink = tokens$ink,
     font = the$font %||% pv_font_stack()
   )
+  # The active locale (pv_locale) rides along beside the theme; with
+  # none set the assignment is a no-op, the field stays absent, and the
+  # JavaScript side keeps its stock US-style formatting.
+  payload$locale <- pv_locale_payload()
+  # Every chart carries a written description of itself (R/alt-text.R) -
+  # the alt text screen readers and knitted figures use. pv_alt()
+  # replaces it with the author's own words.
+  payload$alt <- alt_describe(payload)
   # Send data frames as one object per row (easier to loop over in d3),
   # and missing values as null so JavaScript can spot them.
   attr(payload, "TOJSON_ARGS") <- list(dataframe = "rows", na = "null")

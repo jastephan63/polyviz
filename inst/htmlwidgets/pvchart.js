@@ -92,6 +92,44 @@ function pvHasData(x) {
   return true;
 }
 
+/* Locale support (pv_locale on the R side). A payload built while a
+   locale was set carries the d3 locale definitions; the instances are
+   built once per locale tag and shared by every chart on the page.
+   d3's own stock en-US definitions are kept verbatim below so a chart
+   WITHOUT a locale can put the defaults back after a localised chart
+   swapped them - a page that never sees a locale never touches d3's
+   defaults at all. */
+var pvStockNumberLocale = {
+  thousands: ",", grouping: [3], currency: ["$", ""]
+};
+var pvStockTimeLocale = {
+  dateTime: "%x, %X", date: "%-m/%-d/%Y", time: "%-I:%M:%S %p",
+  periods: ["AM", "PM"],
+  days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday"],
+  shortDays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  months: ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"],
+  shortMonths: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
+    "Sep", "Oct", "Nov", "Dec"]
+};
+var pvLocaleCache = {};
+var pvLocaleSwapped = false;
+
+function pvGetLocale(x) {
+  var def = x.locale;
+  if (!def || !def.number || !def.time) return null;
+  var key = def.tag || "custom";
+  if (!pvLocaleCache[key]) {
+    pvLocaleCache[key] = {
+      number: d3.formatLocale(def.number),
+      time: d3.timeFormatLocale(def.time),
+      decimal: def.number.decimal || "."
+    };
+  }
+  return pvLocaleCache[key];
+}
+
 /* Writes a short notice into a cleared widget. The colours are
    hard-coded mid-tones that read on light and dark pages alike, because
    the theme itself may be the thing that failed. */
@@ -109,6 +147,13 @@ function pvNotice(el, text, isError) {
 
 function pvRender(el, x, width, height, mq) {
   el.__pvLastX = x;
+  /* The written description generated in R (R/alt-text.R) rides on the
+     payload; applying it here makes every widget a labelled image for
+     screen readers. */
+  if (x.alt) {
+    el.setAttribute("role", "img");
+    el.setAttribute("aria-label", x.alt);
+  }
   /* Whatever goes wrong below - a broken payload, a renderer bug -
      becomes a visible message in the widget itself; a silently blank
      box would look like the data's fault. The console keeps the
@@ -146,6 +191,26 @@ function pvRenderChart(el, x, width, height, mq) {
       x.theme.diverging,
     ink: ink
   };
+
+  /* When the payload carries a locale, swap d3's default number and
+     time locales in for the whole draw: every d3.format/d3.timeFormat
+     call in the renderers, and the month names a time axis picks by
+     itself, then come out localised without the renderers knowing.
+     A chart without a locale restores the stock defaults first, so
+     differently-localised charts coexist on one page. */
+  var locale = pvGetLocale(x);
+  if (locale) {
+    d3.formatDefaultLocale(x.locale.number);
+    d3.timeFormatDefaultLocale(x.locale.time);
+    pvLocaleSwapped = true;
+  } else if (pvLocaleSwapped) {
+    d3.formatDefaultLocale(pvStockNumberLocale);
+    d3.timeFormatDefaultLocale(pvStockTimeLocale);
+    pvLocaleSwapped = false;
+  }
+  /* pv-common's tick formatter needs the locale too (pv.fmtTick is
+     called without a ctx), so hand it over before anything draws. */
+  pv.setLocale(locale);
 
   /* Start from a blank container every time - re-rendering is cheaper to
      reason about than patching an existing drawing. */
@@ -185,7 +250,11 @@ function pvRenderChart(el, x, width, height, mq) {
     el: el, x: x, theme: theme, tip: tip, header: header,
     width: width, height: innerH,
     duration: pvHeadless ? 0 : (x.duration == null ? 500 : x.duration),
-    fmt: d3.format(",.2~f")
+    /* Tooltip number formatter and (for date read-outs) the matching
+       time formatter factory, both wearing the chart's locale when it
+       has one. Without a locale these are exactly d3's stock output. */
+    fmt: (locale ? locale.number.format : d3.format)(",.2~f"),
+    fmtTime: locale ? locale.time.format : d3.timeFormat
   };
 
   /* Shiny round-trip: renderers report interactions through ctx.emit and,

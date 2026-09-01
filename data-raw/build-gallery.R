@@ -28,7 +28,8 @@ display_names <- c(
   violin = "Violin plot", calendar = "Calendar heatmap",
   annotated = "Annotations & trends", facet = "Small multiples",
   `bar-stacked` = "Stacked bars", `line-points` = "Connected scatter",
-  `line-zoom` = "Brush to zoom", `violin-points` = "Violin with raw points"
+  `line-zoom` = "Brush to zoom", `violin-points` = "Violin with raw points",
+  `bar-textured` = "Print-ready", `bar-locale` = "Swiss number format"
 )
 
 # Pull the id / explanation / code blocks out of one snippet file.

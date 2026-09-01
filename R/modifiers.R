@@ -226,3 +226,43 @@ pv_downloads <- function(w, enabled = TRUE) {
   w$x$downloads <- check_flag(enabled, "enabled")
   w
 }
+
+#' Texture fills as a second identity channel
+#'
+#' Adds hand-drawn-feel diagonal hatching to a chart's filled marks, in
+#' each series' own colour over a lightened solid of it, so every series
+#' is told apart by colour *and* texture. Neighbouring palette slots
+#' hatch on opposite diagonals and each pair of slots opens the line
+#' spacing a step - identity that survives greyscale printing and
+#' colour-vision deficiency, where solid hues collapse into each other.
+#' Legend swatches wear the same texture; tooltips, hovers, and every
+#' export format carry it along.
+#'
+#' Textures apply to the charts whose marks are filled areas: bar (side
+#' by side, stacked, and percent, vertical or horizontal), area (stacked,
+#' percent, and stream), donut, and treemap. Every other chart ignores
+#' the flag silently - line strokes, scatter/beeswarm/bubble dots,
+#' lollipop heads, and the value ramps of heatmap, calendar, and
+#' choropleth have no series fill for a texture to identify.
+#'
+#' @param w A polyviz chart.
+#' @param enabled `TRUE` hatches the filled marks, `FALSE` (every chart's
+#'   default) keeps them solid.
+#' @return The chart, with the setting attached - ready for more pipe
+#'   steps.
+#' @examples
+#' mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+#' pv_bar(mix, x = "region", y = "revenue", series = "product",
+#'        stack = "stack") |>
+#'   pv_textures()
+#' @export
+pv_textures <- function(w, enabled = TRUE) {
+  check_pv_widget(w, "pv_textures")
+  # A plain on/off switch: there is no data-driven decision for the
+  # JavaScript side to make, so "auto" has no meaning here.
+  if (!isTRUE(enabled) && !isFALSE(enabled)) {
+    rlang::abort("`enabled` must be TRUE or FALSE.")
+  }
+  w$x$textures <- enabled
+  w
+}

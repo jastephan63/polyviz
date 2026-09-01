@@ -24,7 +24,7 @@
     var bins = ctx.x.data;
     var curve = ctx.x.density || [];
 
-    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -146,7 +146,7 @@
     var groups = boxes.map(function (b) { return b.group; });
     var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
 
-    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -318,7 +318,7 @@
     var raw = opt(ctx.x.showPoints, maxN <= 200) ?
       (ctx.x.points || []) : [];
 
-    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);

@@ -199,6 +199,53 @@ test_that("pv_downloads refuses bad flags and non-charts", {
   expect_error(pv_downloads(data.frame(x = 1)), "polyviz chart")
 })
 
+# ---- pv_textures ----
+
+test_that("pv_textures stores the flag the JavaScript side reads", {
+  mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+  w <- pv_bar(mix, x = "region", y = "revenue", series = "product",
+              stack = "stack")
+  # No flag in a fresh payload - the JavaScript default (solid fills)
+  # rules, so every chart built before the flag existed stays identical.
+  expect_null(w$x$textures)
+  expect_true(pv_textures(w)$x$textures)
+  expect_false(pv_textures(w, FALSE)$x$textures)
+  # A later call replaces the flag - the last word in a pipe wins.
+  expect_false(pv_textures(pv_textures(w), FALSE)$x$textures)
+})
+
+test_that("pv_textures attaches to every textured chart family", {
+  agg <- aggregate(revenue ~ region, pv_sales, sum)
+  expect_true(pv_textures(pv_bar(agg, "region", "revenue"))$x$textures)
+  monthly <- aggregate(revenue ~ month + region, pv_sales, sum)
+  expect_true(pv_textures(
+    pv_area(monthly, "month", "revenue", series = "region"))$x$textures)
+  expect_true(pv_textures(
+    pv_donut(agg, category = "region", value = "revenue"))$x$textures)
+  expect_true(pv_textures(
+    pv_treemap(pv_sales, levels = c("region", "product"),
+               value = "revenue"))$x$textures)
+})
+
+test_that("charts without filled series marks accept the flag quietly", {
+  # Textures mean nothing on strokes, dots, or value ramps; the modifier
+  # still attaches without complaint and the renderer ignores it.
+  expect_true(pv_textures(scatter_fixture())$x$textures)
+  monthly <- aggregate(revenue ~ month, pv_sales, sum)
+  expect_true(pv_textures(
+    pv_line(monthly, "month", "revenue"))$x$textures)
+})
+
+test_that("pv_textures refuses bad flags and non-charts", {
+  w <- scatter_fixture()
+  # A plain on/off switch: unlike the tri-state options, "auto" has no
+  # data-driven decision to defer, so it is refused too.
+  expect_error(pv_textures(w, "auto"), "TRUE or FALSE")
+  expect_error(pv_textures(w, NA), "TRUE or FALSE")
+  expect_error(pv_textures(w, c(TRUE, FALSE)), "TRUE or FALSE")
+  expect_error(pv_textures(data.frame(x = 1)), "polyviz chart")
+})
+
 # ---- pv_link ----
 
 test_that("pv_link attaches keys, group name, and the crosstalk libs", {

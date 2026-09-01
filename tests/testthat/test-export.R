@@ -21,6 +21,69 @@ png_size <- function(path) {
     height = sum(as.integer(bytes[21:24]) * 256^(3:0)))
 }
 
+# The gif tests need gifski on top of the browser stack.
+skip_if_no_gif <- function() {
+  skip_if_no_chrome()
+  skip_if_not_installed("gifski")
+}
+
+# A small race for the gif tests: four census years, eight bars.
+export_race <- function(...) {
+  few <- pv_city_population[pv_city_population$year >= 1990, ]
+  pv_race(few, time = "year", id = "city", value = "population",
+          top_n = 8, title = "Swiss cities racing", ...)
+}
+
+# Frame count and per-frame delays, read by walking the GIF's own block
+# structure - grepping the bytes for markers would miscount, since the
+# marker values also occur inside compressed pixel data. After the
+# header and optional global colour table, every block is either an
+# extension (0x21: a graphic-control extension carries the next frame's
+# delay in hundredths of a second), an image (0x2C, one frame), or the
+# trailer (0x3B); sub-blocks are length-prefixed and end at length 0.
+gif_scan <- function(path) {
+  raw <- readBin(path, "raw", file.size(path))
+  skip_sub <- function(p) {
+    repeat {
+      n <- as.integer(raw[p])
+      p <- p + 1L
+      if (n == 0L) {
+        return(p)
+      }
+      p <- p + n
+    }
+  }
+  packed <- as.integer(raw[11])
+  p <- 14L
+  if (bitwAnd(packed, 128L) > 0) {
+    p <- p + 3L * 2L^(bitwAnd(packed, 7L) + 1L)
+  }
+  frames <- 0L
+  delays <- numeric()
+  while (p <= length(raw)) {
+    b <- as.integer(raw[p])
+    if (b == 0x3B) break
+    if (b == 0x21) {
+      if (as.integer(raw[p + 1L]) == 0xF9) {
+        delays <- c(delays, (as.integer(raw[p + 4L]) +
+                               256 * as.integer(raw[p + 5L])) / 100)
+      }
+      p <- skip_sub(p + 2L)
+    } else if (b == 0x2C) {
+      frames <- frames + 1L
+      local_packed <- as.integer(raw[p + 9L])
+      p <- p + 10L
+      if (bitwAnd(local_packed, 128L) > 0) {
+        p <- p + 3L * 2L^(bitwAnd(local_packed, 7L) + 1L)
+      }
+      p <- skip_sub(p + 1L)
+    } else {
+      stop("unexpected GIF block")
+    }
+  }
+  list(frames = frames, delays = delays)
+}
+
 test_that("pv_save validates its arguments", {
   w <- export_chart()
   f <- file.path(tempdir(), "validate.png")
@@ -34,6 +97,26 @@ test_that("pv_save validates its arguments", {
   expect_error(pv_save(w, f, delay = -1), "`delay`")
   expect_error(pv_save(w, f, embed_fonts = "yes"), "`embed_fonts`")
   expect_error(pv_save(w, f, quiet = 1), "`quiet`")
+  expect_error(pv_save(w, f, fps = 0), "`fps`")
+  expect_error(pv_save(w, f, fps = 51), "`fps`")
+  expect_error(pv_save(w, f, fps = c(10, 20)), "`fps`")
+})
+
+test_that("only the race can be saved as a gif", {
+  f <- file.path(tempdir(), "still.gif")
+  # a bar chart has no animation timeline, and neither has the bump
+  # chart - its lines only draw in once
+  expect_error(pv_save(export_chart(), f), "no animation")
+  bump <- pv_bump(pv_city_population, time = "year", id = "city",
+                  value = "population")
+  expect_error(pv_save(bump, f), "no animation")
+})
+
+test_that("a clear error names gifski when it is missing", {
+  local_mocked_bindings(export_has_gifski = function() FALSE)
+  # the gifski check runs before the browser check, so this needs no Chrome
+  expect_error(pv_save(export_race(), file.path(tempdir(), "x.gif"),
+                       quiet = TRUE), "gifski")
 })
 
 test_that("html export is one self-contained file, no browser needed", {
@@ -152,4 +235,63 @@ test_that("javascript errors surface as an R warning", {
   expect_warning(pv_save(w, f, quiet = TRUE, delay = 0),
                  "JavaScript error")
   expect_true(file.exists(f))
+})
+
+test_that("gif export writes a looping animation of the race", {
+  skip_if_no_gif()
+  dir <- withr::local_tempdir()
+  f <- file.path(dir, "race.gif")
+  expect_message(pv_save(export_race(), f, width = 480, height = 320,
+                         scale = 1, fps = 10, delay = 0.2),
+                 "frames at 10 fps")
+  expect_identical(readBin(f, "raw", 6), charToRaw("GIF89a"))
+  expect_gt(file.size(f), 20000)
+  # no leftover temp file from the atomic write
+  expect_identical(list.files(dir, all.files = TRUE, no.. = TRUE),
+                   "race.gif")
+
+  # Four census years at the default tempo (900 ms per keyframe step)
+  # sampled at 10 fps schedule 28 distinct frames; gifski may merge a
+  # consecutive identical pair or split a long hold, so allow slack.
+  info <- gif_scan(f)
+  expect_gte(info$frames, 24)
+  expect_lte(info$frames, 30)
+  # riding frames show for 1/fps seconds each; the opening order holds
+  # longer, and the final standings hold about two seconds
+  expect_identical(stats::median(info$delays), 0.1)
+  expect_gte(info$delays[1], 0.4)
+  expect_gte(info$delays[length(info$delays)], 2)
+
+  # The file must actually play, not just parse: show it in a browser
+  # and look twice about a second apart - a running race puts different
+  # standings on the screen each time.
+  b <- chromote::ChromoteSession$new(width = 480, height = 320)
+  withr::defer(try(b$close(), silent = TRUE))
+  page <- file.path(dir, "play.html")
+  writeLines(paste0(
+    "<!DOCTYPE html><html><body style=\"margin:0\">",
+    "<img src=\"race.gif\" width=\"480\" height=\"320\"></body></html>"),
+    page)
+  loaded <- b$Page$loadEventFired(wait_ = FALSE)
+  b$Page$navigate(utils::URLencode(
+    paste0("file://", normalizePath(page))), wait_ = FALSE)
+  b$wait_for(loaded)
+  shot <- function() {
+    base64enc::base64decode(b$Page$captureScreenshot(format = "png")$data)
+  }
+  early <- shot()
+  Sys.sleep(1.2)
+  late <- shot()
+  expect_false(identical(early, late))
+})
+
+test_that("gif export honours scale and holds the final standings", {
+  skip_if_no_gif()
+  f <- file.path(withr::local_tempdir(), "race2x.gif")
+  pv_save(export_race(), f, width = 240, height = 160, scale = 2,
+          fps = 4, quiet = TRUE, delay = 0.2)
+  # gif pixel size sits little-endian at bytes 7-10 of the header
+  bytes <- readBin(f, "raw", 10)
+  expect_identical(as.integer(bytes[7]) + 256L * as.integer(bytes[8]), 480L)
+  expect_identical(as.integer(bytes[9]) + 256L * as.integer(bytes[10]), 320L)
 })

@@ -2,16 +2,18 @@
 # needs. For .png, .svg, and .pdf the chart is rendered for real - headless
 # Chrome loads the same HTML/d3 pipeline the interactive widget uses - and
 # the settled result is captured as pixels, a standalone SVG document, or a
-# true vector PDF. The .html format is different: it is assembled purely in
-# R, with every script, stylesheet, and font the widget needs inlined into
+# true vector PDF. For .gif the same page is asked for exact frames along
+# the bar-chart race's timeline, and gifski strings them into a looping
+# animation. The .html format is different: it is assembled purely in R,
+# with every script, stylesheet, and font the widget needs inlined into
 # one file, so it works with no browser and no pandoc installed.
 
 # The output format is named by the file extension alone.
 export_format <- function(file) {
   ext <- tolower(tools::file_ext(file))
-  if (!ext %in% c("png", "svg", "pdf", "html")) {
+  if (!ext %in% c("png", "svg", "pdf", "gif", "html")) {
     rlang::abort(sprintf(
-      '`file` must end in .png, .svg, .pdf, or .html (got "%s").',
+      '`file` must end in .png, .svg, .pdf, .gif, or .html (got "%s").',
       basename(file)))
   }
   ext
@@ -219,6 +221,21 @@ export_need_chrome <- function(format) {
   }
 }
 
+# Thin wrapper so tests can pretend gifski is not installed.
+export_has_gifski <- function() {
+  requireNamespace("gifski", quietly = TRUE)
+}
+
+# The GIF encoder is optional like the browser stack; fail before any
+# browser work with a message that says what to install.
+export_need_gifski <- function() {
+  if (!export_has_gifski()) {
+    rlang::abort(paste(
+      "Saving .gif files needs the gifski package. Install it with",
+      'install.packages("gifski").'))
+  }
+}
+
 # Collects JavaScript failures from the page: uncaught exceptions and
 # console.error calls both land in one growing character vector.
 export_watch_errors <- function(b) {
@@ -336,6 +353,68 @@ export_print_pdf <- function(b, stage, width, height, title) {
     pageRanges = "1")$data)
 }
 
+# The GIF is not captured off the live animation. The race runs on one
+# d3.timer, and screenshots of a running page - even under Chrome's
+# virtual-time clock - tie every frame to when the compositor happens to
+# produce one, which is exactly the timing flakiness a capture must not
+# have. Instead the race renderer exposes its draw() as a seek hook on
+# the chart element (motion.js), the page loads settled like every other
+# capture with nothing animating on its own, and each frame is the chart
+# drawn at one exact position on the race's own timeline, screenshotted,
+# and handed to gifski. Same chart, same frames, every run.
+export_capture_gif <- function(b, widget, width, height, scale, fps,
+                               stage) {
+  seek <- function(s) {
+    res <- b$Runtime$evaluate(sprintf(paste0(
+      "(function () {",
+      " var el = document.querySelector('.pvchart');",
+      " return (el && el.__pvRaceSeek) ? el.__pvRaceSeek(%.6f) : -1;",
+      " })()"), s), returnByValue = TRUE)
+    res$result$value
+  }
+  if (!identical(seek(0) > 1, TRUE)) {
+    rlang::abort(
+      "The rendered page exposed no race to seek; the chart failed to draw.")
+  }
+
+  # The frame schedule mirrors the interactive tempo (motion.js): one
+  # keyframe step takes max(200, 900 * duration / 500) ms, and a
+  # duration of 0 - the no-autoplay still - replays at the default
+  # tempo, so its GIF runs at that tempo too.
+  k <- length(widget$x$times)
+  duration <- widget$x$duration %||% 500
+  step_ms <- if (duration > 0) max(200, 900 * duration / 500) else 900
+  pos <- seq(0, (k - 1) * step_ms, by = 1000 / fps) / step_ms
+  if (pos[length(pos)] < k - 1) {
+    pos <- c(pos, k - 1)
+  }
+
+  frame_dir <- file.path(stage, "frames")
+  dir.create(frame_dir)
+  files <- file.path(frame_dir, sprintf("frame-%05d.png", seq_along(pos)))
+  for (i in seq_along(pos)) {
+    seek(pos[i])
+    writeBin(base64enc::base64decode(
+      b$Page$captureScreenshot(format = "png")$data), files[i])
+  }
+
+  # Two holds bracket the run: the starting order shows briefly (as the
+  # interactive race holds its opening frame) and the final standings
+  # hold about two seconds before the loop restarts. gifski takes one
+  # delay for all frames but merges consecutive identical images into a
+  # single longer-showing frame, so the holds ride in as repeated file
+  # names rather than a delay vector it would ignore.
+  files <- c(rep(files[1], round(0.4 * fps)), files,
+             rep(files[length(files)], round(2 * fps)))
+  gif <- file.path(stage, "animation.gif")
+  gifski::gifski(files, gif, width = round(width * scale),
+                 height = round(height * scale), delay = 1 / fps,
+                 loop = TRUE, progress = FALSE)
+  bytes <- readBin(gif, "raw", file.size(gif))
+  attr(bytes, "frames") <- length(pos)
+  bytes
+}
+
 # Writes through a temporary file in the target directory and renames it
 # into place, so a failure part-way never leaves a half-written file.
 export_write_atomic <- function(file, bytes) {
@@ -364,7 +443,7 @@ format_px <- function(v) {
   format(v, scientific = FALSE, trim = TRUE)
 }
 
-#' Save a chart as PNG, SVG, PDF, or self-contained HTML
+#' Save a chart as PNG, SVG, PDF, GIF, or self-contained HTML
 #'
 #' Writes a polyviz chart to disk in the format named by the file
 #' extension, ready to drop into a paper, a slide deck, or an email. The
@@ -384,19 +463,30 @@ format_px <- function(v) {
 #'   and source line all included as vector shapes and text.
 #' * `.pdf` — a true vector PDF from Chrome's print engine, sized exactly
 #'   to the chart; ideal for LaTeX.
+#' * `.gif` — the bar-chart race as a looping animated GIF (needs the
+#'   gifski package). Frames are rendered one by one at exact positions
+#'   on the race's timeline — never screenshotted off the running
+#'   animation, so the file comes out identical on every run — at the
+#'   tempo the chart's `duration` sets, `fps` frames per second. The
+#'   starting order holds briefly and the final standings hold about two
+#'   seconds before the loop restarts. Only [pv_race()] charts can be
+#'   saved this way: every other chart, the bump chart included, only
+#'   animates its entrance, and a GIF of an entrance effect is no use in
+#'   a paper or a deck — asking for one is an error pointing at `.png`.
 #' * `.html` — the interactive widget as one self-contained file (every
 #'   script, stylesheet, and font inlined). This format needs neither
 #'   Chrome nor pandoc, and it keeps the entrance animation.
 #'
 #' @param widget A polyviz chart, as returned by [pv_bar()] and friends.
-#' @param file Output path; the extension (`.png`, `.svg`, `.pdf`, or
-#'   `.html`) picks the format.
+#' @param file Output path; the extension (`.png`, `.svg`, `.pdf`, `.gif`,
+#'   or `.html`) picks the format.
 #' @param width Chart width in CSS pixels.
 #' @param height Chart height in CSS pixels. `NULL` (default) uses the
 #'   fixed height the widget was built with, if any, and 560 otherwise.
 #' @param scale Resolution multiplier for `.png` output: the saved image
 #'   is `scale` times `width` by `scale` times `height` device pixels.
-#'   Other formats are resolution-independent and ignore it.
+#'   `.gif` frames are captured at the same multiplier. The other formats
+#'   are resolution-independent and ignore it.
 #' @param mode `"light"` (default), `"dark"`, or `"auto"`, forced onto the
 #'   saved chart. In an `.html` file `"auto"` keeps the light/dark
 #'   switching live; for captures it renders as light.
@@ -409,6 +499,9 @@ format_px <- function(v) {
 #'   that post-process the SVG with Inter installed may prefer that.
 #'   `.png` and `.pdf` always carry their fonts and ignore this.
 #' @param quiet Skip the one-line message saying what was saved?
+#' @param fps Frames per second for `.gif` output, from 1 to 50 (GIF time
+#'   steps are hundredths of a second, so 50 is the format's practical
+#'   ceiling). The other formats ignore it.
 #' @return The output path, invisibly.
 #' @examplesIf interactive()
 #' agg <- aggregate(revenue ~ region, pv_sales, sum)
@@ -417,10 +510,14 @@ format_px <- function(v) {
 #' pv_save(w, file.path(tempdir(), "revenue.svg"))
 #' pv_save(w, file.path(tempdir(), "revenue.pdf"))
 #' pv_save(w, file.path(tempdir(), "revenue.html"))
+#'
+#' r <- pv_race(pv_city_population, time = "year", id = "city",
+#'              value = "population", top_n = 8)
+#' pv_save(r, file.path(tempdir(), "race.gif"))
 #' @export
 pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
                     mode = "light", delay = 0.5, embed_fonts = TRUE,
-                    quiet = FALSE) {
+                    quiet = FALSE, fps = 20) {
   if (!inherits(widget, "pvchart")) {
     rlang::abort(paste(
       "`widget` must be a polyviz chart (the return value of pv_bar()",
@@ -449,6 +546,20 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
   if (!isTRUE(quiet) && !isFALSE(quiet)) {
     rlang::abort("`quiet` must be TRUE or FALSE.")
   }
+  if (!is.numeric(fps) || length(fps) != 1 || !is.finite(fps) ||
+      fps < 1 || fps > 50) {
+    rlang::abort(
+      "`fps` must be a single number of frames per second from 1 to 50.")
+  }
+  # The race is the only chart whose animation is a data timeline; every
+  # other chart merely animates its entrance, and nobody needs a GIF of
+  # a fade-in when a .png shows the same finished chart.
+  if (format == "gif" && !identical(widget$x$type, "race")) {
+    rlang::abort(sprintf(paste(
+      'A .gif captures the bar-chart race animation, and a "%s" chart',
+      "has no animation to capture - save it as .png instead."),
+      widget$x$type))
+  }
 
   w <- widget
   w$x$mode <- mode
@@ -462,12 +573,16 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
     return(invisible(file))
   }
 
+  if (format == "gif") {
+    export_need_gifski()
+  }
   export_need_chrome(format)
 
   # The capture copy: entrance animation off, and no fixed size of its
   # own - the widget fills the page, and the page is opened at exactly
   # width x height, so the browser never resizes (a resize would
-  # re-render the chart mid-capture).
+  # re-render the chart mid-capture). The GIF starts from the same still
+  # page - its frames come from the seek hook, never from live playback.
   w$x$duration <- 0
   w$width <- NULL
   w$height <- NULL
@@ -484,7 +599,7 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
                                      height = as.integer(round(height)))
   on.exit(try(b$close(), silent = TRUE), add = TRUE)
   errors <- export_watch_errors(b)
-  if (format == "png" && scale != 1) {
+  if (format %in% c("png", "gif") && scale != 1) {
     b$Emulation$setDeviceMetricsOverride(
       width = as.integer(round(width)), height = as.integer(round(height)),
       deviceScaleFactor = scale, mobile = FALSE)
@@ -504,6 +619,7 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
     png = base64enc::base64decode(
       b$Page$captureScreenshot(format = "png")$data),
     pdf = export_print_pdf(b, stage, width, height, widget$x$title),
+    gif = export_capture_gif(b, widget, width, height, scale, fps, stage),
     svg = {
       svg <- export_page_svg(b)
       if (embed_fonts) {
@@ -511,12 +627,19 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
       }
       charToRaw(enc2utf8(svg))
     })
+  # The gif bytes carry their frame count as an attribute for the message
+  # below; writeBin() refuses raw vectors with attributes, so lift it off.
+  frames <- attr(bytes, "frames")
+  attributes(bytes) <- NULL
   export_write_atomic(file, bytes)
   if (!quiet) {
+    extra <- switch(format,
+      png = sprintf(" at %sx", format_px(scale)),
+      gif = sprintf(" at %sx, %s frames at %s fps", format_px(scale),
+                    format_px(frames), format_px(fps)),
+      "")
     message(sprintf("Saved %s (%s, %s x %s px%s)", file, format,
-                    format_px(width), format_px(height),
-                    if (format == "png") sprintf(" at %sx", format_px(scale))
-                    else ""))
+                    format_px(width), format_px(height), extra))
   }
   invisible(file)
 }

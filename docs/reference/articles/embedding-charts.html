@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,11 +77,14 @@
     
 <p>polyviz charts live in the browser, but papers, theses, and slide
 decks need files. This vignette covers the whole path from widget to
-page: the four export formats of <code><a href="../reference/pv_save.html">pv_save()</a></code>, how to size
-them for print, the knit path that makes Word and PDF documents work
-with no extra code, and the download button on every rendered chart.
-None of the code below runs while the vignette builds — most of it needs
-a local Chrome — so copy the chunks into your own session.</p>
+page: the five export formats of <code><a href="../reference/pv_save.html">pv_save()</a></code>, how to size
+them for print, the paper theme and texture fills that keep a figure
+legible in greyscale, Swiss locale formatting, the knit path that makes
+Word and PDF documents work with no extra code, the alt text those
+documents carry, whole PowerPoint decks with <code><a href="../reference/pv_deck.html">pv_deck()</a></code>, and
+the download button on every rendered chart. None of the code below runs
+while the vignette builds — most of it needs a local Chrome — so copy
+the chunks into your own session.</p>
 <p>The running example:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va">polyviz</span><span class="op">)</span></span>
@@ -94,17 +97,18 @@ Viewer. Note that this only happens in an interactive session —
 displays nothing, because there is no viewer to open. In a script, save
 the chart instead.</p>
 <div class="section level2">
-<h2 id="the-four-formats">The four formats<a class="anchor" aria-label="anchor" href="#the-four-formats"></a>
+<h2 id="the-five-formats">The five formats<a class="anchor" aria-label="anchor" href="#the-five-formats"></a>
 </h2>
 <p><code><a href="../reference/pv_save.html">pv_save()</a></code> picks the format from the file extension
-alone. For <code>.png</code>, <code>.svg</code>, and <code>.pdf</code>
-the chart is rendered for real: headless Chrome loads the same d3
-pipeline the interactive widget uses, the entrance animation is switched
-off and the colour mode is pinned (light, unless you ask otherwise), and
-the settled result is captured once nothing is still drawing. A capture
-can never show a half-grown animation or inherit your machine’s dark
-theme. These three formats need the chromote package and a Chrome-based
-browser; <code>.html</code> needs neither.</p>
+alone. For <code>.png</code>, <code>.svg</code>, and <code>.pdf</code> —
+and every frame of a <code>.gif</code> — the chart is rendered for real:
+headless Chrome loads the same d3 pipeline the interactive widget uses,
+the entrance animation is switched off and the colour mode is pinned
+(light, unless you ask otherwise), and the settled result is captured
+once nothing is still drawing. A capture can never show a half-grown
+animation or inherit your machine’s dark theme. The capture formats need
+the chromote package and a Chrome-based browser (<code>.gif</code>
+additionally needs gifski); <code>.html</code> needs neither.</p>
 <div class="section level3">
 <h3 id="png-word-google-docs-slides">PNG — Word, Google Docs, slides<a class="anchor" aria-label="anchor" href="#png-word-google-docs-slides"></a>
 </h3>
@@ -145,6 +149,24 @@ purely in R — it is the only one that works without Chrome, and unlike
 <code>htmlwidgets::saveWidget(selfcontained = TRUE)</code> it needs no
 pandoc either.</p>
 </div>
+<div class="section level3">
+<h3 id="gif-the-bar-chart-race-animated">GIF — the bar-chart race, animated<a class="anchor" aria-label="anchor" href="#gif-the-bar-chart-race-animated"></a>
+</h3>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/pv_race.html">pv_race</a></span><span class="op">(</span><span class="va">pv_city_population</span>, time <span class="op">=</span> <span class="st">"year"</span>, id <span class="op">=</span> <span class="st">"city"</span>,</span>
+<span>             value <span class="op">=</span> <span class="st">"population"</span>, top_n <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">r</span>, <span class="st">"race.gif"</span><span class="op">)</span></span></code></pre></div>
+<p>A looping animated GIF of the race, for slide decks, chat, and
+READMEs (needs the gifski package). Frames are rendered one by one at
+exact positions on the race’s timeline — never screenshotted off the
+running animation — so the file comes out identical on every run. The
+chart’s own <code>duration</code> sets the tempo, <code>fps</code> the
+frame rate (default 20), and the starting order and final standings each
+hold briefly so the loop reads. Only <code><a href="../reference/pv_race.html">pv_race()</a></code> charts save
+as <code>.gif</code>: every other chart merely animates its entrance,
+and a <code>.png</code> shows the same finished chart — asking for a GIF
+of one is an error saying so.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="sizing-and-scale-for-print">Sizing and scale for print<a class="anchor" aria-label="anchor" href="#sizing-and-scale-for-print"></a>
@@ -152,7 +174,7 @@ pandoc either.</p>
 <p><code>width</code> and <code>height</code> are CSS pixels, and print
 maps them at 96 pixels per inch. A chart meant to fill a 6.5-inch text
 block is therefore 624 pixels wide:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.pdf"</span>, width <span class="op">=</span> <span class="fl">624</span>, height <span class="op">=</span> <span class="fl">390</span><span class="op">)</span></span></code></pre></div>
 <p><code>height = NULL</code> (the default) uses the fixed height the
 widget was built with, if any, and 560 otherwise.</p>
@@ -161,7 +183,7 @@ automatic orientation all react to it — so choose <code>width</code> and
 <code>height</code> for the shape you want on the page, and let
 <code>scale</code> carry the resolution. For a 300-dpi PNG, that is
 <code>scale = 300 / 96</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="va">w</span>, <span class="st">"revenue.png"</span>, width <span class="op">=</span> <span class="fl">624</span>, height <span class="op">=</span> <span class="fl">390</span>, scale <span class="op">=</span> <span class="fl">300</span> <span class="op">/</span> <span class="fl">96</span><span class="op">)</span></span></code></pre></div>
 <p>Doubling <code>width</code> instead would sharpen nothing: it renders
 a genuinely wider chart, whose type then looks half as big on the page.
@@ -182,6 +204,67 @@ you post-process the SVG on a machine that has Inter installed anyway.
 ignore the argument.</p>
 </div>
 <div class="section level2">
+<h2 id="greyscale-safety-the-paper-theme-and-textures">Greyscale safety: the paper theme and textures<a class="anchor" aria-label="anchor" href="#greyscale-safety-the-paper-theme-and-textures"></a>
+</h2>
+<p>Many journals print figures in greyscale, and photocopiers always do.
+Two pieces pair up to keep a chart legible with every hue thrown
+away:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_set_theme.html">pv_set_theme</a></span><span class="op">(</span><span class="fu"><a href="../reference/pv_theme_paper.html">pv_theme_paper</a></span><span class="op">(</span>serif <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">mix</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate</a></span><span class="op">(</span><span class="va">revenue</span> <span class="op">~</span> <span class="va">region</span> <span class="op">+</span> <span class="va">product</span>, <span class="va">pv_sales</span>, <span class="va">sum</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/pv_bar.html">pv_bar</a></span><span class="op">(</span><span class="va">mix</span>, x <span class="op">=</span> <span class="st">"region"</span>, y <span class="op">=</span> <span class="st">"revenue"</span>, series <span class="op">=</span> <span class="st">"product"</span>,</span>
+<span>       stack <span class="op">=</span> <span class="st">"stack"</span>, title <span class="op">=</span> <span class="st">"Revenue by region and product"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pv_textures.html">pv_textures</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="st">"figure-3.pdf"</span>, width <span class="op">=</span> <span class="fl">624</span>, height <span class="op">=</span> <span class="fl">390</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/pv_reset_theme.html">pv_reset_theme</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="../reference/pv_theme_paper.html">pv_theme_paper()</a></code> is a complete print-first theme: a pure
+white surface, neutral near-black inks, sequential and diverging ramps
+re-anchored to match, and a five-colour categorical palette whose slots
+climb a luminance ladder — adjacent series stay tellable apart as pure
+greys. <code>serif = TRUE</code> sets the widget type in a serif stack
+for journals that want figures to match their text. Like any theme it is
+session-wide: set it, build the figures, then
+<code><a href="../reference/pv_reset_theme.html">pv_reset_theme()</a></code>.</p>
+<p><code><a href="../reference/pv_textures.html">pv_textures()</a></code> adds the belt to those braces on any chart
+with filled marks (bar, area, donut, treemap): each series is hatched in
+its own diagonal and line spacing over a lightened solid of its colour,
+so series identity is carried by pattern as well — an encoding that
+survives greyscale print and colour-vision deficiency alike. Legend
+swatches wear the same texture, and every export format carries it
+along.</p>
+</div>
+<div class="section level2">
+<h2 id="swiss-number-and-date-formats">Swiss number and date formats<a class="anchor" aria-label="anchor" href="#swiss-number-and-date-formats"></a>
+</h2>
+<p>A figure in a German-language paper should not write
+<code>10,000</code> where the reader expects <code>10'000</code>.
+<code><a href="../reference/pv_locale.html">pv_locale()</a></code> switches every chart built afterwards to one of
+the packaged Swiss conventions — <code>"de-CH"</code>,
+<code>"fr-CH"</code>, <code>"it-CH"</code>, or <code>"en-CH"</code>:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_locale.html">pv_locale</a></span><span class="op">(</span><span class="st">"de-CH"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">pv_city_population</span>, <span class="va">year</span> <span class="op">==</span> <span class="fl">2024</span><span class="op">)</span></span>
+<span><span class="va">pop</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pop</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="op">-</span><span class="va">pop</span><span class="op">$</span><span class="va">population</span><span class="op">)</span>, <span class="op">]</span>, <span class="fl">8</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/pv_bar.html">pv_bar</a></span><span class="op">(</span><span class="va">pop</span>, x <span class="op">=</span> <span class="st">"city"</span>, y <span class="op">=</span> <span class="st">"population"</span>, sort <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>       title <span class="op">=</span> <span class="st">"Wo die städtische Schweiz wohnt"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="../reference/pv_save.html">pv_save</a></span><span class="op">(</span><span class="st">"bevoelkerung.pdf"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/pv_locale.html">pv_locale</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+<p>On the saved figure the population axis reads <code>100'000</code>
+through <code>400'000</code> — apostrophe-grouped in full, the Federal
+Chancellery’s convention — and tooltips in the interactive version
+follow suit; <code>"fr-CH"</code> groups with a space and writes the
+decimal comma instead, and each locale carries its language’s month and
+weekday names for date axes. Ticks below 10’000 stay ungrouped, so year
+axes keep reading <code>2024</code>. The setting travels inside each
+widget’s payload, so a chart keeps its locale wherever it goes, and
+<code>pv_locale(NULL)</code> puts d3’s stock US-English formatting back
+— with no locale set, charts render exactly as they always have.</p>
+</div>
+<div class="section level2">
 <h2 id="knitting-to-word-and-pdf">Knitting to Word and PDF<a class="anchor" aria-label="anchor" href="#knitting-to-word-and-pdf"></a>
 </h2>
 <p>A chart dropped into an R Markdown document needs no special
@@ -193,7 +276,7 @@ like any other figure.</p>
 <p>One line of setup belongs in the document, because knitr otherwise
 reaches for its own generic widget screenshotter (the webshot package)
 before asking the chart how it wants to be printed:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">knitr</span><span class="fu">::</span><span class="va"><a href="https://rdrr.io/pkg/knitr/man/opts_chunk.html" class="external-link">opts_chunk</a></span><span class="op">$</span><span class="fu">set</span><span class="op">(</span>screenshot.force <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <p>After that, an ordinary chunk does the right thing in every output
 format. The chunk’s <code>fig.width</code> and <code>fig.height</code>
@@ -210,6 +293,54 @@ package and a Chrome-based browser on the machine doing the
 knitting.</p>
 </div>
 <div class="section level2">
+<h2 id="alt-text-in-knitted-documents">Alt text in knitted documents<a class="anchor" aria-label="anchor" href="#alt-text-in-knitted-documents"></a>
+</h2>
+<p>Every chart writes a short description of itself when it is built —
+the chart form in plain words, the title, what is measured, and the
+data’s actual shape. In the browser that text reaches screen readers
+through the widget; in a knitted document it rides along as the included
+figure’s <code>fig.alt</code>, so a knit to markdown, GitHub-flavoured
+markdown, or epub keeps an accessible description on the image with no
+extra code. (Word and LaTeX keep their usual figure markup — knitr
+declares <code>fig.alt</code> unsupported there — and an author’s own
+<code>fig.alt</code> or <code>fig.cap</code> chunk option always
+wins.)</p>
+<p><code><a href="../reference/pv_alt_text.html">pv_alt_text()</a></code> returns the generated text, which also
+makes a solid first draft of a figure caption; <code><a href="../reference/pv_alt.html">pv_alt()</a></code>
+replaces it with your own words wherever the data deserves a better
+sentence:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_alt_text.html">pv_alt_text</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span>  <span class="co"># what the chart will say about itself</span></span>
+<span></span>
+<span><span class="va">w</span> <span class="op">|&gt;</span> <span class="fu"><a href="../reference/pv_alt.html">pv_alt</a></span><span class="op">(</span><span class="st">"Revenue by region: North leads, the other three are close."</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="charts-to-slides">Charts to slides<a class="anchor" aria-label="anchor" href="#charts-to-slides"></a>
+</h2>
+<p><code><a href="../reference/pv_deck.html">pv_deck()</a></code> skips the copy-paste round through PowerPoint
+entirely: give it a list of charts and it writes a <code>.pptx</code>,
+one chart per slide.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">deck</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="../reference/pv_bar.html">pv_bar</a></span><span class="op">(</span><span class="va">agg</span>, <span class="st">"region"</span>, <span class="st">"revenue"</span>, title <span class="op">=</span> <span class="st">"Revenue by region"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="../reference/pv_donut.html">pv_donut</a></span><span class="op">(</span><span class="va">agg</span>, <span class="st">"region"</span>, <span class="st">"revenue"</span>, title <span class="op">=</span> <span class="st">"Share of revenue"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/pv_deck.html">pv_deck</a></span><span class="op">(</span><span class="va">deck</span>, <span class="st">"review.pptx"</span>, title <span class="op">=</span> <span class="st">"Quarterly review"</span><span class="op">)</span></span></code></pre></div>
+<p>Every slide is a real render through the same pipeline as
+<code><a href="../reference/pv_save.html">pv_save()</a></code>, captured at exactly the slide’s dimensions and
+placed edge to edge on a blank layout — what lands in the deck is pixel
+for pixel what a <code><a href="../reference/pv_save.html">pv_save()</a></code> capture shows, at 2x resolution
+by default. Slides are 16:9 (<code>ratio = "4:3"</code> switches, or
+give <code>width</code>/<code>height</code> in inches for anything
+else), <code>title</code> opens the deck with a title slide on the same
+chart surface, and each chart’s title and source line go into its
+slide’s speaker notes so the deck stays searchable. Needs the officer
+package to write the file, plus chromote and Chrome to render — and it
+composes with everything above: build the deck under
+<code><a href="../reference/pv_theme_paper.html">pv_theme_paper()</a></code>, a locale, or with textures, and the
+slides carry the look.</p>
+</div>
+<div class="section level2">
 <h2 id="the-download-button">The download button<a class="anchor" aria-label="anchor" href="#the-download-button"></a>
 </h2>
 <p>Every rendered chart carries a small arrow button in its top-right
@@ -219,7 +350,7 @@ a 2x PNG, named after the chart’s title — readers of a report or a Shiny
 app can take any chart with them without asking you for the file. The
 control never appears inside a saved or captured chart. Turn it off per
 chart when it would distract:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/pv_bar.html">pv_bar</a></span><span class="op">(</span><span class="va">agg</span>, <span class="st">"region"</span>, <span class="st">"revenue"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="../reference/pv_downloads.html">pv_downloads</a></span><span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>

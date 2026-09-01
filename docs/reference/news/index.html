@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,33 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.0" id="polyviz-080">polyviz 0.8.0<a class="anchor" aria-label="anchor" href="#polyviz-080"></a></h2>
+<p>The publication release: everything between a finished chart and a finished page.</p>
+<div class="section level3">
+<h3 id="print-0-8-0">Print<a class="anchor" aria-label="anchor" href="#print-0-8-0"></a></h3>
+<ul><li>
+<code>pv_theme_paper(serif = FALSE)</code> — a built-in theme for the printed page: white surface, near-black inks, and a categorical palette ordered on an even lightness ladder so series stay tellable apart even printed in greyscale. <code>serif = TRUE</code> sets figures in serif for journals that want it. Apply with <code>pv_set_theme(pv_theme_paper())</code>.</li>
+<li>
+<code>pv_textures(w)</code> — hand-drawn-feel diagonal hatching over the fills of bar, area, donut, and treemap charts, alternating angle by series: identity that survives greyscale printing and colour-vision deficiency alike. Carried faithfully into SVG exports and legend swatches.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="present-0-8-0">Present<a class="anchor" aria-label="anchor" href="#present-0-8-0"></a></h3>
+<ul><li>
+<code>pv_deck(charts, "talk.pptx")</code> — a list of charts becomes a PowerPoint deck, one print-resolution chart per 16:9 slide (4:3 available), with an optional title slide and each chart’s title and source in the speaker notes.</li>
+<li>
+<code>pv_save(w, "race.gif")</code> — the animated bar-chart race exports as a looping GIF, captured frame-exact rather than by stopwatch, with the final standings held before the loop.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="language-0-8-0">Language<a class="anchor" aria-label="anchor" href="#language-0-8-0"></a></h3>
+<ul><li>
+<code>pv_locale("de-CH")</code> (also <code>"fr-CH"</code>, <code>"it-CH"</code>, <code>"en-CH"</code>) — Swiss number formatting (1’000) and month names in the language, applied to every chart built while set. Axis margins widen automatically for the longer tick labels.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="accessibility-0-8-0">Accessibility<a class="anchor" aria-label="anchor" href="#accessibility-0-8-0"></a></h3>
+<ul><li>Every chart now describes itself: an honest, generated alt text (chart type, what is measured, how many things, the extremes) travels with the widget as its screen-reader label and lands on the figure when knitting. <code>pv_alt_text(w)</code> returns it; <code>pv_alt(w, "…")</code> replaces it with your own words.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.0" id="polyviz-070">polyviz 0.7.0<a class="anchor" aria-label="anchor" href="#polyviz-070"></a></h2>
 <p>Swiss open data, live from R — and maps of the whole country.</p>

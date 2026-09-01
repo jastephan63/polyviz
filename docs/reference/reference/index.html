@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -207,7 +207,7 @@
       </dl></div><div class="section level2">
       <h2 id="chart-layers-linking">Chart layers &amp; linking<a class="anchor" aria-label="anchor" href="#chart-layers-linking"></a></h2>
 
-      <div class="section-desc"><p>Pipe-able modifiers - annotations, fitted trends, small multiples, and crosstalk selection linking - that layer onto an existing chart.</p></div>
+      <div class="section-desc"><p>Pipe-able modifiers - annotations, fitted trends, texture fills, small multiples, and crosstalk selection linking - that layer onto an existing chart.</p></div>
 
 
     </div><div class="section level2">
@@ -235,6 +235,12 @@
         <dd>Add a fitted trend to a scatter or line chart</dd>
       </dl><dl><dt>
 
+          <code><a href="pv_textures.html">pv_textures()</a></code>
+
+        </dt>
+        <dd>Texture fills as a second identity channel</dd>
+      </dl><dl><dt>
+
           <code><a href="pv_facet.html">pv_facet()</a></code>
 
         </dt>
@@ -248,7 +254,7 @@
       </dl></div><div class="section level2">
       <h2 id="papers-export">Papers &amp; export<a class="anchor" aria-label="anchor" href="#papers-export"></a></h2>
 
-      <div class="section-desc"><p>Getting charts out of the browser and onto a page - print-quality PNG/SVG/PDF and self-contained HTML files, plus the in-chart download control. (Knitting to Word or PDF needs no function call at all - a chart in a chunk becomes a figure by itself.)</p></div>
+      <div class="section-desc"><p>Getting charts out of the browser and onto a page - print-quality PNG/SVG/PDF, animated GIFs of the race, self-contained HTML files, whole PowerPoint decks, plus the in-chart download control. (Knitting to Word or PDF needs no function call at all - a chart in a chunk becomes a figure by itself.)</p></div>
 
 
     </div><div class="section level2">
@@ -261,13 +267,42 @@
           <code><a href="pv_save.html">pv_save()</a></code>
 
         </dt>
-        <dd>Save a chart as PNG, SVG, PDF, or self-contained HTML</dd>
+        <dd>Save a chart as PNG, SVG, PDF, GIF, or self-contained HTML</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_deck.html">pv_deck()</a></code>
+
+        </dt>
+        <dd>Save a list of charts as a PowerPoint deck</dd>
       </dl><dl><dt>
 
           <code><a href="pv_downloads.html">pv_downloads()</a></code>
 
         </dt>
         <dd>Toggle a chart's download control</dd>
+      </dl></div><div class="section level2">
+      <h2 id="alt-text">Alt text<a class="anchor" aria-label="anchor" href="#alt-text"></a></h2>
+
+      <div class="section-desc"><p>Every chart carries a generated description of itself, for screen readers and knitted documents - read it, or replace it with your own words.</p></div>
+
+
+    </div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="pv_alt_text.html">pv_alt_text()</a></code>
+
+        </dt>
+        <dd>The generated description of a chart</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_alt.html">pv_alt()</a></code>
+
+        </dt>
+        <dd>Set a chart's alt text by hand</dd>
       </dl></div><div class="section level2">
       <h2 id="data-in-out">Data in &amp; out<a class="anchor" aria-label="anchor" href="#data-in-out"></a></h2>
 
@@ -446,9 +481,9 @@
         </dt>
         <dd>One-call HTML report of a data frame</dd>
       </dl></div><div class="section level2">
-      <h2 id="theming">Theming<a class="anchor" aria-label="anchor" href="#theming"></a></h2>
+      <h2 id="theming-locale">Theming &amp; locale<a class="anchor" aria-label="anchor" href="#theming-locale"></a></h2>
 
-      <div class="section-desc"><p>The packaged colour tokens, palette accessors and ggplot2 scales, and the session theme API with its accessibility checker.</p></div>
+      <div class="section-desc"><p>The packaged colour tokens, palette accessors and ggplot2 scales, the session theme API with its accessibility checker, the print-first paper theme, and locale-aware number and date formatting.</p></div>
 
 
     </div><div class="section level2">
@@ -482,10 +517,22 @@
         <dd>Reset the polyviz theme</dd>
       </dl><dl><dt>
 
+          <code><a href="pv_theme_paper.html">pv_theme_paper()</a></code>
+
+        </dt>
+        <dd>A print-first theme for the printed page</dd>
+      </dl><dl><dt>
+
           <code><a href="pv_check_palette.html">pv_check_palette()</a></code> <code><a href="pv_check_palette.html">print(<i>&lt;pv_palette_check&gt;</i>)</a></code>
 
         </dt>
         <dd>Check a categorical palette for accessibility</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_locale.html">pv_locale()</a></code>
+
+        </dt>
+        <dd>Set a session-wide chart locale</dd>
       </dl><dl><dt>
 
           <code><a href="scale_colour_pv.html">scale_colour_pv()</a></code> <code><a href="scale_colour_pv.html">scale_color_pv()</a></code> <code><a href="scale_colour_pv.html">scale_fill_pv()</a></code>

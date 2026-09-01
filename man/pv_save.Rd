@@ -2,7 +2,7 @@
 % Please edit documentation in R/export.R
 \name{pv_save}
 \alias{pv_save}
-\title{Save a chart as PNG, SVG, PDF, or self-contained HTML}
+\title{Save a chart as PNG, SVG, PDF, GIF, or self-contained HTML}
 \usage{
 pv_save(
   widget,
@@ -13,14 +13,15 @@ pv_save(
   mode = "light",
   delay = 0.5,
   embed_fonts = TRUE,
-  quiet = FALSE
+  quiet = FALSE,
+  fps = 20
 )
 }
 \arguments{
 \item{widget}{A polyviz chart, as returned by \code{\link[=pv_bar]{pv_bar()}} and friends.}
 
-\item{file}{Output path; the extension (\code{.png}, \code{.svg}, \code{.pdf}, or
-\code{.html}) picks the format.}
+\item{file}{Output path; the extension (\code{.png}, \code{.svg}, \code{.pdf}, \code{.gif},
+or \code{.html}) picks the format.}
 
 \item{width}{Chart width in CSS pixels.}
 
@@ -29,7 +30,8 @@ fixed height the widget was built with, if any, and 560 otherwise.}
 
 \item{scale}{Resolution multiplier for \code{.png} output: the saved image
 is \code{scale} times \code{width} by \code{scale} times \code{height} device pixels.
-Other formats are resolution-independent and ignore it.}
+\code{.gif} frames are captured at the same multiplier. The other formats
+are resolution-independent and ignore it.}
 
 \item{mode}{\code{"light"} (default), \code{"dark"}, or \code{"auto"}, forced onto the
 saved chart. In an \code{.html} file \code{"auto"} keeps the light/dark
@@ -46,6 +48,10 @@ that post-process the SVG with Inter installed may prefer that.
 \code{.png} and \code{.pdf} always carry their fonts and ignore this.}
 
 \item{quiet}{Skip the one-line message saying what was saved?}
+
+\item{fps}{Frames per second for \code{.gif} output, from 1 to 50 (GIF time
+steps are hundredths of a second, so 50 is the format's practical
+ceiling). The other formats ignore it.}
 }
 \value{
 The output path, invisibly.
@@ -70,6 +76,16 @@ The formats:
 and source line all included as vector shapes and text.
 \item \code{.pdf} — a true vector PDF from Chrome's print engine, sized exactly
 to the chart; ideal for LaTeX.
+\item \code{.gif} — the bar-chart race as a looping animated GIF (needs the
+gifski package). Frames are rendered one by one at exact positions
+on the race's timeline — never screenshotted off the running
+animation, so the file comes out identical on every run — at the
+tempo the chart's \code{duration} sets, \code{fps} frames per second. The
+starting order holds briefly and the final standings hold about two
+seconds before the loop restarts. Only \code{\link[=pv_race]{pv_race()}} charts can be
+saved this way: every other chart, the bump chart included, only
+animates its entrance, and a GIF of an entrance effect is no use in
+a paper or a deck — asking for one is an error pointing at \code{.png}.
 \item \code{.html} — the interactive widget as one self-contained file (every
 script, stylesheet, and font inlined). This format needs neither
 Chrome nor pandoc, and it keeps the entrance animation.
@@ -83,5 +99,9 @@ pv_save(w, file.path(tempdir(), "revenue.png"))
 pv_save(w, file.path(tempdir(), "revenue.svg"))
 pv_save(w, file.path(tempdir(), "revenue.pdf"))
 pv_save(w, file.path(tempdir(), "revenue.html"))
+
+r <- pv_race(pv_city_population, time = "year", id = "city",
+             value = "population", top_n = 8)
+pv_save(r, file.path(tempdir(), "race.gif"))
 \dontshow{\}) # examplesIf}
 }

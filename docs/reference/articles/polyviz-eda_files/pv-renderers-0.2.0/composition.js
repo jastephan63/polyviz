@@ -33,8 +33,13 @@
     var small = data.filter(function (d) { return !carriesLabel(d); });
     var labelled = data.filter(carriesLabel);
     if (small.length) {
+      /* The texture lookup is built over the FULL category list, so a
+         small slice's swatch wears the slot its slice wears - not a slot
+         renumbered within the legend's subset. */
       pv.buildLegend(ctx.header,
-        small.map(function (d) { return d.category; }), color, ctx.theme);
+        small.map(function (d) { return d.category; }), color, ctx.theme,
+        pv.textureLegend(ctx,
+          data.map(function (d) { return d.category; }), color));
       ctx.height = Math.max(120, ctx.height - 26);
     }
 
@@ -55,6 +60,9 @@
     var innerR = radius * ctx.x.innerRadius;
 
     var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures), one hatch per category slot. */
+    var tex = pv.textureFill(ctx, svg,
+      data.map(function (d) { return d.category; }), color);
     var g = svg.append("g")
       .attr("transform", "translate(" + w / 2 + "," + h / 2 + ")");
 
@@ -70,7 +78,9 @@
 
     var paths = g.selectAll("path.slice").data(arcs).enter().append("path")
       .attr("class", "slice")
-      .attr("fill", function (d) { return color(d.data.category); })
+      .attr("fill", function (d) {
+        return tex ? tex(d.data.category) : color(d.data.category);
+      })
       .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 1.5);
 
     /* Each slice sweeps open from its own start angle, one after the
@@ -215,7 +225,9 @@
        grouping only shows through hue - give it a legend. */
     if (root.height > 1) {
       pv.buildLegend(ctx.header,
-        top.map(function (d) { return d.data.name; }), color, ctx.theme);
+        top.map(function (d) { return d.data.name; }), color, ctx.theme,
+        pv.textureLegend(ctx,
+          top.map(function (d) { return d.data.name; }), color));
       ctx.height = Math.max(120, ctx.height - 26);
     }
 
@@ -241,6 +253,21 @@
     var svg = pv.baseSvg(ctx);
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
+
+    /* Texture fills (pv_textures): every cell of a branch wears that
+       branch's hatch slot, in the cell's own depth-faded colour. The
+       leaves all sit at one depth (the R side builds the tree from a
+       fixed level list), so each slot registers a single colour. */
+    var texDefs = ctx.x.textures === true ? svg.append("defs") : null;
+    var texSlot = {};
+    top.forEach(function (d, i) {
+      texSlot[d.data.name] = i % ctx.theme.palette.length;
+    });
+    function cellFill(d) {
+      if (!texDefs) return fillOf(d);
+      return pv.texturePattern(texDefs, texSlot[topOf(d).data.name],
+        fillOf(d), ctx.theme);
+    }
 
     var leaves = root.leaves();
     var total = root.value || 1;
@@ -268,7 +295,7 @@
       .attr("width", function (d) { return d.x1 - d.x0; })
       .attr("height", function (d) { return d.y1 - d.y0; })
       .attr("rx", 2)
-      .attr("fill", fillOf);
+      .attr("fill", cellFill);
 
     /* Labels only where they honestly fit, 6px in from the corner: the
        name, and the value under it when there's room for a second line.
@@ -290,9 +317,12 @@
     }
     /* Label ink is chosen per cell: light text on dark fills, dark text
        on light fills, judged by the fill's actual luminance - a fixed
-       ink colour can't stay readable across eight hues. */
+       ink colour can't stay readable across eight hues. A textured cell
+       is mostly its lightened ground, so that is what gets judged. */
     function cellInk(d) {
-      var c = d3.color(fillOf(d)).rgb();
+      var base = texDefs ?
+        pv.textureGround(fillOf(d), ctx.theme) : fillOf(d);
+      var c = d3.color(base).rgb();
       var lin = [c.r, c.g, c.b].map(function (v) {
         v /= 255;
         return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);

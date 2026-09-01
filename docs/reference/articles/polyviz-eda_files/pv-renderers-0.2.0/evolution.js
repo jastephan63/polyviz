@@ -28,7 +28,8 @@
        narrow charts, so measure what it really used instead of assuming
        one line - otherwise the plot draws over the source credit. */
     if (opt(ctx.x.legend, seriesNames.length > 1)) {
-      var legendRow = pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
+      var legendRow = pv.buildLegend(ctx.header, seriesNames, color,
+        ctx.theme, pv.textureLegend(ctx, seriesNames, color));
       ctx.height = Math.max(120, ctx.height - legendRow.offsetHeight - 7);
     }
 
@@ -84,10 +85,13 @@
     var yTitle = offset === "stream" ? "" : (ctx.x.ylab || "");
     var m = { top: 12, right: 24,
               bottom: ctx.x.xlab ? 52 : 36,
-              left: offset === "stream" ? 24 : (yTitle ? 58 : 46) };
+              left: offset === "stream" ? 24 :
+                pv.leftMargin(ctx, yTitle ? 58 : 46) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures), one hatch per series slot. */
+    var tex = pv.textureFill(ctx, svg, seriesNames, color);
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
@@ -192,7 +196,7 @@
     var paths = layerHost.selectAll("path.layer").data(layers).enter()
       .append("path")
       .attr("class", "layer")
-      .attr("fill", function (l) { return color(l.key); })
+      .attr("fill", function (l) { return tex ? tex(l.key) : color(l.key); })
       .attr("fill-opacity", 0.85)
       .attr("stroke", ctx.theme.ink.surface)
       .attr("stroke-width", 1.5)

@@ -18,11 +18,43 @@ window.pv = (function () {
       .replace(/>/g, "&gt;");
   };
 
+  /* The active locale for the formatters below. pvchart.js sets it
+     before each render from the payload (pv_locale on the R side):
+     the built d3 locale instances plus the decimal mark, or null for
+     the stock US-style output. The derived tick formatters are cached
+     on the locale object itself, which pvchart.js keeps one of per
+     locale tag, so they are built once per locale, not per render. */
+  pv.locale = null;
+  pv.setLocale = function (locale) {
+    if (locale && !locale.tickBig) {
+      /* Grouped whole numbers with 3 significant digits for the
+         10k-to-1M tick range, and the compact form (locale decimal
+         mark included) for the millions. */
+      locale.tickBig = locale.number.format(",.3~r");
+      locale.tickCompact = locale.number.format(".3~s");
+    }
+    pv.locale = locale || null;
+  };
+
   /* Compact tick labels: 6M instead of 6,000,000; plain numbers below 10k.
      No thousands separator under 10k - otherwise years render as "2,020".
      Three significant digits ("23.3M", not "23.2787M") - charts round,
-     tooltips carry the precision. */
+     tooltips carry the precision.
+
+     An active locale keeps those rules but writes ticks the way Swiss
+     print does: 10'000 up to a million appears grouped in full with the
+     locale's own marks ("10'000", not "10k" - the grouping mark is what
+     makes the full form compact enough), the millions stay in the short
+     form so the fixed axis margins still fit them, and below 10k only
+     the decimal mark changes, so year axes keep reading "2020". */
   pv.fmtTick = function (v) {
+    var loc = pv.locale;
+    if (loc) {
+      if (Math.abs(v) >= 1e6) return loc.tickCompact(v);
+      if (Math.abs(v) >= 10000) return loc.tickBig(v);
+      var s = String(v);
+      return loc.decimal === "." ? s : s.replace(".", loc.decimal);
+    }
     return Math.abs(v) >= 10000 ? d3.format(".3~s")(v) : String(v);
   };
 
@@ -72,7 +104,10 @@ window.pv = (function () {
     return header;
   };
 
-  pv.buildLegend = function (header, names, colorOf, theme) {
+  /* `textureOf` is optional (pv_textures): a lookup handing back the CSS
+     hatch for a series, or nothing - then the swatch stays a solid, as
+     every legend was before textures existed. */
+  pv.buildLegend = function (header, names, colorOf, theme, textureOf) {
     var row = document.createElement("div");
     row.style.cssText =
       "display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:7px;";
@@ -84,6 +119,14 @@ window.pv = (function () {
       var sw = document.createElement("span");
       sw.style.cssText =
         "width:10px;height:10px;border-radius:3px;background:" + colorOf(nm) + ";";
+      var tex = textureOf && textureOf(nm);
+      if (tex) {
+        /* The swatch wears the same texture as the marks: the lightened
+           ground as its background colour, the hatch as a repeating
+           gradient on top of it. */
+        sw.style.background = tex.color;
+        sw.style.backgroundImage = tex.image;
+      }
       item.appendChild(sw);
       item.appendChild(document.createTextNode(nm));
       row.appendChild(item);
@@ -176,6 +219,15 @@ window.pv = (function () {
         .attr("fill", ctx.theme.ink.secondary).style("font-size", "12px")
         .text(ylab);
     }
+  };
+
+  /* The left margin that fits the y-axis ticks. The stock 58px column
+     carries compact ticks like "400k"; a locale that writes numbers out
+     in full ("400'000") needs a wider column so the rotated axis title
+     stays clear of the tick text. */
+  pv.leftMargin = function (ctx, base) {
+    base = base || 58;
+    return ctx.x && ctx.x.locale ? base + 18 : base;
   };
 
   /* Draws a bar as an SVG path where only the top two corners are rounded.
@@ -369,6 +421,14 @@ window.pv = (function () {
     return out;
   }
 
+  function ensureDefs(state) {
+    if (!state.defs) {
+      state.defs = svgNode("defs");
+      state.root.insertBefore(state.defs, state.root.firstChild);
+    }
+    return state.defs;
+  }
+
   /* Turn a computed linear-gradient background (the heatmap and map
      colour-scale bars) into an SVG <linearGradient> in the document's
      defs, and hand back a url(#...) fill for it. Every polyviz gradient
@@ -387,10 +447,7 @@ window.pv = (function () {
       if (sm) stops.push({ color: sm[1], offset: sm[2] + "%" });
     });
     if (stops.length < 2) return null;
-    if (!state.defs) {
-      state.defs = svgNode("defs");
-      state.root.insertBefore(state.defs, state.root.firstChild);
-    }
+    ensureDefs(state);
     var id = "pv-export-grad-" + (++state.gradients);
     var grad = svgNode("linearGradient");
     grad.setAttribute("id", id);
@@ -405,6 +462,65 @@ window.pv = (function () {
       grad.appendChild(stop);
     });
     state.defs.appendChild(grad);
+    return "url(#" + id + ")";
+  }
+
+  /* Rebuild a legend swatch's CSS hatch (the repeating-linear-gradient
+     pv.textureSwatchCss paints when textures are on) as an SVG pattern
+     in the export's defs, over the swatch's own background colour, and
+     hand back a url(#...) fill. The computed style arrives with the
+     angle in degrees and the stop offsets in px, which pin down the
+     stripe geometry exactly; a value shaped any other way returns null
+     and the swatch falls back to its solid ground. */
+  function hatchFill(state, backgroundImage, ground) {
+    var m = backgroundImage.match(/repeating-linear-gradient\((.*)\)/);
+    if (!m) return null;
+    var args = splitCssArgs(m[1]);
+    var am = args.length ? args[0].match(/^(-?[\d.]+)deg$/) : null;
+    if (!am) return null;
+    var stops = [];
+    for (var i = 1; i < args.length; i++) {
+      var sm = args[i].match(/^(.*?)\s+(-?[\d.]+)px$/);
+      if (!sm) return null;
+      stops.push({ color: sm[1].trim(), offset: parseFloat(sm[2]) });
+    }
+    if (stops.length < 2) return null;
+    /* The tile repeats every `period` px along the gradient axis; the
+       stripe is the run of the final (non-transparent) colour, from the
+       first stop that wears it to the period's end. */
+    var period = stops[stops.length - 1].offset;
+    var line = stops[stops.length - 1].color;
+    var start = period;
+    for (var j = 0; j < stops.length; j++) {
+      if (stops[j].color === line) { start = stops[j].offset; break; }
+    }
+    if (!(period > 0) || start <= 0 || start >= period) return null;
+    ensureDefs(state);
+    var id = "pv-export-tex-" + (++state.textures);
+    var pat = svgNode("pattern");
+    pat.setAttribute("id", id);
+    pat.setAttribute("patternUnits", "userSpaceOnUse");
+    pat.setAttribute("width", period);
+    pat.setAttribute("height", period);
+    /* A CSS gradient angle points along the gradient axis measured from
+       "up"; the SVG tile draws its stripe along y and offsets it along
+       x, so rotating by (angle - 90) puts the stripes on the same
+       diagonal the CSS renders. */
+    pat.setAttribute("patternTransform", "rotate(" + (am[1] - 90) + ")");
+    if (ground) {
+      var bg = svgNode("rect");
+      bg.setAttribute("width", period);
+      bg.setAttribute("height", period);
+      bg.setAttribute("fill", ground);
+      pat.appendChild(bg);
+    }
+    var stripe = svgNode("rect");
+    stripe.setAttribute("x", start);
+    stripe.setAttribute("width", period - start);
+    stripe.setAttribute("height", period);
+    stripe.setAttribute("fill", line);
+    pat.appendChild(stripe);
+    state.defs.appendChild(pat);
     return "url(#" + id + ")";
   }
 
@@ -509,7 +625,13 @@ window.pv = (function () {
     if (r.width > 0 && r.height > 0) {
       var fill = null;
       if (cs.backgroundImage && cs.backgroundImage.indexOf("gradient") >= 0) {
-        fill = gradientFill(state, cs.backgroundImage);
+        /* A repeating gradient is a textured legend swatch; letting the
+           plain-gradient path at it would flatten the hatch into one
+           horizontal fade, so it gets its own rebuilder (which falls
+           back to the solid ground below when it cannot parse). */
+        fill = cs.backgroundImage.indexOf("repeating-linear-gradient") >= 0 ?
+          hatchFill(state, cs.backgroundImage, realBg(cs.backgroundColor)) :
+          gradientFill(state, cs.backgroundImage);
       }
       if (!fill) fill = realBg(cs.backgroundColor);
       if (fill) {
@@ -560,7 +682,8 @@ window.pv = (function () {
       bg.setAttribute("height", h);
       bg.setAttribute("fill", surface);
       root.appendChild(bg);
-      var state = { root: root, base: base, defs: null, gradients: 0 };
+      var state = { root: root, base: base, defs: null, gradients: 0,
+        textures: 0 };
       for (var i = 0; i < el.childNodes.length; i++) {
         try { exportWalk(state, el.childNodes[i]); } catch (e) {}
       }
@@ -788,6 +911,118 @@ window.pv = (function () {
     }
     el.appendChild(box);
     return box;
+  };
+
+  /* ---------- texture patterns ----------
+     A second identity channel for filled marks (pv_textures on the R
+     side): hand-drawn-feel diagonal hatching in the slot's own colour
+     over a ground of that colour faded toward the surface. Colour still
+     reads at a glance on screen; the hatch angle and spacing survive
+     greyscale printing and colour-vision deficiency, where solid hues
+     collapse into each other. The SVG patterns are registered inside
+     each plot's own <defs>, so the standalone-svg exporter (which clones
+     the plot svg whole) carries them along for free. Legend swatches are
+     HTML spans, so they wear the matching CSS repeating-gradient
+     instead - and the exporter rebuilds that as an SVG pattern. */
+
+  /* A slot's texture is a pure function of its number, so a series
+     always wears the same hatch: neighbouring slots alternate between
+     the two diagonals - adjacent stacked segments never share an angle -
+     and each pair of slots opens the line spacing a step, so slots two
+     apart differ as well. */
+  function texAngle(slot) { return slot % 2 ? -45 : 45; }
+  function texSpacing(slot) { return 5.5 + 1.5 * Math.floor(slot / 2); }
+  var TEX_STROKE = 1.2;   /* hatch line weight, px */
+  var TEX_WAVE = 12;      /* wave period along the line, px */
+  var TEX_AMP = 0.7;      /* wave amplitude - the hand-drawn wobble */
+  var TEX_GROUND = 0.68;  /* how far the ground fades toward the surface */
+
+  /* The solid the hatching sits on. Fading the slot colour toward the
+     surface lightens it in light mode and darkens it in dark mode - the
+     right move in both - and keeps even marks too small to catch a hatch
+     line (thin stacked segments, slim donut slices) carrying colour. */
+  pv.textureGround = function (color, theme) {
+    return d3.interpolateRgb(color, theme.ink.surface)(TEX_GROUND);
+  };
+
+  /* Registers slot `slotIndex`'s hatch pattern in the given <defs>
+     selection - once; repeat calls reuse it - and returns the url(#...)
+     fill string for it. The tile is the ground plus one gently waving
+     line, drawn vertically and rotated onto the slot's diagonal. The
+     wave's two ends share a tangent, so the line stays smooth where
+     tiles join. Ids carry a random base per defs, so two charts on one
+     page can never capture each other's patterns. */
+  pv.texturePattern = function (defs, slotIndex, color, theme) {
+    var node = defs.node();
+    if (!node.__pvTexBase) {
+      node.__pvTexBase = "pv-tex-" + Math.floor(Math.random() * 1e9);
+    }
+    var id = node.__pvTexBase + "-" + slotIndex;
+    if (!node.querySelector("#" + id)) {
+      var s = texSpacing(slotIndex);
+      var p = defs.append("pattern")
+        .attr("id", id)
+        .attr("patternUnits", "userSpaceOnUse")
+        .attr("width", s).attr("height", TEX_WAVE)
+        .attr("patternTransform", "rotate(" + texAngle(slotIndex) + ")");
+      p.append("rect")
+        .attr("width", s).attr("height", TEX_WAVE)
+        .attr("fill", pv.textureGround(color, theme));
+      var x = s / 2;
+      p.append("path")
+        .attr("d", "M" + x + ",0" +
+          "C" + (x + TEX_AMP) + "," + (TEX_WAVE / 3) + " " +
+          (x - TEX_AMP) + "," + (2 * TEX_WAVE / 3) + " " +
+          x + "," + TEX_WAVE)
+        .attr("fill", "none")
+        .attr("stroke", color)
+        .attr("stroke-width", TEX_STROKE);
+    }
+    return "url(#" + id + ")";
+  };
+
+  /* The same texture as CSS, for the HTML legend swatches: the ground as
+     the background colour, the hatch as a repeating gradient over it. A
+     CSS gradient angle of svg+90 puts the stripes on the same diagonal
+     the rotated SVG tile draws; the stripes are straight, because at
+     swatch size the wave would not show anyway. */
+  pv.textureSwatchCss = function (slotIndex, color, theme) {
+    var s = texSpacing(slotIndex);
+    return {
+      color: pv.textureGround(color, theme),
+      image: "repeating-linear-gradient(" + (texAngle(slotIndex) + 90) +
+        "deg,transparent 0,transparent " + (s - TEX_STROKE) + "px," +
+        color + " " + (s - TEX_STROKE) + "px," + color + " " + s + "px)"
+    };
+  };
+
+  /* Renderer conveniences. With textures off - the default, and any
+     payload built before the flag existed - both return null, and the
+     renderer's fill logic stays exactly what it always was. With them
+     on, textureFill hands back a name-to-fill lookup of pattern urls
+     (building the plot's defs as it goes) and textureLegend the
+     matching swatch-css lookup for pv.buildLegend. Both take the colour
+     scale's FULL domain and recycle slots the way the scale recycles
+     hues, so texture and colour always travel together. */
+  pv.textureFill = function (ctx, svg, names, colorOf) {
+    if (ctx.x.textures !== true) return null;
+    var defs = svg.append("defs");
+    var map = {};
+    names.forEach(function (nm, i) {
+      map[nm] = pv.texturePattern(defs, i % ctx.theme.palette.length,
+        colorOf(nm), ctx.theme);
+    });
+    return function (nm) { return map[nm]; };
+  };
+
+  pv.textureLegend = function (ctx, names, colorOf) {
+    if (ctx.x.textures !== true) return null;
+    var map = {};
+    names.forEach(function (nm, i) {
+      map[nm] = pv.textureSwatchCss(i % ctx.theme.palette.length,
+        colorOf(nm), ctx.theme);
+    });
+    return function (nm) { return map[nm]; };
   };
 
   return pv;

@@ -16,7 +16,11 @@ pv_set_theme(
 \arguments{
 \item{colors}{Character vector of categorical colours for light mode,
 in the order series will receive them (slot order is part of the
-accessibility contract — see \code{\link[=pv_check_palette]{pv_check_palette()}}).}
+accessibility contract — see \code{\link[=pv_check_palette]{pv_check_palette()}}). Alternatively a
+complete theme object such as \code{\link[=pv_theme_paper]{pv_theme_paper()}}: then every other
+palette argument must stay \code{NULL}, and the object's tokens —
+including its diverging scale and ink chrome, which have no
+piecemeal arguments — are applied wholesale.}
 
 \item{colors_dark}{Categorical colours for dark mode, same length as
 \code{colors}. Omit to derive them from \code{colors} automatically.}

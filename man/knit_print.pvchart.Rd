@@ -43,5 +43,14 @@ is not installed — knitr then falls through to this method by itself.)
 
 The static path needs the chromote package and a Chrome-based browser,
 the same as \code{\link[=pv_save]{pv_save()}}.
+
+The chart's alt text (generated at build time, or set with
+\code{\link[=pv_alt]{pv_alt()}}) rides along as the figure's \code{fig.alt}, so a pandoc-driven
+knit to markdown, GitHub-flavoured markdown, or epub keeps an
+accessible description of the chart on the image. \code{fig.alt} or
+\code{fig.cap} chunk options set by the author always win — the figure
+then goes through knitr's stock handling. Word, PDF, and the other
+pandoc office formats keep their usual figure markup untouched, as
+knitr itself declares \code{fig.alt} unsupported there.
 }
 \keyword{internal}

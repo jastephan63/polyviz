@@ -66,14 +66,23 @@
       .domain(grouped ? seriesNames : ["value"])
       .range(ctx.theme.palette);
     if (grouped) {
-      pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
+      pv.buildLegend(ctx.header, seriesNames, color, ctx.theme,
+        pv.textureLegend(ctx, seriesNames, color));
       ctx.height = Math.max(120, ctx.height - 26);
     }
 
-    var m = { top: 12, right: 14, bottom: 52, left: 58 };
+    var m = { top: 12, right: 14, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures): hatch patterns in the plot's own
+       defs replace the solid fills; tooltips keep the solid swatch. */
+    var tex = pv.textureFill(ctx, svg,
+      grouped ? seriesNames : ["value"], color);
+    function fillOf(d) {
+      var nm = grouped ? d.series : "value";
+      return tex ? tex(nm) : color(nm);
+    }
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
@@ -108,7 +117,7 @@
        small stagger from left to right so the chart builds across. */
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
-      .attr("fill", function (d) { return color(grouped ? d.series : "value"); })
+      .attr("fill", fillOf)
       .attr("opacity", baseOp)
       .attr("d", function (d) {
         var bx = grouped ? x0(d.x) + x1(d.series) : x0(d.x);
@@ -216,6 +225,10 @@
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
+    /* Texture fill (pv_textures): the single series is slot 0. */
+    var tex = pv.textureFill(ctx, svg, ["value"],
+      function () { return ctx.theme.palette[0]; });
+    var barFill = tex ? tex("value") : ctx.theme.palette[0];
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
@@ -242,7 +255,7 @@
        vocabulary would land on the wrong axis and mislead. */
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
-      .attr("fill", ctx.theme.palette[0])
+      .attr("fill", barFill)
       .attr("opacity", baseOp)
       .attr("d", function (d) {
         return pv.rightRoundedBar(0, yBand(d.x), 0, yBand.bandwidth(), 4);
@@ -357,7 +370,8 @@
     var seriesNames = pv.uniq(data.map(function (d) { return d.series; }));
     var color = d3.scaleOrdinal().domain(seriesNames)
       .range(ctx.theme.palette);
-    pv.buildLegend(ctx.header, seriesNames, color, ctx.theme);
+    pv.buildLegend(ctx.header, seriesNames, color, ctx.theme,
+      pv.textureLegend(ctx, seriesNames, color));
     ctx.height = Math.max(120, ctx.height - 26);
 
     /* Linked selection (pv_link) works exactly as on grouped bars: tag
@@ -393,10 +407,13 @@
     var data = s.data, cats = s.cats, color = s.color, percent = s.percent;
     function baseOp(d) { return s.keys ? pv.keyOpacity(ctx, d.key, 1) : 1; }
 
-    var m = { top: 12, right: 14, bottom: 52, left: 58 };
+    var m = { top: 12, right: 14, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures), one hatch per series slot. */
+    var tex = pv.textureFill(ctx, svg, color.domain(), color);
+    function fillOf(d) { return tex ? tex(d.series) : color(d.series); }
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
@@ -436,7 +453,7 @@
 
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
-      .attr("fill", function (d) { return color(d.series); })
+      .attr("fill", fillOf)
       .attr("opacity", baseOp)
       .attr("d", function (d) {
         return pv.topRoundedBar(x0(d.x), ih, x0.bandwidth(), 0, geom(d).r);
@@ -465,6 +482,12 @@
       cats.length <= 12 && x0.bandwidth() >= 34);
     if (showVals) {
       var inkFor = stackInkPicker(ctx);
+      /* On a textured segment the text mostly sits on the lightened
+         ground, so that is the colour the ink contrast is judged on. */
+      var segInk = function (d) {
+        return inkFor(tex ?
+          pv.textureGround(color(d.series), ctx.theme) : color(d.series));
+      };
       var labelled = data.filter(function (d) {
         return geom(d).h >= 15 &&
           pv.textWidth(segText(percent, d), 11) <= x0.bandwidth() - 6;
@@ -478,7 +501,7 @@
         })
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
-        .attr("fill", function (d) { return inkFor(color(d.series)); })
+        .attr("fill", segInk)
         .style("font-size", "11px")
         .style("font-variant-numeric", "tabular-nums")
         .style("pointer-events", "none")
@@ -550,6 +573,9 @@
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures), one hatch per series slot. */
+    var tex = pv.textureFill(ctx, svg, color.domain(), color);
+    function fillOf(d) { return tex ? tex(d.series) : color(d.series); }
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
@@ -587,7 +613,7 @@
 
     var bars = g.selectAll("path.bar").data(data).enter().append("path")
       .attr("class", "bar")
-      .attr("fill", function (d) { return color(d.series); })
+      .attr("fill", fillOf)
       .attr("opacity", baseOp)
       .attr("d", function (d) {
         return pv.rightRoundedBar(0, yBand(d.x), 0, yBand.bandwidth(),
@@ -611,6 +637,12 @@
        on every horizontal bar - only an explicit FALSE turns them off. */
     if (opt(ctx.x.valueLabels, true)) {
       var inkFor = stackInkPicker(ctx);
+      /* On a textured segment the text mostly sits on the lightened
+         ground, so that is the colour the ink contrast is judged on. */
+      var segInk = function (d) {
+        return inkFor(tex ?
+          pv.textureGround(color(d.series), ctx.theme) : color(d.series));
+      };
       var labelled = data.filter(function (d) {
         return yBand.bandwidth() >= 12 &&
           pv.textWidth(segText(percent, d), 11) <= geom(d).w - 8;
@@ -626,7 +658,7 @@
         })
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
-        .attr("fill", function (d) { return inkFor(color(d.series)); })
+        .attr("fill", segInk)
         .style("font-size", "11px")
         .style("font-variant-numeric", "tabular-nums")
         .style("pointer-events", "none")
@@ -730,7 +762,7 @@
     }
 
     var directLabels = seriesNames.length > 1 && seriesNames.length <= 4;
-    var m = { top: 12, right: directLabels ? 90 : 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: directLabels ? 90 : 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -1121,7 +1153,7 @@
       return keys ? pv.keyOpacity(ctx, d.key, baseOpacity) : baseOpacity;
     }
 
-    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);

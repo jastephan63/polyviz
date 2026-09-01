@@ -1,3 +1,46 @@
+# polyviz 0.8.0
+
+The publication release: everything between a finished chart and a
+finished page.
+
+## Print
+
+* `pv_theme_paper(serif = FALSE)` — a built-in theme for the printed
+  page: white surface, near-black inks, and a categorical palette
+  ordered on an even lightness ladder so series stay tellable apart
+  even printed in greyscale. `serif = TRUE` sets figures in serif for
+  journals that want it. Apply with `pv_set_theme(pv_theme_paper())`.
+* `pv_textures(w)` — hand-drawn-feel diagonal hatching over the fills
+  of bar, area, donut, and treemap charts, alternating angle by
+  series: identity that survives greyscale printing and colour-vision
+  deficiency alike. Carried faithfully into SVG exports and legend
+  swatches.
+
+## Present
+
+* `pv_deck(charts, "talk.pptx")` — a list of charts becomes a
+  PowerPoint deck, one print-resolution chart per 16:9 slide (4:3
+  available), with an optional title slide and each chart's title and
+  source in the speaker notes.
+* `pv_save(w, "race.gif")` — the animated bar-chart race exports as a
+  looping GIF, captured frame-exact rather than by stopwatch, with
+  the final standings held before the loop.
+
+## Language
+
+* `pv_locale("de-CH")` (also `"fr-CH"`, `"it-CH"`, `"en-CH"`) —
+  Swiss number formatting (1'000) and month names in the language,
+  applied to every chart built while set. Axis margins widen
+  automatically for the longer tick labels.
+
+## Accessibility
+
+* Every chart now describes itself: an honest, generated alt text
+  (chart type, what is measured, how many things, the extremes)
+  travels with the widget as its screen-reader label and lands on the
+  figure when knitting. `pv_alt_text(w)` returns it; `pv_alt(w, "…")`
+  replaces it with your own words.
+
 # polyviz 0.7.0
 
 Swiss open data, live from R — and maps of the whole country.

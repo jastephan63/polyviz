@@ -260,6 +260,23 @@
       });
     }
 
+    /* pv_save()'s GIF export captures the race one exact frame at a
+       time through this hook, rather than screenshotting the live timer
+       run: the timer's clock (Chrome's virtual time included) only
+       advances when the compositor happens to produce a frame, so
+       wall-clock captures tie every frame to scheduler luck. draw() is
+       a pure function of the timeline position, so seeking is exact and
+       repeatable. Seeking stops any running timer and hides the replay
+       control - a button nothing can press has no place inside a GIF.
+       Returns the keyframe count so the caller can check its schedule
+       against what the page actually holds. */
+    ctx.el.__pvRaceSeek = function (s) {
+      if (timer) { timer.stop(); timer = null; }
+      hideReplay();
+      draw(Math.max(0, Math.min(K - 1, +s || 0)));
+      return K;
+    };
+
     /* Hovering a bar dims the others and reads out the exact value at
        the moment shown. Hovering never pauses the race - the tooltip
        refreshes on every pointer move instead. */

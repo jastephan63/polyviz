@@ -67,6 +67,15 @@ knit_fig_size <- function(options) {
 #' The static path needs the chromote package and a Chrome-based browser,
 #' the same as [pv_save()].
 #'
+#' The chart's alt text (generated at build time, or set with
+#' [pv_alt()]) rides along as the figure's `fig.alt`, so a pandoc-driven
+#' knit to markdown, GitHub-flavoured markdown, or epub keeps an
+#' accessible description of the chart on the image. `fig.alt` or
+#' `fig.cap` chunk options set by the author always win — the figure
+#' then goes through knitr's stock handling. Word, PDF, and the other
+#' pandoc office formats keep their usual figure markup untouched, as
+#' knitr itself declares `fig.alt` unsupported there.
+#'
 #' @param x A polyviz chart.
 #' @param ... Passed on to the next method.
 #' @param options The knitr chunk options.
@@ -91,5 +100,30 @@ knit_print.pvchart <- function(x, ..., options = NULL) {
   mode <- if (identical(x$x$mode, "dark")) "dark" else "light"
   pv_save(x, path, width = fig$width, height = fig$height,
           scale = fig$scale, mode = mode, quiet = TRUE)
-  knitr::include_graphics(path)
+  img <- knitr::include_graphics(path)
+  # The chart's alt text goes out through knitr's own fig.alt mechanism,
+  # but only where that mechanism is clean. A pandoc-driven knit to a
+  # markdown-family or HTML-carrying output (gfm, epub, plain markdown)
+  # renders it as the image's alt attribute. Everything else keeps the
+  # untouched include_graphics() path: for Word and the other office
+  # formats knitr declares fig.alt unsupported and would warn on every
+  # chunk; for LaTeX a set fig.alt reroutes the figure through a
+  # different hook; without pandoc (or with a fig.cap) knitr auto-writes
+  # a caption, and its htmlwidget handling would then wrap the figure
+  # twice. An author's own fig.alt chunk option also takes the untouched
+  # path: knitr applies it there by itself.
+  alt <- x$x$alt
+  to <- knitr::pandoc_to()
+  clean <- !is.null(to) &&
+    !to %in% c("docx", "pptx", "rtf", "odt", "latex", "beamer", "context")
+  if (clean && is.null(options$fig.alt) && is.null(options$fig.cap) &&
+      alt_str(alt) && !is.null(options$fig.show) &&
+      "sew" %in% getNamespaceExports("knitr")) {
+    options$fig.alt <- alt
+    # Sewing here, with the amended options, is exactly what knitr would
+    # do with this object one step later - just with fig.alt filled in.
+    return(knitr::asis_output(paste(knitr::sew(img, options),
+                                    collapse = "")))
+  }
+  img
 }

@@ -423,7 +423,11 @@ check_color_vector <- function(value, name, min_len = 1) {
 #'
 #' @param colors Character vector of categorical colours for light mode,
 #'   in the order series will receive them (slot order is part of the
-#'   accessibility contract — see [pv_check_palette()]).
+#'   accessibility contract — see [pv_check_palette()]). Alternatively a
+#'   complete theme object such as [pv_theme_paper()]: then every other
+#'   palette argument must stay `NULL`, and the object's tokens —
+#'   including its diverging scale and ink chrome, which have no
+#'   piecemeal arguments — are applied wholesale.
 #' @param colors_dark Categorical colours for dark mode, same length as
 #'   `colors`. Omit to derive them from `colors` automatically.
 #' @param sequential Light-mode sequential ramp (low to high, at least 3
@@ -447,6 +451,32 @@ check_color_vector <- function(value, name, min_len = 1) {
 pv_set_theme <- function(colors = NULL, colors_dark = NULL,
                          sequential = NULL, sequential_dark = NULL,
                          font = NULL, check = TRUE) {
+  # A complete theme object (class "pv_theme", e.g. pv_theme_paper())
+  # carries every token at once. Unpack it into the piecemeal arguments
+  # so it goes through exactly the same validation below; the pieces
+  # with no argument of their own (diverging, ink) are held aside and
+  # overlaid after the standard ones.
+  bundle <- NULL
+  if (inherits(colors, "pv_theme")) {
+    if (!is.null(colors_dark) || !is.null(sequential) ||
+        !is.null(sequential_dark) || !is.null(font)) {
+      rlang::abort(paste(
+        "When `colors` is a complete theme object, leave the other",
+        "palette arguments NULL - the object already carries its own",
+        "tokens."))
+    }
+    bundle <- colors
+    colors <- bundle$categorical$light
+    colors_dark <- bundle$categorical$dark
+    sequential <- bundle$sequential$light
+    sequential_dark <- bundle$sequential$dark
+    font <- bundle$font
+    # Fail before anything is applied if the bundled diverging poles or
+    # ink chrome hold something col2rgb cannot parse.
+    for (extra in list(bundle$diverging, bundle$ink)) {
+      if (!is.null(extra)) hex_to_srgb(unlist(extra))
+    }
+  }
   check_color_vector(colors, "colors")
   check_color_vector(colors_dark, "colors_dark")
   check_color_vector(sequential, "sequential", min_len = 3)
@@ -473,10 +503,15 @@ pv_set_theme <- function(colors = NULL, colors_dark = NULL,
   }
   if (!is.null(sequential)) tokens$sequential$light <- sequential
   if (!is.null(sequential_dark)) tokens$sequential$dark <- sequential_dark
+  if (!is.null(bundle$diverging)) tokens$diverging <- bundle$diverging
+  if (!is.null(bundle$ink)) tokens$ink <- bundle$ink
 
   if (isTRUE(check)) {
     for (m in c("light", "dark")) {
-      chk <- pv_check_palette(tokens$categorical[[m]], mode = m)
+      # Contrast is judged against the surface the charts will actually
+      # use - the theme's own when it swaps the ink chrome.
+      chk <- pv_check_palette(tokens$categorical[[m]], mode = m,
+                              surface = tokens$ink[[m]]$surface)
       if (!chk$ok) {
         print(chk)
         rlang::abort(sprintf(paste(

@@ -190,3 +190,73 @@ test_that("pv_set_theme validates its arguments", {
   expect_error(pv_set_theme(colors = brand, font = c("a", "b")),
                "font-family")
 })
+
+test_that("the paper theme passes the validator in both modes", {
+  th <- pv_theme_paper()
+  chk <- pv_check_palette(th$categorical$light, mode = "light",
+                          surface = th$ink$light$surface)
+  expect_true(chk$ok)
+  # a clean pass, not the 6-8 warning band - no secondary encoding owed
+  expect_equal(chk$checks$cvd$status, "pass")
+  darks <- derive_dark_palette(th$categorical$light)
+  chk_dark <- pv_check_palette(darks, mode = "dark",
+                               surface = th$ink$dark$surface)
+  expect_true(chk_dark$ok)
+  expect_equal(chk_dark$checks$cvd$status, "pass")
+})
+
+test_that("the paper palette climbs a monotone greyscale ladder", {
+  # CIE L* from relative luminance - the lightness greyscale printing
+  # keeps when it throws the hue away.
+  Y <- relative_luminance(pv_theme_paper()$categorical$light)
+  Lstar <- ifelse(Y > (6 / 29)^3, 116 * Y^(1 / 3) - 16, Y * (29 / 3)^3)
+  gaps <- diff(Lstar)
+  expect_true(all(gaps > 0))
+  # ~10 L* per step: the widest even ladder that fits the validator's
+  # lightness band. If a palette tweak narrows a step, greyscale print
+  # is what breaks first.
+  expect_true(all(gaps >= 9.5))
+  expect_lt(Lstar[1], 34)
+  expect_gt(Lstar[5], 72)
+})
+
+test_that("serif = TRUE swaps the paper theme's font stack", {
+  expect_match(pv_theme_paper()$font, "Inter", fixed = TRUE)
+  serif <- pv_theme_paper(serif = TRUE)$font
+  expect_match(serif, "Source Serif 4", fixed = TRUE)
+  expect_match(serif, "serif$")
+  expect_error(pv_theme_paper(serif = NA), "TRUE or FALSE")
+  expect_error(pv_theme_paper(serif = "yes"), "TRUE or FALSE")
+})
+
+test_that("pv_set_theme applies a complete theme object wholesale", {
+  on.exit(pv_reset_theme())
+  th <- pv_theme_paper()
+  expect_no_warning(pv_set_theme(th))
+  agg <- aggregate(revenue ~ region, pv_sales, sum)
+  w <- pv_bar(agg, "region", "revenue")
+  expect_equal(w$x$theme$categorical$light, th$categorical$light)
+  expect_equal(w$x$theme$sequential, th$sequential)
+  expect_equal(w$x$theme$diverging, th$diverging)
+  expect_equal(w$x$theme$ink, th$ink)
+  expect_equal(w$x$theme$ink$light$surface, "#ffffff")
+  expect_equal(w$x$theme$font, pv_font_stack())
+  # the dark twins are derived, one per slot, and are real hex
+  expect_length(w$x$theme$categorical$dark, length(th$categorical$light))
+  expect_true(all(grepl("^#[0-9a-f]{6}$", w$x$theme$categorical$dark)))
+  # and pv_reset_theme() puts every packaged token back
+  pv_reset_theme()
+  w2 <- pv_bar(agg, "region", "revenue")
+  expect_equal(w2$x$theme$categorical, pv_colors$categorical)
+  expect_equal(w2$x$theme$sequential, pv_colors$sequential)
+  expect_equal(w2$x$theme$diverging, pv_colors$diverging)
+  expect_equal(w2$x$theme$ink, pv_colors$ink)
+  expect_equal(w2$x$theme$font, pv_font_stack())
+})
+
+test_that("a theme object refuses piecemeal companions", {
+  expect_error(pv_set_theme(pv_theme_paper(), font = "Georgia, serif"),
+               "leave the other")
+  expect_error(pv_set_theme(pv_theme_paper(), sequential = rep("#000", 3)),
+               "leave the other")
+})

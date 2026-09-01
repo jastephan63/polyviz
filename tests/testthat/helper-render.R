@@ -178,6 +178,30 @@ render_variants <- list(
     pv_bar(mix, x = "region", y = "revenue", series = "product",
            stack = "percent", title = "Product mix by region")
   },
+  # The full print-ready pairing in one build: the paper theme's tokens
+  # in the payload and the texture patterns drawn over every segment.
+  # The theme is session state, so it is set for this one build and put
+  # back before the builder returns - same discipline as the theme tests.
+  bar_textured = function() {
+    pv_set_theme(pv_theme_paper())
+    on.exit(pv_reset_theme())
+    mix <- aggregate(revenue ~ region + product, pv_sales, sum)
+    pv_bar(mix, x = "region", y = "revenue", series = "product",
+           stack = "stack", title = "Revenue by region and product") |>
+      pv_textures()
+  },
+  # The de-CH locale exercises the JavaScript d3.formatLocale path: axis
+  # ticks of 10'000 and up print apostrophe-grouped. Locale state is
+  # session-wide like the theme, so the same set/reset discipline.
+  bar_locale = function() {
+    pv_locale("de-CH")
+    on.exit(pv_locale(NULL))
+    staedte <- c("Z\u00fcrich", "Gen\u00e8ve", "Basel", "Lausanne")
+    pop <- pv_city_population[pv_city_population$year == 2024 &
+                                pv_city_population$city %in% staedte, ]
+    pv_bar(pop, x = "city", y = "population",
+           title = "Bev\u00f6lkerung der gr\u00f6ssten St\u00e4dte")
+  },
   violin_overlays = function() {
     pv_violin(pv_fiscal, value = "resource_per_capita", group = "year",
               box = TRUE, points = TRUE,

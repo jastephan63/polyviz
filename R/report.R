@@ -113,8 +113,9 @@ report_section <- function(id, heading, context, ...) {
 #' two per row), a horizontal [pv_bar()] of the most common levels of each
 #' categorical column with at most 30 distinct values (first 4), and —
 #' when the frame has three or more usable numeric columns — a
-#' [pv_heatmap()] of their pairwise Pearson correlations on the diverging
-#' palette centred at zero. Sections with nothing to show are skipped.
+#' [pv_heatmap()] of their pairwise correlations (Pearson by default; see
+#' `method`) on the diverging palette centred at zero. Sections with
+#' nothing to show are skipped.
 #'
 #' @param data A data frame.
 #' @param file Path of the HTML file to write. The widget assets (d3, the
@@ -125,13 +126,18 @@ report_section <- function(id, heading, context, ...) {
 #' @param mode `"auto"` (default: the page and every widget follow the
 #'   viewer's light/dark setting), `"light"`, or `"dark"`.
 #' @param open Also open the finished report in the default browser?
+#' @param method Correlation coefficient for the relationships heatmap,
+#'   as in [stats::cor()]: `"pearson"` (default), `"spearman"`, or
+#'   `"kendall"`. The section's context line names the chosen method,
+#'   and the rank-based methods are also named on the heatmap itself.
 #' @return The `file` path, invisibly.
 #' @examples
 #' report <- file.path(tempdir(), "sales-report.html")
 #' pv_report(pv_sales, report, title = "Simulated monthly sales")
 #' @export
 pv_report <- function(data, file, title = deparse(substitute(data)),
-                      mode = "auto", open = FALSE) {
+                      mode = "auto", open = FALSE,
+                      method = c("pearson", "spearman", "kendall")) {
   # deparse() can split a long expression over lines; fold it back.
   title <- paste(as.character(title), collapse = " ")
   if (!is.data.frame(data)) {
@@ -145,6 +151,7 @@ pv_report <- function(data, file, title = deparse(substitute(data)),
       !mode %in% c("auto", "light", "dark")) {
     rlang::abort('`mode` must be "auto", "light", or "dark".')
   }
+  method <- match.arg(method)
   tg <- htmltools::tags
   s <- pv_summary(data)
 
@@ -246,23 +253,33 @@ pv_report <- function(data, file, title = deparse(substitute(data)),
     isTRUE(stats::sd(data[[nm]], na.rm = TRUE) > 0)
   }, logical(1))]
   if (length(cor_cols) >= 3) {
-    m <- stats::cor(data[cor_cols], use = "pairwise.complete.obs")
+    m <- stats::cor(data[cor_cols], use = "pairwise.complete.obs",
+                    method = method)
     # Long form for the heatmap: one row per cell, column-major, so both
     # axes keep the columns in data-frame order.
     long <- data.frame(x = colnames(m)[col(m)],
                        y = rownames(m)[row(m)],
                        r = as.numeric(m))
     long <- long[!is.na(long$r), ]
+    # The context sentence always names the coefficient; the chart gets
+    # its own subtitle only for the rank-based methods, since a Pearson
+    # heatmap labelled "Pearson" would just restate the default everyone
+    # assumes. (switch() returns NULL for "pearson".)
+    heat_sub <- switch(method,
+                       spearman = "Spearman rank correlation",
+                       kendall = "Kendall rank correlation")
     heat <- report_size(
       pv_heatmap(long, x = "x", y = "y", value = "r",
-                 palette = "diverging", mode = mode),
+                 palette = "diverging", subtitle = heat_sub, mode = mode),
       min(560, max(280, 110 + 34 * length(cor_cols))))
+    method_label <- switch(method, pearson = "Pearson",
+                           spearman = "Spearman", kendall = "Kendall")
     sections[[length(sections) + 1]] <- report_section(
       "relationships", "Relationships",
       sprintf(paste(
-        "Pairwise Pearson correlations across the %d numeric columns:",
+        "Pairwise %s correlations across the %d numeric columns:",
         "blue is negative, red is positive, and the pale midpoint is no",
-        "correlation."), length(cor_cols)),
+        "correlation."), method_label, length(cor_cols)),
       heat)
   }
 

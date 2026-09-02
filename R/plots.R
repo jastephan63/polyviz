@@ -33,21 +33,31 @@ pv_plot_missing <- function(data, mode = "light") {
 
 #' Correlation heatmap
 #'
-#' Pairwise Pearson correlations of the numeric columns, on a diverging
-#' blue–red scale with a neutral midpoint at zero.
+#' Pairwise correlations of the numeric columns, on a diverging blue–red
+#' scale with a neutral midpoint at zero. Pearson by default; the
+#' rank-based alternatives are available through `method` and are named
+#' in the plot's subtitle.
 #'
 #' @param data A data frame (only numeric columns are used).
 #' @param mode `"light"` or `"dark"`.
+#' @param method Correlation coefficient, as in [stats::cor()]:
+#'   `"pearson"` (default), `"spearman"`, or `"kendall"`. The default
+#'   Pearson plot keeps its usual look; the rank-based methods add a
+#'   subtitle naming the method, so the plot says which coefficient the
+#'   cells hold.
 #' @return A ggplot object.
 #' @examples
 #' pv_plot_corr(mtcars)
+#' pv_plot_corr(mtcars, method = "spearman")
 #' @export
-pv_plot_corr <- function(data, mode = "light") {
+pv_plot_corr <- function(data, mode = "light",
+                         method = c("pearson", "spearman", "kendall")) {
+  method <- match.arg(method)
   num <- data[vapply(data, is.numeric, logical(1))]
   if (ncol(num) < 2) {
     rlang::abort("Need at least two numeric columns for a correlation plot.")
   }
-  cm <- stats::cor(num, use = "pairwise.complete.obs")
+  cm <- stats::cor(num, use = "pairwise.complete.obs", method = method)
   # ggplot wants one row per cell, so unroll the matrix into long form.
   # Reversing the y side puts the diagonal top-left to bottom-right, the
   # way people expect to read a correlation matrix.
@@ -58,7 +68,15 @@ pv_plot_corr <- function(data, mode = "light") {
   div <- pv_colors$diverging[[mode]]
   midpoint <- div$mid
 
-  ggplot2::ggplot(df, ggplot2::aes(.data$x, .data$y, fill = .data$r)) +
+  # Pearson is the coefficient every correlation matrix is assumed to
+  # show, so the default plot carries no extra label; the rank-based
+  # methods announce themselves in a subtitle so nobody mistakes a rho
+  # or tau for a plain r. (switch() returns NULL for "pearson".)
+  subtitle <- switch(method,
+                     spearman = "Spearman rank correlation",
+                     kendall = "Kendall rank correlation")
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(.data$x, .data$y, fill = .data$r)) +
     ggplot2::geom_tile(colour = ink$surface, linewidth = 1.5) +
     ggplot2::geom_text(
       ggplot2::aes(label = sprintf("%.2f", .data$r)),
@@ -72,4 +90,8 @@ pv_plot_corr <- function(data, mode = "light") {
     ggplot2::theme(panel.grid.major = ggplot2::element_blank(),
                    axis.line.x = ggplot2::element_blank(),
                    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  if (!is.null(subtitle)) {
+    p <- p + ggplot2::labs(subtitle = subtitle)
+  }
+  p
 }

@@ -111,4 +111,40 @@ test_that("bad inputs fail with clear messages", {
   expect_error(pv_report(mtcars, NA_character_), "single file path")
   expect_error(pv_report(mtcars, character(0)), "single file path")
   expect_error(pv_report(mtcars, tempfile(), mode = "sepia"), "mode")
+  expect_error(pv_report(mtcars, tempfile(), method = "cosine"), "pearson")
+})
+
+test_that("the default report still reads as Pearson", {
+  r <- build_report(mtcars)
+  expect_match(r$html, "Pairwise Pearson correlations", fixed = TRUE)
+  expect_false(grepl("Spearman", r$html, fixed = TRUE))
+  expect_false(grepl("Kendall", r$html, fixed = TRUE))
+})
+
+test_that("the correlation method reaches the heatmap and its labels", {
+  # v = 10^u is monotone, so its rank correlation with u is exactly 1
+  # while the Pearson r is only about 0.53 - if the wrong method leaked
+  # through, the payload number below could not match
+  fix <- data.frame(u = 1:12, v = 10^(1:12),
+                    w = c(6, 1, 8, 3, 10, 5, 12, 7, 2, 9, 4, 11))
+  r <- build_report(fix, method = "spearman")
+  expect_match(r$html, "Pairwise Spearman correlations", fixed = TRUE)
+  expect_match(r$html, "Spearman rank correlation", fixed = TRUE)
+  # pull the u-v cell out of the serialised heatmap payload
+  cell <- regmatches(r$html,
+                     regexpr('"x":"u","y":"v","value":[-+0-9.e]+', r$html))
+  expect_length(cell, 1)
+  got <- as.numeric(sub('.*"value":', "", cell))
+  expect_equal(got, stats::cor(fix$u, fix$v, method = "spearman"),
+               tolerance = 1e-6)
+  expect_gt(abs(got - stats::cor(fix$u, fix$v)), 0.4)
+
+  k <- build_report(fix, method = "kendall")
+  expect_match(k$html, "Pairwise Kendall correlations", fixed = TRUE)
+  expect_match(k$html, "Kendall rank correlation", fixed = TRUE)
+  cell <- regmatches(k$html,
+                     regexpr('"x":"u","y":"w","value":[-+0-9.e]+', k$html))
+  got <- as.numeric(sub('.*"value":', "", cell))
+  expect_equal(got, stats::cor(fix$u, fix$w, method = "kendall"),
+               tolerance = 1e-6)
 })

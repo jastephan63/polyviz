@@ -125,6 +125,28 @@ drop_missing <- function(df, bad, col) {
   df
 }
 
+# How many series the active theme can colour: the length of its
+# categorical palette - 8 in the packaged theme, but a theme set with
+# pv_set_theme() may bring fewer (pv_theme_paper() has 5). Colours are
+# assigned in slot order and never recycled, so charts that colour by
+# series cap their level count here rather than at a hardcoded 8.
+theme_palette_slots <- function() {
+  length((the$theme %||% pv_colors)$categorical$light)
+}
+
+# Refuses more groups than the active theme's palette holds. Recycling
+# would silently draw two groups in the same hue, so more groups than
+# slots is a data problem, not a colour problem.
+check_theme_palette_fit <- function(groups, col) {
+  slots <- theme_palette_slots()
+  if (length(groups) > slots) {
+    rlang::abort(sprintf(
+      paste("`%s` has %d levels but the active theme's palette has %d",
+            "colours. Fold the rare levels into an \"Other\" group first."),
+      col, length(groups), slots))
+  }
+}
+
 chart_opts <- function(title, subtitle, mode, duration, source = NULL) {
   if (!is.character(mode) || length(mode) != 1 || is.na(mode) ||
       !mode %in% c("auto", "light", "dark")) {
@@ -343,8 +365,8 @@ pv_bar <- function(data, x, y, series = NULL,
 #'   horizontal pixels between neighbouring dots. Each dot takes its
 #'   line's colour with the usual 2px surface ring, and the crosshair
 #'   tooltip works exactly as before. Spaghetti charts (more series than
-#'   the palette's 8 hues) never draw them — their lines share one muted
-#'   ink, so per-point dots would only add noise.
+#'   the active theme's palette has hues) never draw them — their lines
+#'   share one muted ink, so per-point dots would only add noise.
 #' @param curve How the line travels between observations. `"linear"`
 #'   (default) connects them with straight segments; `"monotone"` draws
 #'   a smoothed curve that still passes through every point without

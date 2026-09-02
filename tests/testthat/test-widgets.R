@@ -280,3 +280,22 @@ test_that("sunburst builds a nested hierarchy", {
   }, numeric(1)))
   expect_equal(total, sum(pv_sales$revenue))
 })
+
+test_that("the series cap reads the active theme's palette", {
+  on.exit(pv_reset_theme())
+  # The packaged theme fills all 8 slots, so nothing changes by default.
+  expect_equal(theme_palette_slots(), 8)
+  expect_silent(check_theme_palette_fit(letters[1:8], "grp"))
+  expect_error(check_theme_palette_fit(letters[1:9], "grp"),
+               "9 levels but the active theme's palette has 8 colours")
+  # A smaller theme lowers the cap - the paper theme brings 5 slots.
+  pv_set_theme(pv_theme_paper())
+  expect_equal(theme_palette_slots(), 5)
+  expect_error(check_theme_palette_fit(letters[1:6], "grp"),
+               "6 levels but the active theme's palette has 5 colours")
+  expect_silent(check_theme_palette_fit(letters[1:5], "grp"))
+  # Resetting the theme restores the packaged 8.
+  pv_reset_theme()
+  expect_equal(theme_palette_slots(), 8)
+  expect_silent(check_theme_palette_fit(letters[1:8], "grp"))
+})

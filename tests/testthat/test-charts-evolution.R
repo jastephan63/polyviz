@@ -32,9 +32,30 @@ test_that("area refuses duplicate series/x rows", {
   expect_error(pv_area(dup, "t", "v"), "aggregate")
 })
 
-test_that("area caps series at the 8 palette slots", {
+test_that("area caps series at the active theme's palette", {
+  # Under the packaged theme nothing changes: the cap is 8, and the
+  # message says which theme set it.
   expect_error(pv_area(pv_city_population, "year", "population",
                        series = "city"), "Other")
+  expect_error(pv_area(pv_city_population, "year", "population",
+                       series = "city"),
+               "active theme's palette has 8 slots")
+  # A smaller theme lowers the cap: the paper theme's 5 slots refuse a
+  # sixth band instead of silently recycling a colour.
+  on.exit(pv_reset_theme())
+  six <- subset(pv_city_population,
+                city %in% c("Luzern", "Emmen", "Kriens", "Horw", "Ebikon",
+                            "Zug"))
+  five <- subset(six, city != "Zug")
+  pv_set_theme(pv_theme_paper())
+  expect_error(pv_area(six, "year", "population", series = "city"),
+               "6 levels but the active theme's palette has 5 slots")
+  expect_pvchart(pv_area(five, "year", "population", series = "city"),
+                 "area")
+  # Resetting the theme restores the packaged 8-slot cap.
+  pv_reset_theme()
+  expect_pvchart(pv_area(six, "year", "population", series = "city"),
+                 "area")
 })
 
 test_that("area understands offsets and x types", {

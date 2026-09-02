@@ -59,8 +59,9 @@ evolution_axis_title <- function(value, fallback, name) {
 #' @param y Name of the numeric value column. Values must be
 #'   non-negative — stacked bands cannot represent a negative height.
 #' @param series Optional name of the series column, one band per level.
-#'   At most 8 levels — beyond that, fold the small ones into an
-#'   `"Other"` level. Omit it for a single-series area.
+#'   At most as many levels as the active theme's categorical palette
+#'   has slots (8 in the packaged theme) — beyond that, fold the small
+#'   ones into an `"Other"` level. Omit it for a single-series area.
 #' @param offset `"stacked"` (default), `"percent"`, or `"stream"`.
 #' @param legend `TRUE`, `FALSE`, or `"auto"` (default). `TRUE` always
 #'   draws the legend row (even for a single series), `FALSE` never draws
@@ -137,10 +138,14 @@ pv_area <- function(data, x, y, series = NULL,
       "`data` has more than one row per series/x combination; aggregate it first.")
   }
   series_names <- unique(df$series)
-  if (length(series_names) > 8) {
+  # The cap is the active theme's palette, not a fixed 8: a theme with
+  # fewer slots (pv_theme_paper() has 5) must refuse the sixth band
+  # rather than silently recycle a colour.
+  slots <- theme_palette_slots()
+  if (length(series_names) > slots) {
     rlang::abort(sprintf(
-      "`series` has %d levels but the palette has 8 slots. Fold the smaller series into an \"Other\" level instead of adding colours.",
-      length(series_names)))
+      "`series` has %d levels but the active theme's palette has %d slots. Fold the smaller series into an \"Other\" level instead of adding colours.",
+      length(series_names), slots))
   }
   # Colours follow first-appearance order. Within a series the rows keep
   # their arrival order on a category axis (sorting "Jan, Feb, ..."

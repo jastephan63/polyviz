@@ -214,6 +214,45 @@ test_that("svg export is a standalone document carrying its font", {
   expect_false(grepl("data:font/woff2", bare, fixed = TRUE))
 })
 
+test_that("svg export embeds a canvas scatter's raster among vector chrome", {
+  skip_if_no_chrome()
+  set.seed(11)
+  cloud <- data.frame(x = stats::rnorm(600), y = stats::rnorm(600))
+  w <- pv_scatter(cloud, x = "x", y = "y", canvas = TRUE,
+                  title = "Canvas cloud")
+  f <- file.path(withr::local_tempdir(), "canvas.svg")
+  expect_no_warning(pv_save(w, f, quiet = TRUE, delay = 0.2))
+  svg <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"),
+               collapse = "\n")
+  # The point marks arrive as one rasterised layer: an <image> holding
+  # the canvas pixels as a png data URI, no circle per point.
+  expect_match(svg, 'href="data:image/png;base64,')
+  expect_length(regmatches(svg, gregexpr("<image", svg))[[1]], 1)
+  expect_false(grepl('circle class="pt"', svg, fixed = TRUE))
+  # Everything around the raster stays vector: the title text and the
+  # axis tick text are real <text> elements.
+  expect_match(svg, "Canvas cloud", fixed = TRUE)
+  expect_match(svg, "<text", fixed = TRUE)
+  # Root document, plot svg, the raster's holder, and the interaction
+  # overlay - four svg elements in all.
+  expect_equal(lengths(regmatches(svg, gregexpr("<svg", svg))), 4L)
+})
+
+test_that("a small scatter's svg export stays fully vector", {
+  skip_if_no_chrome()
+  w <- pv_scatter(mtcars, x = "wt", y = "mpg")
+  f <- file.path(withr::local_tempdir(), "vector.svg")
+  expect_no_warning(pv_save(w, f, quiet = TRUE, delay = 0.2))
+  svg <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"),
+               collapse = "\n")
+  # Under the canvas threshold nothing is rasterised: no <image>, one
+  # circle per data row, and only the root plus the one plot svg.
+  expect_false(grepl("<image", svg, fixed = TRUE))
+  expect_length(regmatches(svg, gregexpr('circle class="pt"', svg))[[1]],
+                nrow(mtcars))
+  expect_equal(lengths(regmatches(svg, gregexpr("<svg", svg))), 2L)
+})
+
 test_that("pdf export is a single-page vector pdf with embedded fonts", {
   skip_if_no_chrome()
   f <- file.path(withr::local_tempdir(), "chart.pdf")

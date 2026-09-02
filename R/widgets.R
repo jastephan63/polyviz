@@ -455,13 +455,42 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #' @param legend Show the colour legend row above the chart? `TRUE` always
 #'   shows it (when a `color` mapping exists), `FALSE` hides it; `"auto"`
 #'   (default) shows it exactly when a `color` mapping exists.
+#' @param density Draw the joint distribution as filled density contours
+#'   instead of point marks? `FALSE` (default) or `TRUE`. When on, a 2D
+#'   kernel density estimate over the points (d3.contourDensity) replaces
+#'   the cloud with filled bands on the theme's sequential ramp, light
+#'   where points are sparse to dark at the peak, with thin
+#'   surface-coloured separators between bands — the readable treatment
+#'   for clouds too dense to show structure point by point. The
+#'   bandwidth and the number of bands are picked adaptively from the
+#'   point count and the plot size, and the tooltip reports the band
+#'   under the cursor as a share of the peak density. Contours have no
+#'   per-point aesthetics, so `color`, `size`, and `label` are refused;
+#'   the drag-to-select brush and [pv_link()] dimming have no marks to
+#'   act on either, so both quietly stay off. [pv_trend()] and
+#'   [pv_annotate()] layers still draw, over the contours. When `canvas`
+#'   is also requested, density wins — the contours are already the
+#'   aggregate view, so `canvas` is ignored.
+#' @param canvas Draw the point marks on a `<canvas>` layer instead of as
+#'   SVG circles? `TRUE` forces it, `FALSE` keeps every mark an SVG
+#'   element; `"auto"` (default) switches to canvas past 8,000 points,
+#'   where one SVG node per point makes browsers sluggish. Only the
+#'   marks move: axes, grid, labels, annotations, trends, and all chrome
+#'   stay SVG, the hover tooltip and click events keep working (nearest
+#'   point within a small radius), the drag-to-select brush and
+#'   [pv_link()] dimming behave as before, and the layer is
+#'   device-pixel-ratio aware so it stays crisp on high-density screens.
+#'   SVG exports embed the canvas layer as a raster image at the same
+#'   position and size; PNG and PDF saves are unaffected. Ignored when
+#'   `density = TRUE`.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
 #' pv_scatter(mtcars, x = "wt", y = "mpg", size = "hp")
 #' @export
 pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
-                       legend = "auto", xlab = NULL, ylab = NULL,
+                       legend = "auto", density = FALSE, canvas = "auto",
+                       xlab = NULL, ylab = NULL,
                        title = NULL, subtitle = NULL, mode = "auto",
                        duration = 400, source = NULL, width = NULL,
                        height = NULL,
@@ -472,6 +501,27 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   check_value_column(data, y)
   if (!is.null(size)) check_value_column(data, size)
   check_flag(legend, "legend")
+  # Density is a plain on/off switch: the contours either replace the
+  # points or they don't, and there is no data-driven middle ground for
+  # the JavaScript side to decide - so "auto" has no meaning here.
+  if (!isTRUE(density) && !isFALSE(density)) {
+    rlang::abort("`density` must be TRUE or FALSE.")
+  }
+  check_flag(canvas, "canvas")
+  # Contours aggregate the cloud into one surface, so there is no point
+  # left for a per-point mapping to colour, size, or name. Refuse the
+  # mappings by name rather than silently dropping them.
+  if (isTRUE(density)) {
+    mapped <- c(color = !is.null(color), size = !is.null(size),
+                label = !is.null(label))
+    if (any(mapped)) {
+      rlang::abort(sprintf(paste(
+        "`density = TRUE` replaces the point marks with filled contours,",
+        "which have no per-point aesthetics - drop the %s mapping%s."),
+        paste0("`", names(mapped)[mapped], "`", collapse = ", "),
+        if (sum(mapped) > 1) "s" else ""))
+    }
+  }
   if (!is.null(color)) {
     n_levels <- length(unique(data[[color]]))
     if (n_levels > 3) {
@@ -492,7 +542,8 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   pv_widget("scatter", c(list(
     data = df, xlab = axis_title(xlab, x), ylab = axis_title(ylab, y),
     sizelab = size,
-    showLegend = !is.null(color), legend = legend
+    showLegend = !is.null(color), legend = legend,
+    density = density, canvas = canvas
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

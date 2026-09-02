@@ -255,6 +255,190 @@ test_that("line and scatter send the legend flag through and validate it", {
                'TRUE, FALSE, or "auto"')
 })
 
+test_that("scatter density and canvas flags travel and validate", {
+  # The defaults reproduce the old rendering: point marks, SVG under
+  # the canvas threshold.
+  w <- pv_scatter(mtcars, "wt", "mpg")
+  expect_false(w$x$density)
+  expect_equal(w$x$canvas, "auto")
+  w2 <- pv_scatter(mtcars, "wt", "mpg", density = TRUE)
+  expect_true(w2$x$density)
+  w3 <- pv_scatter(mtcars, "wt", "mpg", canvas = TRUE)
+  expect_true(w3$x$canvas)
+  w4 <- pv_scatter(mtcars, "wt", "mpg", canvas = FALSE)
+  expect_false(w4$x$canvas)
+  # Density is a plain switch - no "auto" middle ground to defer.
+  expect_error(pv_scatter(mtcars, "wt", "mpg", density = "auto"),
+               "TRUE or FALSE")
+  expect_error(pv_scatter(mtcars, "wt", "mpg", canvas = "yes"),
+               'TRUE, FALSE, or "auto"')
+})
+
+test_that("density contours refuse per-point aesthetics by name", {
+  mt <- mtcars
+  mt$g <- rep(letters[1:2], 16)
+  expect_error(pv_scatter(mt, "wt", "mpg", color = "g", density = TRUE),
+               "no per-point aesthetics.*`color`")
+  expect_error(pv_scatter(mt, "wt", "mpg", size = "hp", label = "g",
+                          density = TRUE),
+               "`size`, `label` mappings")
+  # Density and canvas together: density wins, canvas rides along
+  # ignored, and nothing errors.
+  w <- pv_scatter(mt, "wt", "mpg", density = TRUE, canvas = TRUE)
+  expect_true(w$x$density)
+  expect_true(w$x$canvas)
+})
+
+test_that("density contours and canvas points render without JavaScript errors", {
+  render_skip_if_no_chrome()
+  set.seed(7)
+  big <- data.frame(x = stats::rnorm(9000), y = stats::rnorm(9000))
+  charts <- list(
+    # 9000 points: past the ~8000 "auto" threshold, so this exercises
+    # the canvas layer without asking for it by name.
+    pv_scatter(big, "x", "y"),
+    pv_scatter(big, "x", "y", density = TRUE),
+    # A forced canvas under the threshold, with a trend drawn over it.
+    pv_scatter(head(big, 400), "x", "y", canvas = TRUE) |> pv_trend("lm"),
+    pv_scatter(big, "x", "y", density = TRUE) |> pv_trend("lm"),
+    # A linked density chart has no marks to select; the renderer must
+    # carry the keys without complaint and simply not build a brush.
+    pv_scatter(head(big, 400), "x", "y", density = TRUE) |>
+      pv_link(crosstalk::SharedData$new(head(big, 400)))
+  )
+  for (w in charts) {
+    path <- tempfile(fileext = ".png")
+    expect_no_warning(pv_save(w, path, quiet = TRUE))
+    expect_gt(file.size(path), 20000)
+    unlink(path)
+  }
+})
+
+# Stages a widget the way pv_save() does (light mode, no entrance
+# animation, filling a page opened at a fixed size) and hands back the
+# live Chrome session, for tests that drive the rendered chart. The
+# caller closes the session.
+widget_page_session <- function(w, width = 700, height = 460) {
+  w$x$mode <- "light"
+  w$x$duration <- 0
+  w$width <- NULL
+  w$height <- NULL
+  w$sizingPolicy$browser$fill <- TRUE
+  w$sizingPolicy$browser$padding <- 0
+  stage <- tempfile("pv-widget-page-")
+  dir.create(stage)
+  page <- file.path(stage, "chart.html")
+  htmlwidgets::saveWidget(w, page, selfcontained = FALSE, libdir = "lib")
+  b <- chromote::ChromoteSession$new(width = width, height = height)
+  errors <- polyviz:::export_watch_errors(b)
+  loaded <- b$Page$loadEventFired(wait_ = FALSE)
+  b$Page$navigate(utils::URLencode(paste0("file://", normalizePath(page))),
+                  wait_ = FALSE)
+  b$wait_for(loaded)
+  polyviz:::export_wait_settled(b, errors, 0,
+                                polyviz:::export_settle_count_js(w))
+  list(b = b, errors = errors)
+}
+
+test_that("the canvas scatter's quadtree drives the hover tooltip", {
+  render_skip_if_no_chrome()
+  # Points on a [0, 10] square, which nice() keeps as the domain - so
+  # the point at (5, 5) sits exactly at the canvas centre, wherever the
+  # margins land the plot.
+  pts <- data.frame(x = c(0, 10, 5, 2, 8), y = c(0, 10, 5, 8, 2))
+  s <- widget_page_session(pv_scatter(pts, x = "x", y = "y", canvas = TRUE))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      var cv = document.querySelector('canvas.pv-canvas');
+      if (!cv) return 'no canvas';
+      var r = cv.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var target = document.elementFromPoint(cx, cy);
+      target.dispatchEvent(new PointerEvent('pointermove',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      var tip = document.querySelector('.pv-tooltip');
+      return JSON.stringify({
+        opacity: tip.style.opacity,
+        html: tip.innerHTML,
+        circles: document.querySelectorAll('circle.pt').length
+      });
+    })()", returnByValue = TRUE)$result$value
+  got <- jsonlite::fromJSON(res)
+  # The marks are on the canvas - no SVG circle per point...
+  expect_equal(got$circles, 0)
+  # ...yet hovering the centre finds (5, 5) through the quadtree.
+  expect_equal(got$opacity, "1")
+  expect_match(got$html, "x: <b>5</b>", fixed = TRUE)
+  expect_match(got$html, "y: <b>5</b>", fixed = TRUE)
+})
+
+test_that("the canvas scatter's brush reads the quadtree into crosstalk", {
+  render_skip_if_no_chrome()
+  pts <- data.frame(x = c(0, 10, 5, 2, 8), y = c(0, 10, 5, 8, 2))
+  sd <- crosstalk::SharedData$new(pts, key = c("a", "b", "c", "d", "e"))
+  w <- pv_scatter(pts, x = "x", y = "y", canvas = TRUE) |> pv_link(sd)
+  group <- w$x$ctGroup
+  s <- widget_page_session(w)
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  rect <- s$b$Runtime$evaluate(paste0(
+    "JSON.stringify(document.querySelector('canvas.pv-canvas')",
+    ".getBoundingClientRect())"), returnByValue = TRUE)$result$value
+  r <- jsonlite::fromJSON(rect)
+  # Drag a real brush over the middle half of the plot: only the centre
+  # point (key "c") lies inside it.
+  x0 <- r$left + r$width * 0.25
+  x1 <- r$left + r$width * 0.75
+  y0 <- r$top + r$height * 0.25
+  y1 <- r$top + r$height * 0.75
+  s$b$Input$dispatchMouseEvent(type = "mouseMoved", x = x0, y = y0)
+  s$b$Input$dispatchMouseEvent(type = "mousePressed", x = x0, y = y0,
+                               button = "left", clickCount = 1)
+  for (i in 1:8) {
+    s$b$Input$dispatchMouseEvent(type = "mouseMoved",
+                                 x = x0 + (x1 - x0) * i / 8,
+                                 y = y0 + (y1 - y0) * i / 8,
+                                 button = "left")
+  }
+  s$b$Input$dispatchMouseEvent(type = "mouseReleased", x = x1, y = y1,
+                               button = "left", clickCount = 1)
+  Sys.sleep(0.5)
+  sel <- s$b$Runtime$evaluate(sprintf(
+    "JSON.stringify(window.crosstalk.group('%s').var('selection').get())",
+    group), returnByValue = TRUE)$result$value
+  expect_identical(jsonlite::fromJSON(sel), "c")
+})
+
+test_that("the density scatter reports the band under the cursor", {
+  render_skip_if_no_chrome()
+  # One tight gaussian blob: the plot centre sits in the densest band.
+  set.seed(3)
+  blob <- data.frame(x = stats::rnorm(2000), y = stats::rnorm(2000))
+  s <- widget_page_session(
+    pv_scatter(blob, x = "x", y = "y", density = TRUE))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      /* The first svg in the widget is the download control's icon;
+         the plot svg is the big one. */
+      var svg = null;
+      document.querySelectorAll('.pvchart svg').forEach(function (el) {
+        if (!svg || el.clientWidth > svg.clientWidth) { svg = el; }
+      });
+      var r = svg.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var target = document.elementFromPoint(cx, cy);
+      target.dispatchEvent(new PointerEvent('pointermove',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      return document.querySelector('.pv-tooltip').innerHTML;
+    })()", returnByValue = TRUE)$result$value
+  expect_match(res, "density band <b>")
+  expect_match(res, "of the peak level", fixed = TRUE)
+})
+
 test_that("force widget validates link ids", {
   w <- expect_pvchart(
     pv_force(pv_network$nodes, pv_network$links, group = "group"), "force")

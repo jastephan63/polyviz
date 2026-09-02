@@ -1195,3 +1195,65 @@ window.pv = (function () {
   };
 
 })();
+
+/*
+ * Canvas layer in standalone SVG exports. The canvas scatter draws its
+ * point marks on a <canvas> pinned over the plot area, and the exporter
+ * walk skips canvas elements by tag - so a saved chart would come out
+ * with axes and chrome but no points. This wrapper steps in around the
+ * serialisation: each data canvas (.pv-canvas) is rasterised with
+ * canvas.toDataURL and stood in for by a temporary <svg> holding that
+ * raster as an <image> of the canvas's on-screen size, wearing the same
+ * absolute-position styles. The walk embeds that stand-in like any plot
+ * svg - at the canvas's exact position, in the canvas's exact place in
+ * the stacking order - and everything is put back the moment the
+ * (synchronous) serialisation returns. The raster carries the canvas's
+ * full devicePixelRatio resolution scaled into its CSS box, so a retina
+ * canvas exports as crisply as it renders.
+ */
+(function () {
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var serialise = pv.toStandaloneSvg;
+  pv.toStandaloneSvg = function (el, x, theme) {
+    var canvases = el && el.querySelectorAll ?
+      el.querySelectorAll("canvas.pv-canvas") : [];
+    var swaps = [];
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      /* A canvas that cannot be read (toDataURL can throw on a tainted
+         or zero-sized canvas) is simply left out - an export missing
+         one layer beats no export, the walk's own rule. */
+      try {
+        var url = c.toDataURL("image/png");
+        var r = c.getBoundingClientRect();
+        var w = Math.max(1, Math.round(r.width));
+        var h = Math.max(1, Math.round(r.height));
+        var holder = document.createElementNS(SVG_NS, "svg");
+        holder.setAttribute("width", w);
+        holder.setAttribute("height", h);
+        holder.style.cssText = c.style.cssText;
+        var img = document.createElementNS(SVG_NS, "image");
+        img.setAttribute("width", w);
+        img.setAttribute("height", h);
+        img.setAttribute("preserveAspectRatio", "none");
+        img.setAttribute("href", url);
+        img.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href",
+          url);
+        holder.appendChild(img);
+        c.parentNode.insertBefore(holder, c);
+        swaps.push({ canvas: c, holder: holder, display: c.style.display });
+        c.style.display = "none";
+      } catch (e) {}
+    }
+    var out = serialise(el, x, theme);
+    for (var j = 0; j < swaps.length; j++) {
+      swaps[j].canvas.style.display = swaps[j].display;
+      if (swaps[j].holder.parentNode) {
+        swaps[j].holder.parentNode.removeChild(swaps[j].holder);
+      }
+    }
+    return out;
+  };
+
+})();

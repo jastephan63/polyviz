@@ -1,6 +1,7 @@
-# Gallery snippets for the original six chart types. Each block: an id,
-# an explanation for the demo page, and one runnable expression on the
-# real bundled data. data-raw/build-gallery.R assembles these into docs/.
+# Gallery snippets for the core chart types and their close cousins.
+# Each block: an id, an explanation for the demo page, and one runnable
+# expression on the real bundled data. data-raw/build-gallery.R
+# assembles these into docs/.
 
 ## bar
 # explain: The bar chart is the workhorse of comparison - one bar per
@@ -158,6 +159,32 @@ pv_scatter(
   source = "Source: LUSTAT Statistik Luzern"
 )
 
+## scatter-density
+# explain: Six years of Lucerne days is 2,192 dots, and right where they
+#   matter most they bury each other - a plain scatter of this cloud
+#   turns to solid ink at its densest spots. density = TRUE is the way
+#   out: a 2D kernel density estimate over the points replaces the marks
+#   with filled bands on the sequential ramp, faint where days are
+#   sparse and strongest at the peaks, with the bandwidth and the number
+#   of bands picked from the point count and the plot size; hover
+#   anywhere and the tooltip reads that band as a share of the peak
+#   density. Reach for it whenever the question is where the mass sits
+#   rather than where any single point does. Plotting each day's
+#   overnight low against its afternoon high turns the six years into a
+#   landscape of two mounds: the densest spot of all is a winter mound
+#   near a 1 °C night and an 8 °C afternoon, a broader summer mound sits
+#   near 14 °C and 25 °C, and only a thin saddle connects them - the
+#   Lucerne year is two climates with quick crossings, not one smooth
+#   slide. (When the individual marks should survive instead, the
+#   sibling option canvas = "auto" moves them onto a canvas layer past
+#   8,000 points, tooltips and brushing intact, so huge clouds stay
+#   fluid.)
+pv_scatter(pv_weather, x = "temp_min", y = "temp_max", density = TRUE,
+           xlab = "Overnight low (°C)", ylab = "Afternoon high (°C)",
+           title = "Six years of Lucerne days, as a landscape",
+           subtitle = "Every day of 2020–2025 by its minimum and maximum temperature",
+           source = "Source: MeteoSwiss")
+
 ## force
 # explain: The force-directed network is d3's signature physics
 #   simulation: nodes repel, links pull, and you can grab any node and
@@ -213,6 +240,45 @@ local({
            title = "Commuting to and from Canton Zug",
            subtitle = paste("Daily commuters,", max(latest$period)),
            source = "Source: Fachstelle Statistik Kanton Zug")
+})
+
+## arc
+# explain: The arc diagram is the other way to draw a network: every
+#   node sits on one horizontal line, plainly labelled below it, and
+#   every link bows over the line as an arc as wide as its flow. Reach
+#   for it over the force layout when the names matter as much as the
+#   wiring - the line keeps every label horizontal and legible where a
+#   physics simulation lets them drift and collide, and hovering a node
+#   lights up exactly its arcs. Node order is the whole layout, so
+#   order = "auto" (the default) runs a crossing-reduction heuristic:
+#   barycenter sweeps pull each node toward the average position of its
+#   neighbours, then greedy swaps of neighbouring nodes polish the rest
+#   away, and the result never has more crossings than the order the
+#   nodes arrived in. A hub-and-spoke graph like this one has no
+#   crossings under any arrangement, so "auto" keeps the arrival order - which
+#   this snippet sets to rank Zug's partners by volume. The chord diagram
+#   above shows the same exchange with its direction; here each pair's
+#   two directions are summed into a single arc (opposite flows would
+#   share one curve anyway) and the ranking becomes the story: Zürich,
+#   not neighbouring Luzern, is Zug's biggest commuter partner, 25,099
+#   people a day crossing that border against Luzern's 17,512. Hover any
+#   arc for its exact count.
+local({
+  latest <- pv_commuters[pv_commuters$period ==
+                           max(pv_commuters$period), ]
+  # One arc per pair reads best here, so the two directions are summed -
+  # the chord diagram keeps them apart. Partners arrive ranked by
+  # volume, and on a crossing-free hub graph "auto" respects that.
+  both <- aggregate(commuters ~ region, latest, sum)
+  both <- both[order(-both$commuters), ]
+  pv_arc(data.frame(id = c(both$region, "Zug")),
+         data.frame(source = both$region, target = "Zug",
+                    value = both$commuters),
+         order = "auto",
+         title = "Zürich, not Luzern, is Zug's biggest commuter partner",
+         subtitle = paste("Daily commuters exchanged with Canton Zug,",
+                          "both directions combined, 2022–2024"),
+         source = "Source: Fachstelle Statistik Kanton Zug")
 })
 
 ## sunburst

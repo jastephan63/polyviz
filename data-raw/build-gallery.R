@@ -15,10 +15,13 @@ library(htmltools)
 
 display_names <- c(
   bar = "Bar chart", line = "Line chart", scatter = "Scatter plot",
+  `scatter-density` = "Density contours",
   force = "Force-directed network", chord = "Chord diagram",
+  arc = "Arc diagram",
   sunburst = "Zoomable sunburst", histogram = "Histogram",
   boxplot = "Boxplot", ridgeline = "Ridgeline", donut = "Donut chart",
   treemap = "Treemap", lollipop = "Lollipop chart", area = "Stacked area",
+  `area-stream` = "Streamgraph",
   heatmap = "Heatmap", sankey = "Sankey diagram",
   parallel = "Parallel coordinates", pack = "Circle packing",
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
@@ -133,9 +136,10 @@ page <- tags$html(lang = "en", tags$head(
   toc,
   sections,
   tags$footer(HTML(paste(
-    "Data: Bundesamt f&uuml;r Statistik (stats.swiss),",
-    "LUSTAT Statistik Luzern and Fachstelle Statistik Kanton Zug via",
-    "opendata.swiss - open data, cited per dataset above; LUSTAT data",
+    "Data: Bundesamt f&uuml;r Statistik (stats.swiss), MeteoSwiss,",
+    "LUSTAT Statistik Luzern, Bundesamt f&uuml;r Energie, and Fachstelle",
+    "Statistik Kanton Zug via opendata.swiss - open data, cited per",
+    "dataset above; LUSTAT data",
     "additionally requires the owner's permission for commercial use.",
     "Charts rendered by <a href='https://d3js.org'>d3.js</a> v7,",
     "type set in <a href='https://rsms.me/inter/'>Inter</a>.",

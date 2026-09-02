@@ -29,6 +29,31 @@
           source = "Source: Bundesamt für Statistik")
 }
 
+## area-stream
+# explain: offset = "stream" lets the stacked area chart give up its zero
+#   baseline: the bands wiggle around a centre line placed to keep the whole
+#   shape as calm as possible, trading an easily read total for the clearest
+#   view of each band's own rhythm — the form to reach for when composition
+#   and cadence matter more than the sum. Read thickness, not position, and
+#   hover anywhere for the crosshair with every band's exact value (offset =
+#   "percent" is the third variant, pinning the same bands to a 0–100% frame).
+#   The data is pv_electricity, new to the package in this release:
+#   Switzerland's monthly electricity production 2020–2025, split into the
+#   six sources of the national balance, and it breathes in annual waves —
+#   river and storage hydro swell every summer to 64% of the May–August
+#   output, nuclear runs as the steady ribbon that carries the winter (38% of
+#   December–February production), and beneath them the solar band widens
+#   from 2,700 GWh in 2020 to 7,900 in 2025, nearly tripling, while wind
+#   stays a hairline. A frozen snapshot ships with the package;
+#   pv_fetch_opendata() delivers the live balance from opendata.swiss.
+{
+  pv_area(pv_electricity, x = "date", y = "gwh", series = "source",
+          offset = "stream", xlab = NA,
+          title = "How Switzerland makes its electricity",
+          subtitle = "Monthly production by source in GWh, 2020–2025",
+          source = "Source: Bundesamt für Energie")
+}
+
 ## heatmap
 # explain: A heatmap crosses two categories and colours each cell by a value,
 #   which makes a 200-cell table readable at a glance — use it when the pattern

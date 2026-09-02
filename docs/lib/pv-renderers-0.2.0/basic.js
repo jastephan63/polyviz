@@ -1120,6 +1120,10 @@
   /* ---------- scatter ---------- */
 
   pvRenderers.scatter = function (ctx) {
+    /* Density contours (density = TRUE from R) replace the point marks
+       entirely, and they are already the aggregate view - so they also
+       win over any canvas request. Everything below draws points. */
+    if (ctx.x.density === true) { return renderScatterDensity(ctx); }
     var data = ctx.x.data;
     var hasSeries = data.length && data[0].series !== undefined;
     var hasSize = data.length && data[0].size !== undefined;
@@ -1198,6 +1202,54 @@
        labels, trend fits) is appended after the points, further down. */
     var gUnder = g.append("g").attr("pointer-events", "none");
 
+    /* A point's datum as a plain object, for the Shiny round-trip. */
+    function ptDatum(d) {
+      var out = { x: d.x, y: d.y };
+      if (hasSeries) { out.series = d.series; }
+      if (hasSize) { out.size = d.size; }
+      if (d.label !== undefined) { out.label = d.label; }
+      if (keys) { out.key = d.key; }
+      return out;
+    }
+
+    /* One point's tooltip rows - shared by the SVG and canvas marks, so
+       the two modes always read the same on hover. */
+    function tipHtml(d) {
+      var rows = [];
+      if (d.label !== undefined) rows.push("<b>" + pv.esc(d.label) + "</b>");
+      if (hasSeries) {
+        rows.push(pv.swatchRow(color(d.series), "group", pv.esc(d.series)));
+      }
+      rows.push(pv.esc(ctx.x.xlab || "x") + ": <b>" + ctx.fmt(d.x) + "</b>");
+      rows.push(pv.esc(ctx.x.ylab || "y") + ": <b>" + ctx.fmt(d.y) + "</b>");
+      if (hasSize) {
+        rows.push(pv.esc(ctx.x.sizelab || "size") + ": <b>" +
+          ctx.fmt(d.size) + "</b>");
+      }
+      return rows.join("<br>");
+    }
+
+    /* Canvas rendering (#9). "auto" moves the point marks onto a
+       <canvas> past 8000 points - about where one SVG node per point
+       starts to drag on mid-range hardware (tens of thousands of DOM
+       elements to build, style, and hit-test), while a canvas draws the
+       same cloud in a single pass. Everything else - axes, grid,
+       labels, annotations, trends, brush, chrome - stays SVG. TRUE and
+       FALSE from R override the threshold. */
+    var useCanvas = opt(ctx.x.canvas, nPts > 8000);
+    if (useCanvas) {
+      renderScatterCanvas(ctx, {
+        data: data, hasSize: hasSize, keys: keys, ptOp: ptOp,
+        m: m, iw: iw, ih: ih, svg: svg, g: g, gUnder: gUnder,
+        xScale: xScale, y: y, autoR: autoR, ptStroke: ptStroke, r: r,
+        ptDatum: ptDatum, tipHtml: tipHtml,
+        fillOf: function (d) {
+          return hasSeries ? color(d.series) : ctx.theme.palette[0];
+        }
+      });
+      return;
+    }
+
     /* Drag-to-select, when the chart carries row keys: the brush layer
        goes in BEFORE the points, so the points stay on top and keep
        their hover events, while drags started on empty plot still reach
@@ -1236,16 +1288,6 @@
       .delay(function (d, i) { return Math.min(i * 6, 400); })
       .attr("r", function (d) { return hasSize ? r(d.size) : r(); });
 
-    /* A point's datum as a plain object, for the Shiny round-trip. */
-    function ptDatum(d) {
-      var out = { x: d.x, y: d.y };
-      if (hasSeries) { out.series = d.series; }
-      if (hasSize) { out.size = d.size; }
-      if (d.label !== undefined) { out.label = d.label; }
-      if (keys) { out.key = d.key; }
-      return out;
-    }
-
     pts
       .on("pointerenter pointermove", function (event, d) {
         /* Lift the hovered point to full opacity so it reads clearly
@@ -1257,18 +1299,7 @@
         if (event.type === "pointerenter") {
           ctx.emit("hover", ptDatum(d));
         }
-        var rows = [];
-        if (d.label !== undefined) rows.push("<b>" + pv.esc(d.label) + "</b>");
-        if (hasSeries) {
-          rows.push(pv.swatchRow(color(d.series), "group", pv.esc(d.series)));
-        }
-        rows.push(pv.esc(ctx.x.xlab || "x") + ": <b>" + ctx.fmt(d.x) + "</b>");
-        rows.push(pv.esc(ctx.x.ylab || "y") + ": <b>" + ctx.fmt(d.y) + "</b>");
-        if (hasSize) {
-          rows.push(pv.esc(ctx.x.sizelab || "size") + ": <b>" +
-            ctx.fmt(d.size) + "</b>");
-        }
-        pv.showTip(ctx, event, rows.join("<br>"));
+        pv.showTip(ctx, event, tipHtml(d));
       })
       .on("pointerleave", function (event, d) {
         d3.select(this)
@@ -1296,5 +1327,329 @@
       gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
       xScale, y);
   };
+
+  /* The canvas marks layer of the scatter. The caller (the scatter
+     renderer above) has already drawn the whole SVG substrate - grid,
+     axes, labels, and the under-annotation bands - and hands over its
+     scales and point styling. This helper adds two layers on top of
+     that svg, in stacking order:
+
+       1. a <canvas> pinned exactly over the plot area, carrying every
+          point mark, drawn at devicePixelRatio resolution so retina
+          screens stay crisp;
+       2. an overlay <svg> of the same footprint as the main one,
+          holding everything that belongs above the points - the brush,
+          the hover marker, reference lines, annotation labels, and
+          trend fits - so a trend still draws over the cloud exactly as
+          it does over SVG points.
+
+     Hovering has no per-point elements to listen on, so the points go
+     into a d3.quadtree keyed by their pixel positions: the tooltip
+     finds the nearest point within a small radius, and the brush reads
+     the same tree to collect the keys inside its rectangle. Crosstalk
+     dimming needs no special path at all - a selection re-renders the
+     widget, and every redraw already paints each point at its
+     pv.keyOpacity. */
+  function renderScatterCanvas(ctx, s) {
+    var data = s.data, m = s.m, iw = s.iw, ih = s.ih;
+    var xScale = s.xScale, y = s.y;
+
+    /* The main svg sits in normal flow under the header; the canvas and
+       the overlay are positioned absolutely inside the widget, so both
+       need the svg's offset within it. In a container that is not laid
+       out yet the rects read zero and everything lands at the widget's
+       corner - the resize observer re-renders as soon as real geometry
+       exists. */
+    var elRect = ctx.el.getBoundingClientRect();
+    var svgRect = s.svg.node().getBoundingClientRect();
+    var offLeft = svgRect.left - elRect.left;
+    var offTop = svgRect.top - elRect.top;
+
+    var dpr = window.devicePixelRatio || 1;
+    var canvas = document.createElement("canvas");
+    canvas.className = "pv-canvas";
+    canvas.width = Math.max(1, Math.round(iw * dpr));
+    canvas.height = Math.max(1, Math.round(ih * dpr));
+    canvas.style.cssText = "position:absolute;" +
+      "left:" + (offLeft + m.left) + "px;" +
+      "top:" + (offTop + m.top) + "px;" +
+      "width:" + iw + "px;height:" + ih + "px;pointer-events:none;";
+    ctx.el.appendChild(canvas);
+    var c2 = canvas.getContext("2d");
+
+    function radiusOf(d) { return s.hasSize ? s.r(d.size) : s.r(); }
+
+    /* One full paint of the cloud, at `grow` times the final radius (the
+       entrance animation drives grow from 0 to 1). Fill opacity is the
+       same per-point pv.keyOpacity the SVG marks use, and the
+       surface-coloured ring stays opaque like an SVG stroke. */
+    function draw(grow) {
+      c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c2.clearRect(0, 0, iw, ih);
+      c2.lineWidth = s.ptStroke;
+      c2.strokeStyle = ctx.theme.ink.surface;
+      for (var i = 0; i < data.length; i++) {
+        var d = data[i];
+        var pr = radiusOf(d) * grow;
+        if (pr <= 0) { continue; }
+        c2.beginPath();
+        c2.arc(xScale(d.x), y(d.y), pr, 0, 2 * Math.PI);
+        c2.globalAlpha = s.ptOp(d);
+        c2.fillStyle = s.fillOf(d);
+        c2.fill();
+        if (s.ptStroke > 0) {
+          c2.globalAlpha = 1;
+          c2.stroke();
+        }
+      }
+      c2.globalAlpha = 1;
+    }
+
+    /* The entrance: the whole cloud grows out of nothing together. The
+       per-point stagger of the SVG marks would be invisible at canvas
+       point counts anyway. A re-render mid-animation detaches the
+       canvas, and the timer notices and stops. */
+    if (ctx.duration > 0) {
+      var timer = d3.timer(function (elapsed) {
+        if (!canvas.isConnected) { timer.stop(); return; }
+        var t = Math.min(1, elapsed / ctx.duration);
+        draw(d3.easeCubicOut(t));
+        if (t >= 1) { timer.stop(); }
+      });
+    } else {
+      draw(1);
+    }
+
+    /* Every point, keyed by its pixel position - the one lookup both
+       the hover tooltip and the brush use. */
+    var quad = d3.quadtree()
+      .x(function (d) { return xScale(d.x); })
+      .y(function (d) { return y(d.y); })
+      .addAll(data);
+    var hitR = Math.max(12, (s.hasSize ? 13 : s.autoR) + 4);
+
+    var overlay = d3.select(ctx.el).append("svg")
+      .attr("width", ctx.width).attr("height", ctx.height)
+      .style("position", "absolute")
+      .style("left", offLeft + "px").style("top", offTop + "px")
+      .style("font-family", "inherit");
+    var overlayG = overlay.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    /* Drag-to-select, when the chart carries row keys. The brush's own
+       surface doubles as the hover surface below, and its end handler
+       walks the quadtree, pruning every subtree that lies wholly
+       outside the brushed rectangle. */
+    if (s.keys) {
+      var brush = d3.brush().extent([[0, 0], [iw, ih]])
+        .on("end", function (event) {
+          /* A click (or an emptied brush) clears the selection. */
+          if (!event.selection) { ctx.select([]); return; }
+          var b = event.selection;
+          var inside = [];
+          quad.visit(function (node, x0, y0, x1, y1) {
+            if (!node.length) {
+              do {
+                var d = node.data;
+                var px = xScale(d.x), py = y(d.y);
+                if (px >= b[0][0] && px <= b[1][0] &&
+                    py >= b[0][1] && py <= b[1][1]) {
+                  inside.push(d.key);
+                }
+              } while ((node = node.next));
+            }
+            return x0 > b[1][0] || y0 > b[1][1] ||
+              x1 < b[0][0] || y1 < b[0][1];
+          });
+          ctx.select(inside);
+        });
+      overlayG.append("g").attr("class", "brush").call(brush);
+    }
+
+    /* The hover marker: the nearest point re-drawn at hover size in
+       SVG, exactly the lift the SVG marks perform on themselves. It
+       lives in its own layer so it stays under the reference lines and
+       trends appended after it, matching the SVG stacking. */
+    var hoverLayer = overlayG.append("g").attr("pointer-events", "none");
+    var hoverDot = null;
+    var hovered = null;
+
+    function hitAt(event) {
+      var p = d3.pointer(event, overlayG.node());
+      return quad.find(p[0], p[1], hitR) || null;
+    }
+    function onMove(event) {
+      var d = hitAt(event);
+      if (!d) { onLeave(); return; }
+      if (d !== hovered) {
+        hovered = d;
+        ctx.emit("hover", s.ptDatum(d));
+      }
+      if (!hoverDot) {
+        hoverDot = hoverLayer.append("circle")
+          .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2);
+      }
+      hoverDot
+        .attr("cx", xScale(d.x)).attr("cy", y(d.y))
+        .attr("r", radiusOf(d) * 1.35)
+        .attr("fill", s.fillOf(d))
+        .style("display", null);
+      pv.showTip(ctx, event, s.tipHtml(d));
+    }
+    function onLeave() {
+      hovered = null;
+      if (hoverDot) { hoverDot.style("display", "none"); }
+      pv.hideTip(ctx);
+    }
+    function onClick(event) {
+      var d = hitAt(event);
+      if (d) { ctx.emit("click", s.ptDatum(d)); }
+    }
+
+    /* With a brush in place its surface owns the pointer, so the hover
+       listeners sit on the overlay svg and catch the bubbled events;
+       without one a plain transparent rectangle over the plot does the
+       listening, as on every other chart. */
+    if (s.keys) {
+      overlay
+        .on("pointermove", onMove)
+        .on("pointerleave", onLeave)
+        .on("click", onClick);
+    } else {
+      overlayG.append("rect")
+        .attr("width", iw).attr("height", ih)
+        .attr("fill", "transparent")
+        .on("pointermove", onMove)
+        .on("pointerleave", onLeave)
+        .on("click", onClick);
+    }
+
+    /* Reference lines, annotation labels, and trend fits go into the
+       overlay, above the canvas, so they draw over the points exactly
+       as they do over SVG marks. The under-bands already sit in the
+       main svg's gUnder, below the canvas. */
+    var gOver = overlayG.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, s.gUnder, gOver, xScale, y, iw, ih);
+    var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);
+    overlay.append("clipPath").attr("id", clipId)
+      .append("rect").attr("width", iw).attr("height", ih);
+    pv.drawTrends(ctx,
+      gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
+      xScale, y);
+  }
+
+  /* ---------- scatter density contours ---------- */
+
+  /* The density treatment (density = TRUE from R): the cloud aggregated
+     into filled contour bands - d3.contourDensity's 2D kernel estimate
+     over the projected points, filled along the theme's sequential ramp
+     from light (sparse) to dark (the peak), with thin surface-coloured
+     separators so neighbouring bands never fuse. The points themselves
+     are not drawn, so there is nothing for the drag-to-select brush or
+     a crosstalk selection to pick out - both stay off here - while
+     annotation and trend layers draw over the contours exactly as they
+     draw over points. */
+  function renderScatterDensity(ctx) {
+    var data = ctx.x.data;
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var xScale = d3.scaleLinear()
+      .domain(d3.extent(data, function (d) { return d.x; })).nice()
+      .range([0, iw]);
+    var y = d3.scaleLinear()
+      .domain(d3.extent(data, function (d) { return d.y; })).nice()
+      .range([ih, 0]);
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). */
+    if (ctx.x.xlim) { xScale.domain(ctx.x.xlim); }
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
+
+    pv.yGrid(g, y, iw, ctx.theme);
+    g.append("g").attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(xScale).ticks(Math.min(8, Math.floor(iw / 80)))
+        .tickFormat(pv.fmtTick).tickSizeOuter(0))
+      .call(function (sel) { pv.styleAxis(sel, ctx.theme, true); });
+    g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
+      .call(function (sel) { pv.styleAxis(sel, ctx.theme, false); });
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
+
+    /* Annotation bands still go under the data layer. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
+
+    /* The estimator's two knobs, picked from the data and the plot
+       rather than hard-coded. Bandwidth follows Scott's rule scaled to
+       pixel space: the kernel width shrinks with n^(-1/6) - more
+       points justify finer structure - around a base of a quarter of
+       the plot's short side, roughly the spread of a cloud that fills
+       the panel; clamped so tiny plots never blur into one blob and
+       huge ones never dissolve into speckle. The band count grows with
+       the plot's short side (about one band per 28px of it, within 8
+       to 14): enough steps to show the gradation, few enough that
+       neighbouring fills on the sequential ramp stay tellable apart. */
+    var n = data.length;
+    var bw = Math.max(6, Math.min(40,
+      0.25 * Math.min(iw, ih) * Math.pow(n, -1 / 6)));
+    var bands = Math.max(8, Math.min(14, Math.round(Math.min(iw, ih) / 28)));
+    var contours = d3.contourDensity()
+      .x(function (d) { return xScale(d.x); })
+      .y(function (d) { return y(d.y); })
+      .size([iw, ih])
+      .bandwidth(bw)
+      .thresholds(bands)(data);
+
+    var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
+    var maxV = contours.length ?
+      contours[contours.length - 1].value : 1;
+    var geo = d3.geoPath();
+    var gBands = g.append("g");
+    var paths = gBands.selectAll("path").data(contours).enter()
+      .append("path")
+      .attr("d", geo)
+      .attr("fill", function (d, i) {
+        return ramp(contours.length > 1 ? i / (contours.length - 1) : 1);
+      })
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 0.7);
+
+    /* The whole surface fades in as one layer - bands have no
+       per-mark entrance to stagger. */
+    if (ctx.duration > 0) {
+      gBands.attr("opacity", 0)
+        .transition().duration(ctx.duration)
+        .attr("opacity", 1);
+    }
+
+    /* The tooltip reports the band under the cursor. SVG hit-testing
+       hands the event to the topmost band containing the pointer -
+       exactly the highest density level reached there. The level is
+       read out relative to the darkest band's threshold: the absolute
+       estimate is in points per square pixel, a unit no reader should
+       have to think in. */
+    paths
+      .on("pointerenter pointermove", function (event, d) {
+        var i = contours.indexOf(d);
+        pv.showTip(ctx, event,
+          "density band <b>" + (i + 1) + " of " + contours.length +
+          "</b><br>at least <b>" + d3.format(".0%")(d.value / maxV) +
+          "</b> of the peak level");
+      })
+      .on("pointerleave", function () { pv.hideTip(ctx); });
+
+    /* Reference lines, annotation labels, and trend fits over the
+       contours, clipped like every scatter trend layer. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
+    var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);
+    svg.append("clipPath").attr("id", clipId)
+      .append("rect").attr("width", iw).attr("height", ih);
+    pv.drawTrends(ctx,
+      gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
+      xScale, y);
+  }
 
 })();

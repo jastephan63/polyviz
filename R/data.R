@@ -210,3 +210,49 @@
 #' @source MeteoSwiss open government data, SwissMetNet station LUZ.
 #'   Open use, source citation required ("Source: MeteoSwiss").
 "pv_weather"
+
+#' Monthly Swiss electricity production by source
+#'
+#' Switzerland's monthly electricity production split into the six
+#' sources of the national electricity balance — river and storage
+#' hydro, nuclear, conventional thermal, wind, and solar — over the
+#' definitive years 2020 through 2025. A strong seasonal rhythm (hydro
+#' peaks in summer, nuclear carries the winter) with solar tripling
+#' underneath: [pv_area()] on `date`/`gwh` with `series = "source"` and
+#' `offset = "stream"` shows the whole story in one streamgraph.
+#'
+#' A frozen snapshot for examples and tests; [pv_fetch_opendata()]
+#' delivers the live balance (find it with
+#' `pv_search_opendata("Elektrizitätsbilanz Monatswerte")`).
+#'
+#' @format A data frame with 432 rows: `date` (first day of the month),
+#'   `year`, `month`, `source` (River hydro, Storage hydro, Nuclear,
+#'   Thermal, Wind, or Solar), `gwh` (production in gigawatt hours).
+#' @source Bundesamt für Energie (BFE), "Schweizerische
+#'   Elektrizitätsbilanz - Monatswerte", via opendata.swiss. Open use,
+#'   source citation required ("Quelle: Bundesamt für Energie").
+"pv_electricity"
+
+#' Hotel nights in Swiss cantons by guest origin
+#'
+#' Annual hotel arrivals and overnight stays for each of the 26 Swiss
+#' cantons, split into the ten biggest guest markets plus
+#' `"Other countries"`, 2005 through 2025. Two decades of Swiss tourism
+#' — the rise of the Asian markets, the COVID-19 collapse of 2020, the
+#' record-breaking recovery. The origins sum to the published cantonal
+#' totals, so one year of it feeds a canton-by-origin [pv_heatmap()]
+#' straight away, and summing `nights` over origins gives
+#' [pv_choropleth()] a value per `canton_id` on [pv_swiss_cantons].
+#'
+#' A frozen snapshot of the BFS accommodation statistics (HESTA) cube
+#' px-x-1003020000_102, which also carries months and many more origin
+#' countries.
+#'
+#' @format A data frame with 6006 rows: `year`, `canton_id` (official
+#'   BFS canton number — joins [pv_swiss_cantons]), `canton` (English
+#'   short name), `origin` (guest country of residence), `arrivals`,
+#'   `nights` (guests arriving and nights spent in hotels).
+#' @source Bundesamt für Statistik (BFS), Beherbergungsstatistik HESTA,
+#'   via the BFS PXWeb service and opendata.swiss. Open use, source
+#'   citation required ("Quelle: Bundesamt für Statistik").
+"pv_tourism"

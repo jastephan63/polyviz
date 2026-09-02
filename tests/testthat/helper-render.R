@@ -38,6 +38,16 @@ render_charts <- list(
   chord = function() {
     pv_chord(pv_flows, title = "Inter-warehouse shipments")
   },
+  arc = function() {
+    latest <- pv_commuters[pv_commuters$period ==
+                             max(pv_commuters$period), ]
+    both <- aggregate(commuters ~ region, latest, sum)
+    both <- both[order(-both$commuters), ]
+    pv_arc(data.frame(id = c(both$region, "Zug")),
+           data.frame(source = both$region, target = "Zug",
+                      value = both$commuters),
+           title = "Commuter exchange with Canton Zug")
+  },
   sunburst = function() {
     pv_sunburst(pv_city_landuse[pv_city_landuse$city == "Luzern", ],
                 levels = c("group", "category"), value = "hectares",
@@ -241,6 +251,18 @@ render_variants <- list(
   line_zoom = function() {
     pv_line(pv_weather, x = "date", y = "temp_mean", zoom = TRUE,
             title = "Six years of daily means")
+  },
+  # The scatter's two big-cloud treatments. Contours replace the marks
+  # with the d3-contour density pipeline; canvas = TRUE forces the
+  # canvas mark layer on, so that drawing path runs regardless of the
+  # 8,000-point threshold "auto" would apply.
+  scatter_density = function() {
+    pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
+               density = TRUE, title = "Six years of days, as contours")
+  },
+  scatter_canvas = function() {
+    pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
+               canvas = TRUE, title = "Six years of days, on canvas")
   },
   # The two country-wide geo paths, on bundled layers only - the
   # municipality layer would need a network fetch, which tests never do.

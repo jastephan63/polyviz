@@ -12,7 +12,7 @@ test_that("every chart type has a render check", {
   # type strings the JavaScript dispatches on. A new chart type has to
   # show up here, or it ships with no render coverage.
   expect_setequal(names(render_charts), c(
-    "bar", "line", "scatter", "force", "chord", "sunburst",
+    "bar", "line", "scatter", "force", "chord", "arc", "sunburst",
     "histogram", "boxplot", "violin", "ridgeline",
     "donut", "treemap", "lollipop",
     "area", "heatmap", "calendar",
@@ -45,6 +45,10 @@ test_that("force renders without JavaScript errors", {
 
 test_that("chord renders without JavaScript errors", {
   expect_chart_renders("chord")
+})
+
+test_that("arc renders without JavaScript errors", {
+  expect_chart_renders("arc")
 })
 
 test_that("sunburst renders without JavaScript errors", {
@@ -137,14 +141,15 @@ test_that("table renders without JavaScript errors", {
 
 # The opt-in chart options ship extra drawing code the canonical charts
 # above never reach - stacked layouts, marker dots, curve interpolation,
-# the zoom strip, violin overlays, texture patterns, locale formatting.
-# One variant per option keeps those paths under the same render
-# contract.
+# the zoom strip, violin overlays, texture patterns, locale formatting,
+# the scatter's density contours and its canvas mark layer. One variant
+# per option keeps those paths under the same render contract.
 
 test_that("every option variant builds its base chart type", {
   expect_setequal(names(render_variants), c(
     "bar_stacked", "bar_percent", "bar_textured", "bar_locale",
     "violin_overlays", "line_markers", "line_zoom",
+    "scatter_density", "scatter_canvas",
     "choropleth_cantons"))
   for (id in names(render_variants)) {
     w <- render_variants[[id]]()
@@ -179,6 +184,14 @@ test_that("line with markers and curve renders without JavaScript errors", {
 
 test_that("zoomed line renders without JavaScript errors", {
   expect_chart_renders("line_zoom")
+})
+
+test_that("scatter density contours render without JavaScript errors", {
+  expect_chart_renders("scatter_density")
+})
+
+test_that("scatter canvas marks render without JavaScript errors", {
+  expect_chart_renders("scatter_canvas")
 })
 
 # The country-wide geo paths: the cantons layer with its lakes overlay

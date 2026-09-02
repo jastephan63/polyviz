@@ -99,6 +99,58 @@ test_that("stacked areas share the tallest stack, normalised areas skip y", {
   expect_equal(pct$x$xlim, c(1, 2))
 })
 
+test_that("faceted stacked bars share the tallest bar; percent bars skip y", {
+  # A facetable stacked bar keeps every series/category pair unique by
+  # nesting the categories inside the panels - municipalities inside
+  # cantons here - exactly like a facetable area nests its series.
+  df <- data.frame(
+    muni = rep(c("m1", "m2", "m3", "m4"), each = 2),
+    seg = rep(c("s1", "s2"), 4),
+    v = c(1, 2, 3, 4, 5, 6, 7, 8),
+    canton = rep(c("A", "B"), each = 4))
+  f <- pv_bar(df, "muni", "v", series = "seg", stack = "stack") |>
+    pv_facet(df$canton)
+  expect_equal(f$x$subtype, "bar")
+  expect_length(f$x$panels, 2)
+  # The shared ceiling is the tallest category TOTAL (m4: 7 + 8 = 15),
+  # not the largest single segment (8), rounded outward like any other
+  # shared limit.
+  expect_equal(f$x$ylim, facet_nice(c(0, 15)))
+  expect_gte(f$x$ylim[2], 15)
+  # Percent-stacked panels normalise themselves - no shared range.
+  p <- pv_bar(df, "muni", "v", series = "seg", stack = "percent") |>
+    pv_facet(df$canton)
+  expect_null(p$x$ylim)
+  # Side-by-side bars keep the single-value ceiling they always had.
+  g <- pv_bar(df, "muni", "v", series = "seg") |> pv_facet(df$canton)
+  expect_equal(g$x$ylim, facet_nice(c(0, 8)))
+})
+
+test_that("faceting appends an honest panel sentence to the alt text", {
+  pop <- facet_pop()
+  w <- pv_line(pop, "year", "population", series = "city")
+  base_alt <- w$x$alt
+  # The pre-facet description survives, with one new sentence after it,
+  # and the panel variable's name is read off the `by` argument.
+  f <- pv_facet(w, pop$city)
+  expect_equal(f$x$alt,
+               paste(base_alt, "Shown as 4 small-multiple panels by city."))
+  # A [["name"]] lookup and a bare vector name are legible too.
+  expect_match(pv_facet(w, pop[["city"]])$x$alt,
+               "Shown as 4 small-multiple panels by city\\.$")
+  panels <- pop$city
+  expect_match(pv_facet(w, panels)$x$alt,
+               "Shown as 4 small-multiple panels by panels\\.$")
+  # An anonymous expression keeps just the count.
+  f3 <- pv_scatter(mtcars, "wt", "mpg") |> pv_facet(rep(c("a", "b"), 16))
+  expect_match(f3$x$alt, "Shown as 2 small-multiple panels\\.$")
+  # An author's own alt text is kept and extended the same way.
+  own <- pv_alt(w, "Four cities, drawn one per panel.")
+  expect_equal(
+    pv_facet(own, pop$city)$x$alt,
+    "Four cities, drawn one per panel. Shown as 4 small-multiple panels by city.")
+})
+
 test_that("negative values pull the shared y floor below zero", {
   df <- data.frame(cat = c("a", "b", "c", "d"), n = c(3, -2, 7, 1),
                    g = rep(c("p1", "p2"), each = 2))

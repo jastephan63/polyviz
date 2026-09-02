@@ -11,6 +11,29 @@ facet_nice <- function(r) {
   range(pretty(r, n = 10))
 }
 
+# The panel variable's name, when the `by` argument makes it legible:
+# pop$city and df[["city"]] read as "city", and a bare vector name reads
+# as itself. Anything more elaborate (an ifelse(), a pipe placeholder)
+# returns NULL, and the alt text keeps just the panel count.
+facet_by_name <- function(expr) {
+  if (is.symbol(expr)) {
+    name <- as.character(expr)
+    return(if (name == ".") NULL else name)
+  }
+  if (is.call(expr) && length(expr) == 3) {
+    op <- expr[[1]]
+    if (identical(op, as.name("$")) &&
+        (is.symbol(expr[[3]]) || is.character(expr[[3]]))) {
+      return(as.character(expr[[3]]))
+    }
+    if (identical(op, as.name("[[")) && is.character(expr[[3]]) &&
+        length(expr[[3]]) == 1) {
+      return(expr[[3]])
+    }
+  }
+  NULL
+}
+
 # Works out what kind of x values a faceted payload carries, so the
 # shared x domain can be computed the right way. Bar categories are
 # always strings; scatter x is always numeric; line and area recorded
@@ -52,9 +75,10 @@ facet_xtype <- function(x) {
 #' `ylim` for the renderers to honour. Set `share_y = FALSE` (or
 #' `share_x = FALSE`) to let each panel scale to its own data — useful
 #' when the panels live on very different orders of magnitude, but then
-#' the panels no longer compare directly. For stacked areas the shared y
-#' range covers the tallest stack; percent and stream areas normalise
-#' themselves, so `share_y` has nothing to do there.
+#' the panels no longer compare directly. For stacked areas and stacked
+#' bars the shared y range covers the tallest stack; percent and stream
+#' areas and percent-stacked bars normalise themselves, so `share_y` has
+#' nothing to do there.
 #'
 #' @param w A polyviz widget made by [pv_bar()], [pv_line()],
 #'   [pv_scatter()], or [pv_area()].
@@ -80,6 +104,7 @@ facet_xtype <- function(x) {
 #'   pv_facet(fiscal$year)
 #' @export
 pv_facet <- function(w, by, ncol = NULL, share_y = TRUE, share_x = TRUE) {
+  by_expr <- substitute(by)
   if (!inherits(w, "htmlwidget") ||
       !identical(attr(w, "package"), "polyviz")) {
     rlang::abort(
@@ -155,6 +180,23 @@ pv_facet <- function(w, by, ncol = NULL, share_y = TRUE, share_x = TRUE) {
   w$x$data <- NULL
   if (!is.null(ncol)) w$x$ncol <- as.integer(ncol)
 
+  # The attached alt text was written for the unfaceted chart and its
+  # facts still hold, so keep it and add the one thing that changed:
+  # the panelling. The panel variable's name comes from the `by`
+  # argument when it is legible there; otherwise just the count.
+  by_name <- facet_by_name(by_expr)
+  panel_note <- if (is.null(by_name)) {
+    sprintf("Shown as %d small-multiple panels.", length(levels))
+  } else {
+    sprintf("Shown as %d small-multiple panels by %s.", length(levels),
+            by_name)
+  }
+  w$x$alt <- if (alt_str(w$x$alt)) {
+    paste(w$x$alt, panel_note)
+  } else {
+    panel_note
+  }
+
   # Shared axis ranges, computed across every panel. The cartesian
   # renderers honour xlim/ylim over their own data-driven domains, so
   # injecting the global extent here is all the sharing needs.
@@ -187,6 +229,19 @@ pv_facet <- function(w, by, ncol = NULL, share_y = TRUE, share_x = TRUE) {
         # scale by construction; there is no range to share.
         NULL
       }
+    } else if (identical(w$x$subtype, "bar") &&
+               identical(w$x$stack, "stack")) {
+      # A stacked bar's height is its category total, not its largest
+      # single segment - the constructor already computed each total
+      # for the labels, so the tallest bar is the largest of those.
+      # (Stacked bars refuse negative values, so the floor is zero.)
+      c(0, max(as.numeric(data$total), na.rm = TRUE))
+    } else if (identical(w$x$subtype, "bar") &&
+               identical(w$x$stack, "percent")) {
+      # Percent-stacked bars normalise every category to the same 100%
+      # scale by construction - like percent areas, there is no shared
+      # range to compute.
+      NULL
     } else {
       # Bars and lines anchor at zero (or below, for negative values).
       c(min(0, min(yv, na.rm = TRUE)), max(yv, na.rm = TRUE))

@@ -26,12 +26,13 @@ reference:
   desc: >
     Every chart function returns an htmlwidget rendered by the bundled
     D3.js v7 - interactive, animated, and theme-aware. All of them share
-    the same title/subtitle/mode/duration/source options.
+    the same title/subtitle/mode/source options.
   contents:
   - pv_bar
   - pv_line
   - pv_area
   - pv_scatter
+  - pv_pairs
   - pv_lollipop
   - pv_donut
   - pv_treemap
@@ -53,6 +54,7 @@ reference:
   - pv_choropleth
   - pv_bubble_map
   - pv_race
+  - pv_table
 
 - title: Chart layers & linking
   desc: >

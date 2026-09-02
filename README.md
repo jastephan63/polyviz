@@ -6,13 +6,13 @@
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 25 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 27 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 25 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 27 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -40,7 +40,7 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_calendar()` | `pv_choropleth()` | `pv_bubble_map()` |
 | `pv_force()` | `pv_chord()` | `pv_sankey()` |
 | `pv_parallel()` — brushable | `pv_race()` — animated | `pv_bump()` |
-| `pv_dendrogram()` — from `hclust` | | |
+| `pv_dendrogram()` — from `hclust` | `pv_pairs()` — scatterplot matrix | `pv_table()` — sortable, in-cell bars, shading & sparklines |
 
 ## Charts in papers and documents
 
@@ -111,6 +111,13 @@ pv_profile(airquality)
 # Outlier flags by IQR fence or z-score
 pv_outliers(airquality$Ozone, method = "iqr")
 ```
+
+The profile also states each variable's shape — skewness, excess
+kurtosis, and the Jarque-Bera normality test. And wherever a
+correlation is computed (`pv_pairs()`, `pv_plot_corr()`, the
+`pv_report()` heatmap), `method = "spearman"` or `"kendall"` swaps
+Pearson's *r* for a rank coefficient — the honest choice for
+relationships that are monotone but not linear.
 
 ## Bundled data
 

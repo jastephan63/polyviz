@@ -8,7 +8,7 @@ GitHub issue - the numbers below link to them.
 
 - [x] Violin plot: add optional boxplot overlay and jittered raw points (#1) — shipped in 0.6.0
 - [x] Stacked and percent-stacked modes for `pv_bar` (plus horizontal orientation) (#2) — shipped in 0.6.0
-- [ ] Correlogram / scatterplot-matrix widget (`pv_pairs`) composing scatter, histogram, and correlation cells (#3)
+- [x] Correlogram / scatterplot-matrix widget (`pv_pairs`) composing scatter, histogram, and correlation cells (#3) — shipped in 0.9.0
 - [x] Dendrogram widget that accepts `hclust` objects directly — shipped in 0.3.0 as `pv_dendrogram()`
 - [x] Zoomable circular-packing widget (`pv_pack`) — shipped in 0.3.0
 - [x] Connected-scatter option for `pv_line` (`show_points`, curve styles) (#4) — shipped in 0.6.0
@@ -23,8 +23,8 @@ GitHub issue - the numbers below link to them.
 
 - [ ] Add more LUSTAT / opendata.swiss datasets with documented examples (#10)
 - [x] `pv_report()`: one call that builds a full HTML EDA report from a data frame — shipped in 0.4.0
-- [ ] Correlation method options (Spearman, Kendall) for `pv_plot_corr` and heatmaps (#11)
-- [ ] Python backend: add skewness/kurtosis and normality checks to `pv_profile` (#12)
+- [x] Correlation method options (Spearman, Kendall) for `pv_plot_corr` and heatmaps (#11) — shipped in 0.9.0
+- [x] Python backend: add skewness/kurtosis and normality checks to `pv_profile` (#12) — shipped in 0.9.0
 
 ## Documentation & infrastructure
 

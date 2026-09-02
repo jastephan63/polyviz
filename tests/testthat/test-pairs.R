@@ -96,6 +96,56 @@ test_that("pairs maps color and label, with the 8-level palette cap", {
   expect_length(unique(w2$x$data$series), 8)
 })
 
+test_that("pairs colour cap follows the active theme's palette", {
+  on.exit(pv_reset_theme())
+  six_years <- sort(unique(pv_fiscal$year))[1:6]
+  f <- subset(pv_fiscal, year %in% six_years)
+  f$year_chr <- as.character(f$year)
+  # Six colour levels fit the packaged theme's 8 slots...
+  expect_pvchart(pv_pairs(f, columns = fiscal_cols, color = "year_chr"),
+                 "pairs")
+  # ...but not the paper theme's 5: refuse rather than recycle colours.
+  pv_set_theme(pv_theme_paper())
+  expect_error(pv_pairs(f, columns = fiscal_cols, color = "year_chr"),
+               "6 levels but the active theme's palette has 5 colours")
+  pv_reset_theme()
+  expect_pvchart(pv_pairs(f, columns = fiscal_cols, color = "year_chr"),
+                 "pairs")
+})
+
+test_that("pairs names constant columns instead of base R's sd warning", {
+  # year is constant in the 2025 subset, and the default column pick
+  # includes it - the natural way to hit a zero-variance column.
+  f25 <- subset(pv_fiscal, year == 2025)
+  expect_warning(
+    w <- pv_pairs(f25),
+    "`year` is constant in this data; its correlations are undefined.",
+    fixed = TRUE)
+  # Every off-diagonal coefficient touching year travels as NA - the
+  # matrix cells already draw an em dash there.
+  vars <- vapply(w$x$variables, function(v) v$name, character(1))
+  expect_equal(vars[1], "year")
+  expect_true(all(is.na(w$x$cor[[1]][-1])))
+  # Coefficients between the varying columns are untouched.
+  cm <- suppressWarnings(
+    stats::cor(f25[vars], use = "pairwise.complete.obs"))
+  expect_equal(w$x$cor[[3]], unname(cm[3, ]))
+  # One house-worded warning; the base one never leaks.
+  warns <- character()
+  withCallingHandlers(pv_pairs(f25), warning = function(cnd) {
+    warns <<- c(warns, conditionMessage(cnd))
+    invokeRestart("muffleWarning")
+  })
+  expect_length(warns, 1)
+  expect_false(any(grepl("standard deviation", warns)))
+  # Two constant columns are named together, verbs matching.
+  f25$flat <- 7
+  expect_warning(
+    pv_pairs(f25, columns = c("year", "flat", "resource_index")),
+    "`year` and `flat` are constant in this data; their correlations are undefined.",
+    fixed = TRUE)
+})
+
 test_that("pairs computes spearman and kendall when asked", {
   f25 <- utils::head(pairs25(), 40)
   for (m in c("spearman", "kendall")) {

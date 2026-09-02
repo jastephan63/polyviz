@@ -25,16 +25,19 @@
 #' pairwise-complete observations, and each scatter cell drops only the
 #' rows incomplete for its own pair, so no cell loses data to a gap in
 #' some other column. Rows with any missing value are counted in a
-#' single warning.
+#' single warning. A column that is constant in the data has no defined
+#' correlations — those cells show an em dash, and a warning names the
+#' column.
 #'
 #' @param data A data frame.
 #' @param columns Character vector of numeric column names to pair, in
 #'   matrix order. `NULL` (the default) takes the first 6 numeric
 #'   columns (excluding any mapped to `color` or `label`). At most 8 -
 #'   past that the cells shrink below anything readable.
-#' @param color Optional name of a grouping column (max 8 levels,
-#'   coloured from the categorical palette). Rows with a missing group
-#'   are dropped with a warning.
+#' @param color Optional name of a grouping column, coloured from the
+#'   categorical palette — at most as many levels as the active theme's
+#'   palette has colours (8 in the packaged theme). Rows with a missing
+#'   group are dropped with a warning.
 #' @param label Optional name of a column naming each row, shown first
 #'   in scatter-cell tooltips.
 #' @param method Which correlation the upper triangle shows:
@@ -94,7 +97,7 @@ pv_pairs <- function(data, columns = NULL, color = NULL, label = NULL,
   if (!is.null(color)) {
     pts$series <- as.character(data[[color]])
     pts <- drop_missing(pts, is.na(pts$series), color)
-    check_palette_fit(unique(pts$series), color)
+    check_theme_palette_fit(unique(pts$series), color)
   }
   if (!is.null(label)) pts$label <- as.character(data[[label]])
   for (k in seq_along(columns)) {
@@ -125,8 +128,26 @@ pv_pairs <- function(data, columns = NULL, color = NULL, label = NULL,
          lim = c(min(bins$x0), max(bins$x1)))
   })
 
-  cm <- stats::cor(pts[vcols], use = "pairwise.complete.obs",
-                   method = method)
+  # A constant column has no variance, so every correlation touching it
+  # is undefined: stats::cor() returns NA there and the matrix cells
+  # draw an em dash. Base R would mutter "the standard deviation is
+  # zero"; silence that and say it in plain words, naming the column(s).
+  constant <- columns[vapply(vcols, function(vc) {
+    v <- pts[[vc]][!is.na(pts[[vc]])]
+    min(v) == max(v)
+  }, logical(1))]
+  cm <- withCallingHandlers(
+    stats::cor(pts[vcols], use = "pairwise.complete.obs", method = method),
+    warning = function(w) {
+      if (length(constant)) invokeRestart("muffleWarning")
+    })
+  if (length(constant)) {
+    rlang::warn(sprintf(
+      "%s %s constant in this data; %s correlations are undefined.",
+      alt_join(paste0("`", constant, "`")),
+      if (length(constant) == 1) "is" else "are",
+      if (length(constant) == 1) "its" else "their"))
+  }
   # How many complete pairs each coefficient rests on - stated in the
   # correlation cell's tooltip, so a coefficient from thin pairwise
   # coverage can't masquerade as one from the full data.

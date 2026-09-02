@@ -55,7 +55,9 @@ render: the chart goes through the same headless-Chrome pipeline as
 times \code{scale}), and the settled PNG is placed edge to edge on a blank
 layout — what lands in the deck is pixel for pixel what a \code{pv_save()}
 capture shows. When \code{title} is given the deck opens with a title slide
-on the same chart surface. Each chart's title and source line also go
+on the same chart surface, set in Inter like the charts themselves;
+on machines without Inter installed PowerPoint silently substitutes a
+system font. Each chart's title and source line also go
 into its slide's speaker notes, so the deck stays searchable and
 presentable even though the slides are images.
 }

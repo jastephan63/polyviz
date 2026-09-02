@@ -54,9 +54,10 @@ here across every panel and injected into the payload as \code{xlim}/
 \code{ylim} for the renderers to honour. Set \code{share_y = FALSE} (or
 \code{share_x = FALSE}) to let each panel scale to its own data — useful
 when the panels live on very different orders of magnitude, but then
-the panels no longer compare directly. For stacked areas the shared y
-range covers the tallest stack; percent and stream areas normalise
-themselves, so \code{share_y} has nothing to do there.
+the panels no longer compare directly. For stacked areas and stacked
+bars the shared y range covers the tallest stack; percent and stream
+areas and percent-stacked bars normalise themselves, so \code{share_y} has
+nothing to do there.
 }
 \examples{
 pop <- subset(pv_city_population,

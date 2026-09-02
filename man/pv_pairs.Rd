@@ -28,9 +28,10 @@ matrix order. \code{NULL} (the default) takes the first 6 numeric
 columns (excluding any mapped to \code{color} or \code{label}). At most 8 -
 past that the cells shrink below anything readable.}
 
-\item{color}{Optional name of a grouping column (max 8 levels,
-coloured from the categorical palette). Rows with a missing group
-are dropped with a warning.}
+\item{color}{Optional name of a grouping column, coloured from the
+categorical palette — at most as many levels as the active theme's
+palette has colours (8 in the packaged theme). Rows with a missing
+group are dropped with a warning.}
 
 \item{label}{Optional name of a column naming each row, shown first
 in scatter-cell tooltips.}
@@ -75,7 +76,9 @@ Missing values follow the pairwise rule: correlations use
 pairwise-complete observations, and each scatter cell drops only the
 rows incomplete for its own pair, so no cell loses data to a gap in
 some other column. Rows with any missing value are counted in a
-single warning.
+single warning. A column that is constant in the data has no defined
+correlations — those cells show an em dash, and a warning names the
+column.
 }
 \examples{
 pv_pairs(subset(pv_fiscal, year == 2025),

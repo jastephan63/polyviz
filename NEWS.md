@@ -1,3 +1,29 @@
+# polyviz 0.9.1
+
+A polish release on the road to 1.0: every loose end from the last five
+releases, resolved.
+
+* Locale completeness: the calendar's month-initial row and weekday
+  hints now derive from the active `pv_locale()` (an Italian calendar
+  reads GFMAMGLASOND), and the race and bump charts' time labels and
+  tooltips format through the chart's own locale.
+* The series-colour cap now reads the active theme instead of a
+  hardcoded 8: under `pv_theme_paper()` (5 slots) a sixth area band is
+  refused with the real number, and colours are never recycled.
+* `pv_pairs()` explains constant columns in plain words instead of
+  leaking base R's standard-deviation warning.
+* Faceted charts' alt text now says so: "Shown as N small-multiple
+  panels by <variable>."
+* Faceted stacked bars share their y axis to the tallest stack total
+  (and percent stacks correctly share nothing).
+* `pv_save()` on a plain table no longer waits out the SVG settle
+  timeout; in-cell bars keep their rounded ends in PDF exports; and
+  `pv_deck()` title slides ask for Inter.
+* For the development machine: `R CMD check --as-cran` hanging at
+  "checking use of S3 registration" was diagnosed as a broken XQuartz
+  remnant intercepting tcltk's display probe — run checks with
+  `DISPLAY=` unset. Not a package issue; CI was never affected.
+
 # polyviz 0.9.0
 
 Tables, the scatterplot matrix, and deeper statistics.

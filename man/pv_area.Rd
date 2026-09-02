@@ -34,8 +34,9 @@ Rows with a missing x or value are dropped with a warning.}
 non-negative — stacked bands cannot represent a negative height.}
 
 \item{series}{Optional name of the series column, one band per level.
-At most 8 levels — beyond that, fold the small ones into an
-\code{"Other"} level. Omit it for a single-series area.}
+At most as many levels as the active theme's categorical palette
+has slots (8 in the packaged theme) — beyond that, fold the small
+ones into an \code{"Other"} level. Omit it for a single-series area.}
 
 \item{offset}{\code{"stacked"} (default), \code{"percent"}, or \code{"stream"}.}
 

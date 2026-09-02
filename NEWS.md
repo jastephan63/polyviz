@@ -1,3 +1,36 @@
+# polyviz 0.9.0
+
+Tables, the scatterplot matrix, and deeper statistics.
+
+## Two new chart types (27 total)
+
+* `pv_table()` — a first-class data table in the house style: sortable
+  columns, right-aligned tabular numerals, thin in-cell bars
+  (`bars =`), conditional shading from the sequential ramp
+  (`shade =`), inline sparklines from list-columns (`spark =`), and
+  optional paging. Locale-aware, light/dark, and exportable as PNG,
+  PDF, or HTML (a vector file cannot hold an HTML table, so `.svg`
+  and `.gif` refuse plainly). A table is what you ship when readers
+  need the exact numbers.
+* `pv_pairs()` — the scatterplot matrix: scatters below the diagonal,
+  histograms on it, correlation coefficients above it, inked by sign
+  and strength on the diverging ramp. Up to eight numeric columns,
+  an optional grouping colour, and `method = "spearman"` or
+  `"kendall"` when ranks tell the truer story.
+
+## Analysis
+
+* `pv_plot_corr()` and `pv_report()` gained the same `method`
+  argument; rank-based methods are named on the plot so a reader
+  always knows what they see. (#11)
+* `pv_profile()` now reports skewness, excess kurtosis, and a
+  Jarque–Bera normality check — computed identically by the Python
+  engine and the pure-R fallback, cross-checked in the tests. (#12)
+
+Every chart's generated alt text now covers the new types with real
+descriptions (a table's shape; a matrix's variables and its strongest
+correlation).
+
 # polyviz 0.8.0
 
 The publication release: everything between a finished chart and a

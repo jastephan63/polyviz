@@ -14,14 +14,21 @@ pv_profile(data, engine = c("auto", "python", "r"))
 }
 \value{
 A data frame with one row per numeric column: \code{variable}, \code{n},
-\code{n_missing}, \code{mean}, \code{sd}, \code{min}, \code{q25}, \code{median}, \code{q75}, \code{max}. The
-engine that produced it is recorded in \code{attr(, "engine")}.
+\code{n_missing}, \code{mean}, \code{sd}, \code{min}, \code{q25}, \code{median}, \code{q75}, \code{max},
+\code{skewness} (how lopsided the distribution is — 0 for symmetric,
+positive for a long right tail), \code{kurtosis} (excess kurtosis: how
+heavy the tails are compared to a normal distribution, which scores
+0), and \code{jb_stat} with \code{jb_p} (the Jarque-Bera normality test built
+from those two; a small \code{jb_p} means the column's shape would be
+surprising for normal data). The shape columns are \code{NA} for columns
+with fewer than four observed values or zero variance. The engine
+that produced the result is recorded in \code{attr(, "engine")}.
 }
 \description{
-Per-column counts, missingness, moments, and quartiles. Runs on the
-bundled Python module when available (see \code{\link[=pv_py_available]{pv_py_available()}}) and on an
-identical pure-R implementation otherwise — results match to numerical
-precision either way.
+Per-column counts, missingness, moments, quartiles, distribution shape,
+and a normality check. Runs on the bundled Python module when available
+(see \code{\link[=pv_py_available]{pv_py_available()}}) and on an identical pure-R implementation
+otherwise — results match to numerical precision either way.
 }
 \examples{
 pv_profile(mtcars, engine = "r")

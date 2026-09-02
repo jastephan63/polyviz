@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,7 +68,7 @@
 <p><a href="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p><strong>D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.</strong></p>
 <p>polyviz was born from loving <a href="https://d3js.org" class="external-link">d3.js</a> visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.</p>
-<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 25 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
+<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 27 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
 <p>Behind the R interface, the package deliberately spans four backend languages:</p>
 <table class="table">
 <colgroup>
@@ -85,7 +85,7 @@
 <tr>
 <td><strong>JavaScript (D3 v7)</strong></td>
 <td><code>inst/htmlwidgets/</code></td>
-<td>Renders all 25 interactive chart types</td>
+<td>Renders all 27 interactive chart types</td>
 </tr>
 <tr>
 <td><strong>SQL</strong></td>
@@ -174,8 +174,10 @@
 <td>
 <code><a href="reference/pv_dendrogram.html">pv_dendrogram()</a></code> — from <code>hclust</code>
 </td>
-<td></td>
-<td></td>
+<td>
+<code><a href="reference/pv_pairs.html">pv_pairs()</a></code> — scatterplot matrix</td>
+<td>
+<code><a href="reference/pv_table.html">pv_table()</a></code> — sortable, in-cell bars, shading &amp; sparklines</td>
 </tr>
 </tbody>
 </table>
@@ -242,6 +244,7 @@
 <span></span>
 <span><span class="co"># Outlier flags by IQR fence or z-score</span></span>
 <span><span class="fu"><a href="reference/pv_outliers.html">pv_outliers</a></span><span class="op">(</span><span class="va">airquality</span><span class="op">$</span><span class="va">Ozone</span>, method <span class="op">=</span> <span class="st">"iqr"</span><span class="op">)</span></span></code></pre></div>
+<p>The profile also states each variable’s shape — skewness, excess kurtosis, and the Jarque-Bera normality test. And wherever a correlation is computed (<code><a href="reference/pv_pairs.html">pv_pairs()</a></code>, <code><a href="reference/pv_plot_corr.html">pv_plot_corr()</a></code>, the <code><a href="reference/pv_report.html">pv_report()</a></code> heatmap), <code>method = "spearman"</code> or <code>"kendall"</code> swaps Pearson’s <em>r</em> for a rank coefficient — the honest choice for relationships that are monotone but not linear.</p>
 </div>
 <div class="section level2">
 <h2 id="bundled-data">Bundled data<a class="anchor" aria-label="anchor" href="#bundled-data"></a>

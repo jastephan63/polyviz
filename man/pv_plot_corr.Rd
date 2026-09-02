@@ -4,20 +4,33 @@
 \alias{pv_plot_corr}
 \title{Correlation heatmap}
 \usage{
-pv_plot_corr(data, mode = "light")
+pv_plot_corr(
+  data,
+  mode = "light",
+  method = c("pearson", "spearman", "kendall")
+)
 }
 \arguments{
 \item{data}{A data frame (only numeric columns are used).}
 
 \item{mode}{\code{"light"} or \code{"dark"}.}
+
+\item{method}{Correlation coefficient, as in \code{\link[stats:cor]{stats::cor()}}:
+\code{"pearson"} (default), \code{"spearman"}, or \code{"kendall"}. The default
+Pearson plot keeps its usual look; the rank-based methods add a
+subtitle naming the method, so the plot says which coefficient the
+cells hold.}
 }
 \value{
 A ggplot object.
 }
 \description{
-Pairwise Pearson correlations of the numeric columns, on a diverging
-blue–red scale with a neutral midpoint at zero.
+Pairwise correlations of the numeric columns, on a diverging blue–red
+scale with a neutral midpoint at zero. Pearson by default; the
+rank-based alternatives are available through \code{method} and are named
+in the plot's subtitle.
 }
 \examples{
 pv_plot_corr(mtcars)
+pv_plot_corr(mtcars, method = "spearman")
 }

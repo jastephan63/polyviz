@@ -9,7 +9,8 @@ pv_report(
   file,
   title = deparse(substitute(data)),
   mode = "auto",
-  open = FALSE
+  open = FALSE,
+  method = c("pearson", "spearman", "kendall")
 )
 }
 \arguments{
@@ -26,6 +27,11 @@ called with, so \code{pv_report(airquality, f)} is titled "airquality".}
 viewer's light/dark setting), \code{"light"}, or \code{"dark"}.}
 
 \item{open}{Also open the finished report in the default browser?}
+
+\item{method}{Correlation coefficient for the relationships heatmap,
+as in \code{\link[stats:cor]{stats::cor()}}: \code{"pearson"} (default), \code{"spearman"}, or
+\code{"kendall"}. The section's context line names the chosen method,
+and the rank-based methods are also named on the heatmap itself.}
 }
 \value{
 The \code{file} path, invisibly.
@@ -39,8 +45,9 @@ as styled HTML, a \code{\link[=pv_histogram]{pv_histogram()}} for each numeric c
 two per row), a horizontal \code{\link[=pv_bar]{pv_bar()}} of the most common levels of each
 categorical column with at most 30 distinct values (first 4), and —
 when the frame has three or more usable numeric columns — a
-\code{\link[=pv_heatmap]{pv_heatmap()}} of their pairwise Pearson correlations on the diverging
-palette centred at zero. Sections with nothing to show are skipped.
+\code{\link[=pv_heatmap]{pv_heatmap()}} of their pairwise correlations (Pearson by default; see
+\code{method}) on the diverging palette centred at zero. Sections with
+nothing to show are skipped.
 }
 \examples{
 report <- file.path(tempdir(), "sales-report.html")

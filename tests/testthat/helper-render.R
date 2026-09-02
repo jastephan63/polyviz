@@ -160,6 +160,30 @@ render_charts <- list(
     pv_beeswarm(f25, value = "resource_index", group = "side",
                 label = "municipality",
                 title = "Every municipality is a dot")
+  },
+  pairs = function() {
+    f25 <- pv_fiscal[pv_fiscal$year == 2025, ]
+    f25$side <- ifelse(f25$equalization_chf > 0, "receives", "contributes")
+    pv_pairs(f25, columns = c("resource_per_capita", "resource_index",
+                              "equalization_chf"),
+             color = "side", label = "municipality",
+             title = "Every pair of fiscal measures at once")
+  },
+  # The one chart drawn as HTML rather than SVG. All three in-cell
+  # encodings ride along, so the bar, shade, and sparkline paths are all
+  # under the render contract.
+  table = function() {
+    pop <- pv_city_population[order(pv_city_population$city,
+                                    pv_city_population$year), ]
+    now <- pop[pop$year == 2024, c("city", "population")]
+    then <- pop[pop$year == 1990, c("city", "population")]
+    tab <- merge(now, then, by = "city", suffixes = c("", "_1990"))
+    tab$growth <- 100 * (tab$population / tab$population_1990 - 1)
+    tab$trend <- I(split(pop$population, pop$city)[tab$city])
+    tab <- head(tab[order(-tab$population), ], 10)
+    pv_table(tab, columns = c("city", "population", "growth", "trend"),
+             bars = "population", shade = "growth", spark = "trend",
+             title = "The largest Swiss cities in numbers")
   }
 )
 

@@ -18,7 +18,8 @@ test_that("every chart type has a render check", {
     "area", "heatmap", "calendar",
     "sankey", "parallel",
     "pack", "dendrogram",
-    "choropleth", "bubblemap", "race", "bump", "beeswarm"))
+    "choropleth", "bubblemap", "race", "bump", "beeswarm",
+    "pairs", "table"))
   for (id in names(render_charts)) {
     w <- render_charts[[id]]()
     expect_s3_class(w, "pvchart")
@@ -124,6 +125,14 @@ test_that("bump renders without JavaScript errors", {
 
 test_that("beeswarm renders without JavaScript errors", {
   expect_chart_renders("beeswarm")
+})
+
+test_that("pairs renders without JavaScript errors", {
+  expect_chart_renders("pairs")
+})
+
+test_that("table renders without JavaScript errors", {
+  expect_chart_renders("table")
 })
 
 # The opt-in chart options ship extra drawing code the canonical charts

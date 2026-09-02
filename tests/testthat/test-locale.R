@@ -128,6 +128,76 @@ test_that("a fr-CH line chart labels its months in French", {
   expect_match(txt, "12\u00a0345,6", fixed = TRUE)
 })
 
+# The calendar's letter rows, read back in draw order: the twelve
+# month initials along the top of the year block, then the weekday
+# hints beside it. They are the only single-character <text> nodes in
+# the plot, so filtering on length keeps exactly them.
+calendar_letters_js <- paste0(
+  "(function () {",
+  " return Array.prototype.map.call(",
+  "   document.querySelectorAll('.pvchart svg text'),",
+  "   function (n) { return n.textContent; })",
+  "   .filter(function (s) { return s.length === 1; }).join('');",
+  " })()")
+
+calendar_letters_df <- data.frame(
+  date = as.Date(c("2024-01-15", "2024-04-02", "2024-07-19",
+                   "2024-10-05", "2024-12-24")),
+  reading = c(12, 18, 31, 14, 3))
+
+test_that("a fr-CH calendar derives its letter rows from the locale", {
+  render_skip_if_no_chrome()
+  withr::defer(pv_locale(NULL))
+  pv_locale("fr-CH")
+  w <- pv_calendar(calendar_letters_df, date = "date", value = "reading")
+  pv_locale(NULL)
+  letters_seen <- locale_render_eval(w, calendar_letters_js)
+  # The month row spells the initials of janvier through decembre -
+  # which happen to be the same twelve letters as English - and then
+  # the weekday hints give the locale away: lundi, mercredi, vendredi
+  # read L, M, V where English shows M, W, F.
+  expect_identical(letters_seen, "JFMAMJJASONDLMV")
+})
+
+test_that("an it-CH calendar swaps in the Italian month initials", {
+  render_skip_if_no_chrome()
+  withr::defer(pv_locale(NULL))
+  pv_locale("it-CH")
+  w <- pv_calendar(calendar_letters_df, date = "date", value = "reading")
+  pv_locale(NULL)
+  letters_seen <- locale_render_eval(w, calendar_letters_js)
+  # Gennaio, Giugno, and Luglio break from the English row, so this is
+  # the render that proves the initials are computed, not hardcoded.
+  expect_identical(letters_seen, "GFMAMGLASONDLMV")
+})
+
+test_that("a de-CH race stamps its time label through the locale", {
+  render_skip_if_no_chrome()
+  withr::defer(pv_locale(NULL))
+  df <- data.frame(
+    stadt = rep(c("Luzern", "Zug", "Schwyz"), times = 3),
+    monat = rep(as.Date(c("2024-01-01", "2024-02-01", "2024-03-01")),
+                each = 3),
+    besucher = seq_len(9) * 100)
+  pv_locale("de-CH")
+  w <- pv_race(df, time = "monat", id = "stadt", value = "besucher",
+               top_n = 3)
+  pv_locale(NULL)
+  txt <- locale_render_eval(w, locale_text_js)
+  # With no animation the race draws its final keyframe, so the big
+  # corner readout shows the last time point - through de-CH's month
+  # names: "Mar 2024" in English.
+  expect_match(txt, "M\u00e4r 2024", fixed = TRUE)
+  expect_false(grepl("Mar 2024", txt, fixed = TRUE))
+})
+
+test_that("without a locale the calendar keeps its English letter rows", {
+  render_skip_if_no_chrome()
+  w <- pv_calendar(calendar_letters_df, date = "date", value = "reading")
+  letters_seen <- locale_render_eval(w, calendar_letters_js)
+  expect_identical(letters_seen, "JFMAMJJASONDMWF")
+})
+
 test_that("without a locale the stock US-style output is untouched", {
   render_skip_if_no_chrome()
   df <- data.frame(canton = c("LU", "ZG", "SZ", "OW"),

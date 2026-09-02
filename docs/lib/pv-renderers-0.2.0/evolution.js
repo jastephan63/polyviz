@@ -677,8 +677,26 @@
     var offY = Math.max(6, (ctx.height - totalH) / 2);
 
     var svg = pv.baseSvg(ctx);
-    var fmtDate = d3.timeFormat("%A, %b %e, %Y");
-    var monthInitials = "JFMAMJJASOND";
+    /* The tooltip date and the letter rows below all come from
+       ctx.fmtTime, the chart's own locale-aware formatter factory:
+       with pv_locale set the locale supplies its month and day names,
+       without one this is exactly d3's stock English output. */
+    var fmtDate = ctx.fmtTime("%A, %b %e, %Y");
+    /* The month row is the first letter of each month name, uppercased
+       - JFMAMJJASOND in English (French and German happen to spell the
+       same row), GFMAMGLASOND in Italian. Any year serves for the
+       probe dates; only the month matters. */
+    var fmtMonth = ctx.fmtTime("%B");
+    var monthInitials = d3.range(12).map(function (mi) {
+      return fmtMonth(new Date(2000, mi, 1)).charAt(0).toUpperCase();
+    });
+    /* The weekday hints are the same idea on the day names: Monday,
+       Wednesday, Friday - the alternate rows they sit beside. The probe
+       week is one that starts on a Monday. */
+    var fmtDay = ctx.fmtTime("%A");
+    var wdHints = [1, 3, 5].map(function (dd) {
+      return fmtDay(new Date(2024, 0, dd)).charAt(0).toUpperCase();
+    });
 
     blocks.forEach(function (b, bi) {
       var top = offY + bi * (blockH + gapY);
@@ -701,12 +719,12 @@
           .attr("y", -4)
           .attr("fill", ctx.theme.ink.muted)
           .style("font-size", "9.5px")
-          .text(monthInitials.charAt(mi));
+          .text(monthInitials[mi]);
       }
 
       /* Weekday hints on alternate rows, when the cells can carry them. */
       if (showWd) {
-        ["M", "W", "F"].forEach(function (wd, wi) {
+        wdHints.forEach(function (wd, wi) {
           g.append("text")
             .attr("x", -5).attr("y", wi * 2 * step + cell / 2)
             .attr("text-anchor", "end")

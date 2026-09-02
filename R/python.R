@@ -53,19 +53,53 @@ resolve_engine <- function(engine = c("auto", "python", "r")) {
   engine
 }
 
+# Sample skewness, excess kurtosis, and the Jarque-Bera normality test for
+# a vector with the missing values already dropped. Mirrors _moments() in
+# inst/python/polyviz.py: plain moment estimators g1 = m3 / m2^1.5 and
+# g2 = m4 / m2^2 - 3, central moments with an n denominator. With fewer
+# than four values, or when every value is the same, the shape of the
+# distribution is not meaningfully estimable, so all four come back NaN.
+profile_moments <- function(clean) {
+  none <- c(skewness = NaN, kurtosis = NaN, jb_stat = NaN, jb_p = NaN)
+  n <- length(clean)
+  if (n < 4) {
+    return(none)
+  }
+  mu <- mean(clean)
+  m2 <- mean((clean - mu)^2)
+  if (m2 == 0) {
+    return(none)
+  }
+  skew <- mean((clean - mu)^3) / m2^1.5
+  kurt <- mean((clean - mu)^4) / m2^2 - 3
+  jb <- n / 6 * (skew^2 + kurt^2 / 4)
+  # The Jarque-Bera statistic is compared against a chi-squared with 2 df,
+  # whose upper tail is exactly exp(-x / 2) - the Python side uses that
+  # closed form and pchisq gives the same number.
+  c(skewness = skew, kurtosis = kurt, jb_stat = jb,
+    jb_p = stats::pchisq(jb, df = 2, lower.tail = FALSE))
+}
+
 #' Profile the numeric columns of a data frame
 #'
-#' Per-column counts, missingness, moments, and quartiles. Runs on the
-#' bundled Python module when available (see [pv_py_available()]) and on an
-#' identical pure-R implementation otherwise — results match to numerical
-#' precision either way.
+#' Per-column counts, missingness, moments, quartiles, distribution shape,
+#' and a normality check. Runs on the bundled Python module when available
+#' (see [pv_py_available()]) and on an identical pure-R implementation
+#' otherwise — results match to numerical precision either way.
 #'
 #' @param data A data frame.
 #' @param engine `"auto"` (default: Python when available), `"python"`, or
 #'   `"r"`.
 #' @return A data frame with one row per numeric column: `variable`, `n`,
-#'   `n_missing`, `mean`, `sd`, `min`, `q25`, `median`, `q75`, `max`. The
-#'   engine that produced it is recorded in `attr(, "engine")`.
+#'   `n_missing`, `mean`, `sd`, `min`, `q25`, `median`, `q75`, `max`,
+#'   `skewness` (how lopsided the distribution is — 0 for symmetric,
+#'   positive for a long right tail), `kurtosis` (excess kurtosis: how
+#'   heavy the tails are compared to a normal distribution, which scores
+#'   0), and `jb_stat` with `jb_p` (the Jarque-Bera normality test built
+#'   from those two; a small `jb_p` means the column's shape would be
+#'   surprising for normal data). The shape columns are `NA` for columns
+#'   with fewer than four observed values or zero variance. The engine
+#'   that produced the result is recorded in `attr(, "engine")`.
 #' @examples
 #' pv_profile(mtcars, engine = "r")
 #' @export
@@ -90,13 +124,18 @@ pv_profile <- function(data, engine = c("auto", "python", "r")) {
       clean <- x[!is.na(x)]
       stats_row <- if (length(clean)) {
         q <- stats::quantile(clean, c(0.25, 0.5, 0.75), names = FALSE)
+        mom <- profile_moments(clean)
         data.frame(mean = mean(clean),
                    sd = if (length(clean) > 1) stats::sd(clean) else NaN,
                    min = min(clean), q25 = q[1], median = q[2], q75 = q[3],
-                   max = max(clean))
+                   max = max(clean),
+                   skewness = mom[["skewness"]],
+                   kurtosis = mom[["kurtosis"]],
+                   jb_stat = mom[["jb_stat"]], jb_p = mom[["jb_p"]])
       } else {
         data.frame(mean = NaN, sd = NaN, min = NaN, q25 = NaN,
-                   median = NaN, q75 = NaN, max = NaN)
+                   median = NaN, q75 = NaN, max = NaN,
+                   skewness = NaN, kurtosis = NaN, jb_stat = NaN, jb_p = NaN)
       }
       cbind(data.frame(variable = nm, n = length(x),
                        n_missing = sum(is.na(x))),

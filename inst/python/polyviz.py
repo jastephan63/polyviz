@@ -30,12 +30,50 @@ def _quartiles(clean):
     return q[0], q[1], q[2]
 
 
+def _chisq2_sf(x):
+    """Upper-tail probability of the chi-squared distribution with 2 df.
+
+    With two degrees of freedom the chi-squared distribution is an
+    exponential with mean 2, so the survival function is exactly
+    exp(-x / 2). This matches R's pchisq(x, 2, lower.tail = FALSE).
+    """
+    if x <= 0:
+        return 1.0
+    return math.exp(-x / 2.0)
+
+
+def _moments(clean):
+    """Sample skewness, excess kurtosis, and the Jarque-Bera test.
+
+    Uses the plain moment estimators g1 = m3 / m2^1.5 and
+    g2 = m4 / m2^2 - 3, where m_k is the k-th central moment with an n
+    denominator. With fewer than four values, or when every value is the
+    same, the shape of the distribution is not meaningfully estimable, so
+    all four results are NaN.
+    """
+    n = len(clean)
+    nan = float("nan")
+    if n < 4:
+        return nan, nan, nan, nan
+    mu = statistics.fmean(clean)
+    m2 = math.fsum((v - mu) ** 2 for v in clean) / n
+    if m2 == 0:
+        return nan, nan, nan, nan
+    m3 = math.fsum((v - mu) ** 3 for v in clean) / n
+    m4 = math.fsum((v - mu) ** 4 for v in clean) / n
+    skew = m3 / m2 ** 1.5
+    kurt = m4 / m2 ** 2 - 3.0
+    jb = n / 6.0 * (skew ** 2 + kurt ** 2 / 4.0)
+    return skew, kurt, jb, _chisq2_sf(jb)
+
+
 def profile_columns(data):
     """Profile a dict of {name: list of numbers}.
 
     Returns a list of dicts, one per column, with n, n_missing, mean, sd,
-    min, quartiles, and max. Columns with no non-missing values report
-    counts only.
+    min, quartiles, max, skewness, excess kurtosis, and the Jarque-Bera
+    normality test (statistic and p-value). Columns with no non-missing
+    values report counts only.
     """
     rows = []
     for name, values in data.items():
@@ -47,6 +85,7 @@ def profile_columns(data):
         }
         if clean:
             q25, q50, q75 = _quartiles(clean)
+            skew, kurt, jb, jb_p = _moments(clean)
             row.update({
                 "mean": statistics.fmean(clean),
                 "sd": statistics.stdev(clean) if len(clean) > 1 else float("nan"),
@@ -55,10 +94,15 @@ def profile_columns(data):
                 "median": q50,
                 "q75": q75,
                 "max": max(clean),
+                "skewness": skew,
+                "kurtosis": kurt,
+                "jb_stat": jb,
+                "jb_p": jb_p,
             })
         else:
             row.update({k: float("nan") for k in
-                        ("mean", "sd", "min", "q25", "median", "q75", "max")})
+                        ("mean", "sd", "min", "q25", "median", "q75", "max",
+                         "skewness", "kurtosis", "jb_stat", "jb_p")})
         rows.append(row)
     return rows
 

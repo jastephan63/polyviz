@@ -669,9 +669,43 @@ alt_beeswarm <- function(x) {
 # The dispatcher pv_widget() and pv_alt_text() call. Any type without a
 # dedicated describer (a facet payload, say) still gets an honest
 # generic sentence rather than nothing.
+# The data table: structural facts only - the exact numbers live in the
+# cells themselves, so the description says what the table holds, not
+# what it says.
+alt_table <- function(x) {
+  cols <- vapply(x$columns, function(s) s$key, character(1))
+  alt_lead(x, "A data table",
+           sprintf("listing %s across %s (%s)",
+                   alt_count(nrow(x$data), "row", "rows"),
+                   alt_count(length(cols), "column", "columns"),
+                   alt_join(cols)))
+}
+
+# The scatterplot matrix: the variables, the method, and the strongest
+# relationship - the one fact a reader would ask for first.
+alt_pairs <- function(x) {
+  vars <- vapply(x$variables, function(v) v$name, character(1))
+  out <- alt_lead(x, "A scatterplot matrix",
+                  sprintf("comparing %s pairwise (%s)",
+                          alt_count(length(vars), "variable", "variables"),
+                          alt_join(vars)))
+  cm <- do.call(rbind, x$cor)
+  cm[upper.tri(cm, diag = TRUE)] <- NA
+  if (any(is.finite(cm))) {
+    at <- which(abs(cm) == max(abs(cm), na.rm = TRUE), arr.ind = TRUE)[1, ]
+    out <- paste(out, sprintf(
+      "The strongest %s is between %s and %s, at %s.",
+      x$methodLabel, vars[at[["col"]]], vars[at[["row"]]],
+      alt_num(cm[at[["row"]], at[["col"]]])))
+  }
+  out
+}
+
 alt_describe <- function(x) {
   type <- if (alt_str(x$type)) x$type else "data"
   switch(type,
+    table = alt_table(x),
+    pairs = alt_pairs(x),
     bar = alt_bar(x),
     line = alt_line(x),
     scatter = alt_scatter(x),

@@ -30,3 +30,5 @@ dependencies:
       - motion.js
       - points.js
       - facet.js
+      - table.js
+      - pairs.js

@@ -73,6 +73,7 @@ var pvDataKeys = {
   area: "data", heatmap: "data", calendar: "data", donut: "data",
   lollipop: "data", beeswarm: "data", parallel: "data", race: "data",
   bump: "data", choropleth: "data", bubblemap: "data",
+  table: "data", pairs: "data",
   force: "nodes", sankey: "nodes",
   chord: "matrix",
   sunburst: "root", pack: "root", treemap: "root",

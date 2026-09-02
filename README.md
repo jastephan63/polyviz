@@ -6,13 +6,13 @@
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 27 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 27 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 28 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -28,7 +28,7 @@ Python is optional. If `reticulate` finds any Python ≥ 3.8, the profiling func
 
 ## The charts
 
-Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (`pvchartOutput()` / `renderPvchart()`). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit `TRUE`/`FALSE`/`"auto"` override. Options add depth where the form supports it, without changing any chart that doesn't ask: bars stack by value or to 100%, lines take observation markers, curved or stepped interpolation, and a brush-to-zoom strip (areas zoom too), and violins pin the raw values inside their silhouettes as jittered dots. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the [gallery](https://jastephan63.github.io/polyviz/).
+Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (`pvchartOutput()` / `renderPvchart()`). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit `TRUE`/`FALSE`/`"auto"` override. Options add depth where the form supports it, without changing any chart that doesn't ask: bars stack by value or to 100%, lines take observation markers, curved or stepped interpolation, and a brush-to-zoom strip (areas zoom too), violins pin the raw values inside their silhouettes as jittered dots, and scatters trade their marks for filled density contours (`density = TRUE`) or move them to a canvas layer (`canvas`, automatic past 8,000 points) so huge clouds stay fluid. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the [gallery](https://jastephan63.github.io/polyviz/).
 
 | | | |
 |---|---|---|
@@ -38,9 +38,10 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_beeswarm()` | `pv_donut()` | `pv_treemap()` |
 | `pv_sunburst()` — zoomable | `pv_pack()` — zoomable | `pv_heatmap()` |
 | `pv_calendar()` | `pv_choropleth()` | `pv_bubble_map()` |
-| `pv_force()` | `pv_chord()` | `pv_sankey()` |
-| `pv_parallel()` — brushable | `pv_race()` — animated | `pv_bump()` |
-| `pv_dendrogram()` — from `hclust` | `pv_pairs()` — scatterplot matrix | `pv_table()` — sortable, in-cell bars, shading & sparklines |
+| `pv_force()` | `pv_chord()` | `pv_arc()` — crossing-minimised order |
+| `pv_sankey()` | `pv_parallel()` — brushable | `pv_race()` — animated |
+| `pv_bump()` | `pv_dendrogram()` — from `hclust` | `pv_pairs()` — scatterplot matrix |
+| `pv_table()` — sortable, in-cell bars, shading & sparklines | | |
 
 ## Charts in papers and documents
 
@@ -121,8 +122,8 @@ relationships that are monotone but not linear.
 
 ## Bundled data
 
-Twelve real open-government datasets ship with the package, covering the
-population, economy, territory, and weather of Switzerland:
+Fourteen real open-government datasets ship with the package, covering the
+population, economy, energy, territory, tourism, and weather of Switzerland:
 
 - `pv_city_population` — 180 Swiss cities at census years 1930–2024 (BFS)
 - `pv_city_sectors` — employment shares by economic sector per city (BFS/STATENT)
@@ -134,6 +135,8 @@ population, economy, territory, and weather of Switzerland:
 - `pv_swiss_cantons` / `pv_swiss_districts` / `pv_swiss_lakes` — country-wide boundary layers for `pv_choropleth()` and `pv_bubble_map()` (BFS ThemaKart)
 - `pv_city_coords` — one WGS84 point per city, the bubble-map companion (derived from BFS ThemaKart)
 - `pv_weather` — daily temperature, precipitation, and sunshine in Lucerne, 2020–2025 (MeteoSwiss)
+- `pv_electricity` — monthly Swiss electricity production by source, 2020–2025 (Bundesamt für Energie)
+- `pv_tourism` — hotel arrivals and nights per canton by guest origin, 2005–2025 (BFS/HESTA)
 
 The one layer too big to bundle — all ~2100 municipal boundaries — is
 downloaded and cached on first use by `pv_fetch_map("municipalities")`,

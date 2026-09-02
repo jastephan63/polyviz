@@ -51,6 +51,7 @@ reference:
   - pv_sankey
   - pv_chord
   - pv_force
+  - pv_arc
   - pv_choropleth
   - pv_bubble_map
   - pv_race
@@ -155,7 +156,7 @@ reference:
   desc: >
     Bundled demonstration data - simulated sales and networks, plus real
     Swiss open data (cities, commuters, Lucerne fiscal equalization,
-    elections, boundaries, and weather).
+    elections, boundaries, weather, electricity, and tourism).
   contents:
   - pv_sales
   - pv_network
@@ -172,6 +173,8 @@ reference:
   - pv_swiss_lakes
   - pv_city_coords
   - pv_weather
+  - pv_electricity
+  - pv_tourism
 
 - title: Shiny
   desc: Output and render bindings for using the charts in Shiny apps.

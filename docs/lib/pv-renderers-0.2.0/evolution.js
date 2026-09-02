@@ -85,7 +85,8 @@
     var yTitle = offset === "stream" ? "" : (ctx.x.ylab || "");
     var m = { top: 12, right: 24,
               bottom: ctx.x.xlab ? 52 : 36,
-              left: offset === "stream" ? 24 : (yTitle ? 58 : 46) };
+              left: offset === "stream" ? 24 :
+                pv.leftMargin(ctx, yTitle ? 58 : 46) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);

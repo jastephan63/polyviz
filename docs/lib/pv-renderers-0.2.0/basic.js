@@ -71,7 +71,7 @@
       ctx.height = Math.max(120, ctx.height - 26);
     }
 
-    var m = { top: 12, right: 14, bottom: 52, left: 58 };
+    var m = { top: 12, right: 14, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -407,7 +407,7 @@
     var data = s.data, cats = s.cats, color = s.color, percent = s.percent;
     function baseOp(d) { return s.keys ? pv.keyOpacity(ctx, d.key, 1) : 1; }
 
-    var m = { top: 12, right: 14, bottom: 52, left: 58 };
+    var m = { top: 12, right: 14, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -762,7 +762,7 @@
     }
 
     var directLabels = seriesNames.length > 1 && seriesNames.length <= 4;
-    var m = { top: 12, right: directLabels ? 90 : 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: directLabels ? 90 : 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);
@@ -1153,7 +1153,7 @@
       return keys ? pv.keyOpacity(ctx, d.key, baseOpacity) : baseOpacity;
     }
 
-    var m = { top: 12, right: 24, bottom: 52, left: 58 };
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
     var iw = ctx.width - m.left - m.right,
         ih = ctx.height - m.top - m.bottom;
     var svg = pv.baseSvg(ctx);

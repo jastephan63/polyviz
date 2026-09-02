@@ -221,6 +221,15 @@ window.pv = (function () {
     }
   };
 
+  /* The left margin that fits the y-axis ticks. The stock 58px column
+     carries compact ticks like "400k"; a locale that writes numbers out
+     in full ("400'000") needs a wider column so the rotated axis title
+     stays clear of the tick text. */
+  pv.leftMargin = function (ctx, base) {
+    base = base || 58;
+    return ctx.x && ctx.x.locale ? base + 18 : base;
+  };
+
   /* Draws a bar as an SVG path where only the top two corners are rounded.
      A plain <rect> with rounded corners would round the bottom too, and the
      bottom edge should sit flat on the axis baseline. */

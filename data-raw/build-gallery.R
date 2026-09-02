@@ -25,6 +25,7 @@ display_names <- c(
   `choropleth-cantons` = "Country-wide choropleth",
   `bubble-map` = "Bubble map",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
+  pairs = "Scatterplot matrix", table = "Data table",
   violin = "Violin plot", calendar = "Calendar heatmap",
   annotated = "Annotations & trends", facet = "Small multiples",
   `bar-stacked` = "Stacked bars", `line-points` = "Connected scatter",

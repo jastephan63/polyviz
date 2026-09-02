@@ -591,6 +591,33 @@ window.pv = (function () {
     });
   }
 
+  /* The outline of a box whose corners round unevenly, as SVG path
+     data: clockwise from the top-left, a straight edge to each corner
+     and a quarter-circle arc around the rounded ones (a corner at 0
+     stays sharp). Radii are clamped to half the box, as CSS clamps
+     them. */
+  function roundedRectPath(x, y, w, h, radii) {
+    var cap = Math.min(w, h) / 2;
+    var rr = radii.map(function (v) {
+      return Math.max(0, Math.min(cap, v));
+    });
+    var tl = rr[0], tr = rr[1], br = rr[2], bl = rr[3];
+    function arc(rad, ex, ey) {
+      return "A" + round2(rad) + " " + round2(rad) + " 0 0 1 " +
+        round2(ex) + " " + round2(ey);
+    }
+    var d = "M" + round2(x + tl) + " " + round2(y) +
+      "H" + round2(x + w - tr);
+    if (tr) d += arc(tr, x + w, y + tr);
+    d += "V" + round2(y + h - br);
+    if (br) d += arc(br, x + w - br, y + h);
+    d += "H" + round2(x + bl);
+    if (bl) d += arc(bl, x, y + h - bl);
+    d += "V" + round2(y + tl);
+    if (tl) d += arc(tl, x + tl, y);
+    return d + "Z";
+  }
+
   /* A plot svg goes in whole, as a nested <svg> pinned to the spot it
      occupies in the widget - that keeps its own coordinate system and
      clip paths intact without touching any of its content. */
@@ -635,15 +662,29 @@ window.pv = (function () {
       }
       if (!fill) fill = realBg(cs.backgroundColor);
       if (fill) {
-        var rect = svgNode("rect");
-        rect.setAttribute("x", round2(r.left - state.base.left));
-        rect.setAttribute("y", round2(r.top - state.base.top));
-        rect.setAttribute("width", round2(r.width));
-        rect.setAttribute("height", round2(r.height));
-        var radius = parseFloat(cs.borderTopLeftRadius) || 0;
-        if (radius) rect.setAttribute("rx", round2(radius));
-        rect.setAttribute("fill", fill);
-        state.root.appendChild(rect);
+        var tl = parseFloat(cs.borderTopLeftRadius) || 0;
+        var tr = parseFloat(cs.borderTopRightRadius) || 0;
+        var br = parseFloat(cs.borderBottomRightRadius) || 0;
+        var bl = parseFloat(cs.borderBottomLeftRadius) || 0;
+        var shape;
+        if (tl === tr && tr === br && br === bl) {
+          shape = svgNode("rect");
+          shape.setAttribute("x", round2(r.left - state.base.left));
+          shape.setAttribute("y", round2(r.top - state.base.top));
+          shape.setAttribute("width", round2(r.width));
+          shape.setAttribute("height", round2(r.height));
+          if (tl) shape.setAttribute("rx", round2(tl));
+        } else {
+          /* Corners rounding unevenly - a table's in-cell bar rounds
+             only its data end - are more than an rx rect can say, so
+             the outline is rebuilt as a path, one arc per corner. */
+          shape = svgNode("path");
+          shape.setAttribute("d", roundedRectPath(
+            r.left - state.base.left, r.top - state.base.top,
+            r.width, r.height, [tl, tr, br, bl]));
+        }
+        shape.setAttribute("fill", fill);
+        state.root.appendChild(shape);
       }
     }
     for (var i = 0; i < node.childNodes.length; i++) {

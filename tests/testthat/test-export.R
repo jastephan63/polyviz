@@ -226,6 +226,100 @@ test_that("pdf export is a single-page vector pdf with embedded fonts", {
   expect_match(ascii, "FontFile", fixed = TRUE)
 })
 
+test_that("the settle probe matches what the chart draws", {
+  # every SVG chart settles on the count of SVG elements...
+  expect_identical(polyviz:::export_settle_count_js(export_chart()),
+                   "document.querySelectorAll('svg *').length")
+  # ...and so does a table with a spark column - its sparklines are SVG
+  df <- data.frame(city = c("A", "B"), size = c(2, 1))
+  df$trend <- I(list(c(1, 2, 3), c(2, 1, 4)))
+  sparky <- pv_table(df, bars = "size", spark = "trend")
+  expect_identical(polyviz:::export_settle_count_js(sparky),
+                   "document.querySelectorAll('svg *').length")
+  # a table without sparklines never draws any SVG, so the SVG poll
+  # would sit out its whole timeout; that table settles on its own rows
+  plain <- pv_table(data.frame(a = c("x", "y"), b = c(1, 2)),
+                    sortable = FALSE)
+  expect_identical(polyviz:::export_settle_count_js(plain),
+                   "document.querySelectorAll('.pvchart table tr').length")
+})
+
+test_that("a plain table saves well under the old settle timeout", {
+  skip_if_no_chrome()
+  dir <- withr::local_tempdir()
+  set.seed(1)
+  tab <- data.frame(name = sprintf("Municipality %02d", 1:50),
+                    population = round(runif(50, 1000, 90000)))
+  w <- pv_table(tab, sortable = FALSE, title = "A plain table")
+  # one throwaway save first, so Chrome's own startup cost stays out of
+  # the measured run
+  pv_save(w, file.path(dir, "warmup.png"), quiet = TRUE, delay = 0)
+  f <- file.path(dir, "plain.png")
+  elapsed <- system.time(
+    pv_save(w, f, quiet = TRUE, delay = 0))[["elapsed"]]
+  expect_true(file.exists(f))
+  expect_gt(file.size(f), 20000)
+  # With no SVG on the page the old settle loop sat out its full
+  # 4-second cap before every capture; polling the table's rows settles
+  # in a few tenths. Asserted with slack for slow machines, but still
+  # well under the old floor.
+  expect_lt(elapsed, 3)
+})
+
+# Renders a widget in headless Chrome exactly the way pv_save() stages
+# its captures (light mode, no entrance animation), waits until it has
+# settled, and returns the standalone SVG document - what the .pdf print
+# path is built from.
+export_settled_svg <- function(widget) {
+  w <- widget
+  w$x$mode <- "light"
+  w$x$duration <- 0
+  w$width <- NULL
+  w$height <- NULL
+  w$sizingPolicy$browser$fill <- TRUE
+  w$sizingPolicy$browser$padding <- 0
+  stage <- tempfile("pv-export-")
+  dir.create(stage)
+  on.exit(unlink(stage, recursive = TRUE), add = TRUE)
+  page <- file.path(stage, "chart.html")
+  htmlwidgets::saveWidget(w, page, selfcontained = FALSE, libdir = "lib")
+
+  b <- chromote::ChromoteSession$new(width = 700, height = 460)
+  on.exit(try(b$close(), silent = TRUE), add = TRUE)
+  errors <- polyviz:::export_watch_errors(b)
+  loaded <- b$Page$loadEventFired(wait_ = FALSE)
+  b$Page$navigate(utils::URLencode(paste0("file://", normalizePath(page))),
+                  wait_ = FALSE)
+  b$wait_for(loaded)
+  polyviz:::export_wait_settled(b, errors, 0,
+                                polyviz:::export_settle_count_js(w))
+  expect_identical(errors$msgs, character())
+  b$Runtime$evaluate(paste0(
+    "(function () {",
+    " var el = document.querySelector('.pvchart');",
+    " return window.pv.toStandaloneSvg(el, el.__pvLastX || null, null);",
+    " })()"), returnByValue = TRUE)$result$value
+}
+
+test_that("a table's bars keep their rounded data end in vector output", {
+  skip_if_no_chrome()
+  regions <- aggregate(revenue ~ region, pv_sales, sum)
+  w <- pv_table(regions, bars = "revenue", digits = 0,
+                title = "Revenue by region")
+  svg <- export_settled_svg(w)
+  # The in-cell bar rounds only its data end (border-radius: 0 3px 3px
+  # 0), which an rx-only rect cannot say: it must come out as a path
+  # with one 3px arc per right corner, filled with the accent the bars
+  # are drawn in.
+  accent <- grDevices::col2rgb(w$x$theme$categorical$light[[1]])
+  bar <- sprintf(paste0(
+    '<path d="M[^"]*A3 3 0 0 1[^"]*A3 3 0 0 1[^"]*Z" ',
+    'fill="rgb\\(%d, %d, %d\\)"'), accent[1], accent[2], accent[3])
+  expect_match(svg, bar)
+  # one rounded bar per data row
+  expect_length(regmatches(svg, gregexpr(bar, svg))[[1]], 4)
+})
+
 test_that("javascript errors surface as an R warning", {
   skip_if_no_chrome()
   w <- export_chart()

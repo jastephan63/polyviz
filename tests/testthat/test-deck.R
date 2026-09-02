@@ -109,6 +109,9 @@ test_that("a titled deck is one 16:9 slide per chart plus the opener", {
   expect_match(opener, "Quarterly review", fixed = TRUE)
   expect_match(opener, "Rendered by polyviz", fixed = TRUE)
   expect_identical(deck_count(opener, "<p:pic>"), 0L)
+  # both heading runs name Inter, the face the rendered charts are set
+  # in - never the template's Calibri
+  expect_identical(deck_count(opener, 'typeface="Inter"'), 2L)
 
   # each content slide places exactly one image
   for (i in 2:4) {

@@ -266,13 +266,32 @@ export_watch_errors <- function(b) {
   errors
 }
 
+# What to poll while waiting for the chart to settle. Every chart draws
+# into SVG except the table, so counting SVG elements is the general
+# signal - but a table without sparklines never grows any, and polling
+# for them would sit out the whole timeout. That table settles on its
+# own DOM: the count of <table> rows. A table with a spark column draws
+# real SVG (the sparklines) and keeps the general signal.
+export_settle_count_js <- function(widget) {
+  if (identical(widget$x$type, "table")) {
+    spark <- vapply(widget$x$columns, function(col) {
+      identical(col$type, "spark")
+    }, logical(1))
+    if (!any(spark)) {
+      return("document.querySelectorAll('.pvchart table tr').length")
+    }
+  }
+  "document.querySelectorAll('svg *').length"
+}
+
 # Waits until the page has actually drawn the chart. The renderers draw
 # synchronously once their scripts run, but scripts and fonts arrive
-# asynchronously even from file://, so poll the number of SVG elements
-# until it stops changing (or a JavaScript error makes waiting pointless),
-# wait for the web font, then honour the caller's extra delay.
-export_wait_settled <- function(b, errors, delay) {
-  count_js <- "document.querySelectorAll('svg *').length"
+# asynchronously even from file://, so poll the number of drawn elements
+# (`count_js`, SVG children for every chart but the plain table) until it
+# stops changing (or a JavaScript error makes waiting pointless), wait
+# for the web font, then honour the caller's extra delay.
+export_wait_settled <- function(b, errors, delay, count_js = NULL) {
+  count_js <- count_js %||% "document.querySelectorAll('svg *').length"
   last <- -1
   stable <- 0
   for (i in seq_len(40)) {
@@ -618,7 +637,7 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
   b$Page$navigate(utils::URLencode(paste0("file://", normalizePath(page))),
                   wait_ = FALSE)
   b$wait_for(loaded)
-  export_wait_settled(b, errors, delay)
+  export_wait_settled(b, errors, delay, export_settle_count_js(widget))
   if (length(errors$msgs)) {
     rlang::warn(sprintf(
       "JavaScript error while rendering the chart: %s",

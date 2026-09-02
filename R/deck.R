@@ -89,8 +89,11 @@ deck_set_slide_size <- function(doc, width, height) {
 # template's "Title Slide" one, whose placeholders sit where a 4:3 slide
 # put them. A full-bleed rectangle first paints the same surface the
 # rendered charts sit on, then the heading text goes just above the
-# vertical centre. The text keeps the template's theme font - naming a
-# font the viewer's machine lacks would only invite an ugly substitute.
+# vertical centre. The text names Inter, the face every rendered chart
+# is set in - left to the template it would come out in Calibri and the
+# opener would clash with its own deck. PowerPoint substitutes a system
+# font silently on machines without Inter, which beats the guaranteed
+# mismatch.
 deck_title_slide <- function(doc, title, subtitle, width, height, ink) {
   doc <- officer::add_slide(doc, layout = "Blank", master = "Office Theme")
   doc <- officer::ph_with(
@@ -103,7 +106,8 @@ deck_title_slide <- function(doc, title, subtitle, width, height, ink) {
     doc,
     officer::fpar(
       officer::ftext(title, officer::fp_text_lite(
-        color = ink$primary %||% "#000000", font.size = 36, bold = TRUE)),
+        color = ink$primary %||% "#000000", font.size = 36, bold = TRUE,
+        font.family = "Inter")),
       fp_p = officer::fp_par(text.align = "left")),
     location = officer::ph_location(left = margin, top = 0.36 * height,
                                     width = width - 2 * margin, height = 1))
@@ -112,7 +116,8 @@ deck_title_slide <- function(doc, title, subtitle, width, height, ink) {
       doc,
       officer::fpar(
         officer::ftext(subtitle, officer::fp_text_lite(
-          color = ink$secondary %||% "#666666", font.size = 18)),
+          color = ink$secondary %||% "#666666", font.size = 18,
+          font.family = "Inter")),
         fp_p = officer::fp_par(text.align = "left")),
       location = officer::ph_location(left = margin,
                                       top = 0.36 * height + 1,
@@ -144,7 +149,9 @@ deck_notes <- function(widget) {
 #' times `scale`), and the settled PNG is placed edge to edge on a blank
 #' layout — what lands in the deck is pixel for pixel what a `pv_save()`
 #' capture shows. When `title` is given the deck opens with a title slide
-#' on the same chart surface. Each chart's title and source line also go
+#' on the same chart surface, set in Inter like the charts themselves;
+#' on machines without Inter installed PowerPoint silently substitutes a
+#' system font. Each chart's title and source line also go
 #' into its slide's speaker notes, so the deck stays searchable and
 #' presentable even though the slides are images.
 #'

@@ -551,6 +551,16 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
     rlang::abort(
       "`fps` must be a single number of frames per second from 1 to 50.")
   }
+  # The table is the one chart drawn as HTML rather than SVG, so the two
+  # formats built from the chart's vector drawing have nothing to build
+  # from: an .svg would carry the text but none of the table itself, and
+  # a .gif captures an animation a table does not have. The raster, PDF,
+  # and page formats all work.
+  if (format %in% c("svg", "gif") && identical(widget$x$type, "table")) {
+    rlang::abort(sprintf(paste(
+      "A .%s file cannot hold an HTML table - save it as .png, .pdf,",
+      "or .html instead."), format))
+  }
   # The race is the only chart whose animation is a data timeline; every
   # other chart merely animates its entrance, and nobody needs a GIF of
   # a fade-in when a .png shows the same finished chart.

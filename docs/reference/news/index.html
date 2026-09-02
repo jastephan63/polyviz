@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,25 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.9.0" id="polyviz-090">polyviz 0.9.0<a class="anchor" aria-label="anchor" href="#polyviz-090"></a></h2>
+<p>Tables, the scatterplot matrix, and deeper statistics.</p>
+<div class="section level3">
+<h3 id="two-new-chart-types-total-0-9-0">Two new chart types (27 total)<a class="anchor" aria-label="anchor" href="#two-new-chart-types-total-0-9-0"></a></h3>
+<ul><li>
+<code><a href="../reference/pv_table.html">pv_table()</a></code> — a first-class data table in the house style: sortable columns, right-aligned tabular numerals, thin in-cell bars (<code>bars =</code>), conditional shading from the sequential ramp (<code>shade =</code>), inline sparklines from list-columns (<code>spark =</code>), and optional paging. Locale-aware, light/dark, and exportable as PNG, PDF, or HTML (a vector file cannot hold an HTML table, so <code>.svg</code> and <code>.gif</code> refuse plainly). A table is what you ship when readers need the exact numbers.</li>
+<li>
+<code><a href="../reference/pv_pairs.html">pv_pairs()</a></code> — the scatterplot matrix: scatters below the diagonal, histograms on it, correlation coefficients above it, inked by sign and strength on the diverging ramp. Up to eight numeric columns, an optional grouping colour, and <code>method = "spearman"</code> or <code>"kendall"</code> when ranks tell the truer story.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="analysis-0-9-0">Analysis<a class="anchor" aria-label="anchor" href="#analysis-0-9-0"></a></h3>
+<ul><li>
+<code><a href="../reference/pv_plot_corr.html">pv_plot_corr()</a></code> and <code><a href="../reference/pv_report.html">pv_report()</a></code> gained the same <code>method</code> argument; rank-based methods are named on the plot so a reader always knows what they see. (#11)</li>
+<li>
+<code><a href="../reference/pv_profile.html">pv_profile()</a></code> now reports skewness, excess kurtosis, and a Jarque–Bera normality check — computed identically by the Python engine and the pure-R fallback, cross-checked in the tests. (#12)</li>
+</ul><p>Every chart’s generated alt text now covers the new types with real descriptions (a table’s shape; a matrix’s variables and its strongest correlation).</p>
+</div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.8.0" id="polyviz-080">polyviz 0.8.0<a class="anchor" aria-label="anchor" href="#polyviz-080"></a></h2>
 <p>The publication release: everything between a finished chart and a finished page.</p>

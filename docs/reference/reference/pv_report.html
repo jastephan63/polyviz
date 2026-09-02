@@ -7,8 +7,9 @@ as styled HTML, a pv_histogram() for each numeric column (first 8,
 two per row), a horizontal pv_bar() of the most common levels of each
 categorical column with at most 30 distinct values (first 4), and —
 when the frame has three or more usable numeric columns — a
-pv_heatmap() of their pairwise Pearson correlations on the diverging
-palette centred at zero. Sections with nothing to show are skipped."><meta property="og:description" content="Profiles a data frame and writes a standalone, themed HTML report built
+pv_heatmap() of their pairwise correlations (Pearson by default; see
+method) on the diverging palette centred at zero. Sections with
+nothing to show are skipped."><meta property="og:description" content="Profiles a data frame and writes a standalone, themed HTML report built
 from real polyviz widgets — every chart on the page is the same live d3
 graphic the individual chart functions produce. The report has a header
 with the dimensions and completeness, the pv_summary() column table
@@ -16,8 +17,9 @@ as styled HTML, a pv_histogram() for each numeric column (first 8,
 two per row), a horizontal pv_bar() of the most common levels of each
 categorical column with at most 30 distinct values (first 4), and —
 when the frame has three or more usable numeric columns — a
-pv_heatmap() of their pairwise Pearson correlations on the diverging
-palette centred at zero. Sections with nothing to show are skipped."></head><body>
+pv_heatmap() of their pairwise correlations (Pearson by default; see
+method) on the diverging palette centred at zero. Sections with
+nothing to show are skipped."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -25,7 +27,7 @@ palette centred at zero. Sections with nothing to show are skipped."></head><bod
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,8 +74,9 @@ as styled HTML, a <code><a href="pv_histogram.html">pv_histogram()</a></code> fo
 two per row), a horizontal <code><a href="pv_bar.html">pv_bar()</a></code> of the most common levels of each
 categorical column with at most 30 distinct values (first 4), and —
 when the frame has three or more usable numeric columns — a
-<code><a href="pv_heatmap.html">pv_heatmap()</a></code> of their pairwise Pearson correlations on the diverging
-palette centred at zero. Sections with nothing to show are skipped.</p>
+<code><a href="pv_heatmap.html">pv_heatmap()</a></code> of their pairwise correlations (Pearson by default; see
+<code>method</code>) on the diverging palette centred at zero. Sections with
+nothing to show are skipped.</p>
     </div>
 
     <div class="section level2">
@@ -83,7 +86,8 @@ palette centred at zero. Sections with nothing to show are skipped.</p>
 <span>  <span class="va">file</span>,</span>
 <span>  title <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/deparse.html" class="external-link">deparse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/substitute.html" class="external-link">substitute</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  mode <span class="op">=</span> <span class="st">"auto"</span>,</span>
-<span>  open <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  open <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"pearson"</span>, <span class="st">"spearman"</span>, <span class="st">"kendall"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -113,6 +117,13 @@ viewer's light/dark setting), <code>"light"</code>, or <code>"dark"</code>.</p><
 
 <dt id="arg-open">open<a class="anchor" aria-label="anchor" href="#arg-open"></a></dt>
 <dd><p>Also open the finished report in the default browser?</p></dd>
+
+
+<dt id="arg-method">method<a class="anchor" aria-label="anchor" href="#arg-method"></a></dt>
+<dd><p>Correlation coefficient for the relationships heatmap,
+as in <code><a href="https://rdrr.io/r/stats/cor.html" class="external-link">stats::cor()</a></code>: <code>"pearson"</code> (default), <code>"spearman"</code>, or
+<code>"kendall"</code>. The section's context line names the chosen method,
+and the rank-based methods are also named on the heatmap itself.</p></dd>
 
 </dl></div>
     <div class="section level2">

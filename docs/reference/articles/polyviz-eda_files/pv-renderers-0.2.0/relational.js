@@ -1,6 +1,7 @@
 /*
- * Relational and hierarchical renderers: force-directed network, chord
- * diagram, zoomable sunburst. See basic.js for the ctx contract.
+ * Relational and hierarchical renderers: force-directed network, arc
+ * diagram, chord diagram, zoomable sunburst. See basic.js for the ctx
+ * contract.
  */
 (function () {
 
@@ -194,6 +195,212 @@
       });
       placeLabels();
     });
+  };
+
+  /* ---------- arc diagram ---------- */
+
+  pvRenderers.arc = function (ctx) {
+    var nodes = ctx.x.nodes.map(function (d) { return Object.assign({}, d); });
+    var links = ctx.x.links.map(function (d) { return Object.assign({}, d); });
+    var hasGroup = nodes.length && nodes[0].group !== undefined;
+    /* The R side ships the group levels in the caller's original node
+       order, so colours stay put whichever node `order` was chosen. */
+    var groups = hasGroup ?
+      (ctx.x.groups || pv.uniq(nodes.map(function (d) { return d.group; }))) :
+      [];
+    var color = d3.scaleOrdinal().domain(groups).range(ctx.theme.palette);
+    if (hasGroup) {
+      pv.buildLegend(ctx.header, groups, color, ctx.theme);
+      ctx.height = Math.max(120, ctx.height - 26);
+    }
+
+    /* Each node's connection count sizes its dot; the adjacency map
+       drives the hover highlight. Links here keep their id strings -
+       there is no simulation to swap them for objects. */
+    var degree = {}, adjacent = {}, groupOf = {}, labelOf = {};
+    links.forEach(function (l) {
+      degree[l.source] = (degree[l.source] || 0) + 1;
+      degree[l.target] = (degree[l.target] || 0) + 1;
+      (adjacent[l.source] = adjacent[l.source] || {})[l.target] = true;
+      (adjacent[l.target] = adjacent[l.target] || {})[l.source] = true;
+    });
+    nodes.forEach(function (d) {
+      groupOf[d.id] = d.group;
+      labelOf[d.id] = d.label;
+    });
+
+    var w = ctx.width, h = ctx.height;
+    var nr = function (d) {
+      return 3.5 + 1.6 * Math.sqrt(degree[d.id] || 0);
+    };
+    var maxR = d3.max(nodes, nr) || 5;
+
+    /* The line of nodes. scalePoint spaces them evenly; the half-step
+       outer padding keeps the first and last labels inside the frame. */
+    var xs = d3.scalePoint()
+      .domain(nodes.map(function (d) { return d.id; }))
+      .range([18, w - 18]).padding(0.5);
+    var step = xs.step();
+
+    /* Labels sit horizontally under the dots. When the widest one no
+       longer fits its slot the labels stagger into two rows, and if even
+       two slots are too narrow they are shortened with an ellipsis - the
+       tooltip always carries the full name. */
+    var maxLabelW = d3.max(nodes, function (d) {
+      return pv.textWidth(d.label, 11);
+    }) || 0;
+    var staggered = nodes.length > 1 && maxLabelW > step - 6;
+    var labelChars = Math.max(4, Math.floor(
+      ((staggered ? 2 * step : step) - 8) / (11 * 0.62)));
+    var baseY = h - maxR - (staggered ? 32 : 19) - 4;
+
+    /* Arc width by the square root of the flow, and a resting opacity
+       that steps down as the picture fills up - a dense weave stays
+       readable only when each thread is faint. */
+    var lw = d3.scaleSqrt()
+      .domain([0, d3.max(links, function (l) { return l.value; }) || 1])
+      .range([0.7, 5]);
+    var baseOp = links.length <= 12 ? 0.7 :
+                 links.length <= 40 ? 0.55 :
+                 links.length <= 100 ? 0.42 : 0.3;
+
+    /* Linked selection (pv_link): the resting opacities every hover
+       restores - full strength with no selection anywhere, faded for
+       nodes outside it and links touching no selected node. */
+    function nodeOp(d) { return pv.keyOpacity(ctx, d.id, 1, 0.15); }
+    function linkOp(l) {
+      if (!ctx.selected) return baseOp;
+      return ctx.selected.indexOf(String(l.source)) >= 0 ||
+             ctx.selected.indexOf(String(l.target)) >= 0 ? baseOp : 0.06;
+    }
+
+    /* A link is half an ellipse over the baseline: full semicircles
+       until the chart is too short for the widest span, then flattened
+       just enough to stay inside the frame. */
+    function arcPath(l) {
+      var x1 = xs(l.source), x2 = xs(l.target);
+      var lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+      var rx = (hi - lo) / 2;
+      var ry = Math.min(rx, baseY - 10);
+      return "M" + lo + "," + baseY +
+        " A" + rx + "," + ry + " 0 0,1 " + hi + "," + baseY;
+    }
+
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g");
+
+    /* The line itself: one hairline under the dots. */
+    if (nodes.length > 1) {
+      g.append("line")
+        .attr("x1", xs(nodes[0].id) - 10)
+        .attr("x2", xs(nodes[nodes.length - 1].id) + 10)
+        .attr("y1", baseY).attr("y2", baseY)
+        .attr("stroke", ctx.theme.ink.baseline);
+    }
+
+    var link = g.selectAll("path.arc").data(links).enter().append("path")
+      .attr("class", "arc")
+      .attr("fill", "none")
+      .attr("d", arcPath)
+      .attr("stroke", function (l) {
+        return hasGroup ? color(groupOf[l.source]) : ctx.theme.ink.muted;
+      })
+      .attr("stroke-width", function (l) { return lw(l.value); })
+      .attr("stroke-linecap", "round")
+      .attr("stroke-opacity", ctx.duration > 0 ? 0 : linkOp);
+
+    /* Entrance: arcs fade in one after the other. Skipped entirely in
+       instant mode - the final opacity is already set above. */
+    if (ctx.duration > 0) {
+      link.transition().duration(ctx.duration)
+        .delay(function (d, i) { return i * 25; })
+        .attr("stroke-opacity", linkOp);
+    }
+
+    /* A thin arc is a hard hover target, so an invisible wider twin of
+       each one catches the pointer. Both selections are bound to the
+       same link objects, which is how a hit path finds its arc. */
+    var hit = g.selectAll("path.hit").data(links).enter().append("path")
+      .attr("class", "hit")
+      .attr("fill", "none")
+      .attr("d", arcPath)
+      .attr("stroke", "transparent")
+      .attr("stroke-width", function (l) { return Math.max(9, lw(l.value)); })
+      .style("cursor", "pointer");
+
+    var node = g.selectAll("g.node").data(nodes).enter().append("g")
+      .attr("class", "node").style("cursor", "pointer")
+      .attr("transform", function (d) {
+        return "translate(" + xs(d.id) + "," + baseY + ")";
+      })
+      .attr("opacity", nodeOp);
+
+    node.append("circle")
+      .attr("r", nr)
+      .attr("fill", function (d) {
+        return hasGroup ? color(d.group) : ctx.theme.palette[0];
+      })
+      .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2);
+
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("y", function (d, i) {
+        return maxR + (staggered && i % 2 ? 26 : 13);
+      })
+      .attr("fill", ctx.theme.ink.secondary)
+      .style("font-size", "11px")
+      .style("pointer-events", "none")
+      .text(function (d) { return pv.truncate(d.label, labelChars); });
+
+    node
+      .on("pointerenter pointermove", function (event, d) {
+        node.attr("opacity", function (n) {
+          return n.id === d.id || (adjacent[d.id] && adjacent[d.id][n.id]) ?
+            1 : 0.25;
+        });
+        link.attr("stroke-opacity", function (l) {
+          return l.source === d.id || l.target === d.id ?
+            Math.min(1, baseOp + 0.35) : 0.06;
+        });
+        var rows = ["<b>" + pv.esc(d.label) + "</b>"];
+        if (hasGroup) {
+          rows.push(pv.swatchRow(color(d.group), "group", pv.esc(d.group)));
+        }
+        rows.push("connections: <b>" + (degree[d.id] || 0) + "</b>");
+        pv.showTip(ctx, event, rows.join("<br>"));
+      })
+      .on("pointerleave", function () {
+        node.attr("opacity", nodeOp);
+        link.attr("stroke-opacity", linkOp);
+        pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking a node reports it as input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          part: "node", id: d.id, label: d.label,
+          group: hasGroup ? d.group : null,
+          connections: degree[d.id] || 0
+        });
+      });
+
+    hit
+      .on("pointerenter pointermove", function (event, l) {
+        link.filter(function (x) { return x === l; })
+          .attr("stroke-opacity", 0.95);
+        pv.showTip(ctx, event,
+          pv.esc(labelOf[l.source]) + " &rarr; " + pv.esc(labelOf[l.target]) +
+          ": <b>" + ctx.fmt(l.value) + "</b>");
+      })
+      .on("pointerleave", function () {
+        link.attr("stroke-opacity", linkOp);
+        pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking an arc reports the flow it carries. */
+      .on("click", function (event, l) {
+        ctx.emit("click", {
+          part: "link", source: l.source, target: l.target, value: l.value
+        });
+      });
   };
 
   /* ---------- chord ---------- */

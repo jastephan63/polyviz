@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,7 +68,7 @@
 <p><a href="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p><strong>D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.</strong></p>
 <p>polyviz was born from loving <a href="https://d3js.org" class="external-link">d3.js</a> visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.</p>
-<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 27 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
+<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
 <p>Behind the R interface, the package deliberately spans four backend languages:</p>
 <table class="table">
 <colgroup>
@@ -85,7 +85,7 @@
 <tr>
 <td><strong>JavaScript (D3 v7)</strong></td>
 <td><code>inst/htmlwidgets/</code></td>
-<td>Renders all 27 interactive chart types</td>
+<td>Renders all 28 interactive chart types</td>
 </tr>
 <tr>
 <td><strong>SQL</strong></td>
@@ -117,7 +117,7 @@
 <div class="section level2">
 <h2 id="the-charts">The charts<a class="anchor" aria-label="anchor" href="#the-charts"></a>
 </h2>
-<p>Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (<code><a href="reference/pvchart-shiny.html">pvchartOutput()</a></code> / <code><a href="reference/pvchart-shiny.html">renderPvchart()</a></code>). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit <code>TRUE</code>/<code>FALSE</code>/<code>"auto"</code> override. Options add depth where the form supports it, without changing any chart that doesn’t ask: bars stack by value or to 100%, lines take observation markers, curved or stepped interpolation, and a brush-to-zoom strip (areas zoom too), and violins pin the raw values inside their silhouettes as jittered dots. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the <a href="https://jastephan63.github.io/polyviz/" class="external-link">gallery</a>.</p>
+<p>Every chart is an htmlwidget: it animates in, responds to hover with tooltips, follows light/dark mode, re-renders when its container resizes, and works in the RStudio Viewer, R Markdown, Quarto, and Shiny (<code><a href="reference/pvchart-shiny.html">pvchartOutput()</a></code> / <code><a href="reference/pvchart-shiny.html">renderPvchart()</a></code>). Automatic corrections adapt each chart to its data and size — orientation, labels, legends, opacity — and every automatic behaviour has an explicit <code>TRUE</code>/<code>FALSE</code>/<code>"auto"</code> override. Options add depth where the form supports it, without changing any chart that doesn’t ask: bars stack by value or to 100%, lines take observation markers, curved or stepped interpolation, and a brush-to-zoom strip (areas zoom too), violins pin the raw values inside their silhouettes as jittered dots, and scatters trade their marks for filled density contours (<code>density = TRUE</code>) or move them to a canvas layer (<code>canvas</code>, automatic past 8,000 points) so huge clouds stay fluid. Invalid or degenerate data — a missing column, text where numbers belong, two rows for one bar, nothing left to draw — fails immediately with a clear R-side message instead of rendering a broken chart. See each one live, explained, in the <a href="https://jastephan63.github.io/polyviz/" class="external-link">gallery</a>.</p>
 <table class="table">
 <colgroup>
 <col width="33%">
@@ -161,23 +161,29 @@
 <tr>
 <td><code><a href="reference/pv_force.html">pv_force()</a></code></td>
 <td><code><a href="reference/pv_chord.html">pv_chord()</a></code></td>
-<td><code><a href="reference/pv_sankey.html">pv_sankey()</a></code></td>
+<td>
+<code><a href="reference/pv_arc.html">pv_arc()</a></code> — crossing-minimised order</td>
 </tr>
 <tr>
+<td><code><a href="reference/pv_sankey.html">pv_sankey()</a></code></td>
 <td>
 <code><a href="reference/pv_parallel.html">pv_parallel()</a></code> — brushable</td>
 <td>
 <code><a href="reference/pv_race.html">pv_race()</a></code> — animated</td>
-<td><code><a href="reference/pv_bump.html">pv_bump()</a></code></td>
 </tr>
 <tr>
+<td><code><a href="reference/pv_bump.html">pv_bump()</a></code></td>
 <td>
 <code><a href="reference/pv_dendrogram.html">pv_dendrogram()</a></code> — from <code>hclust</code>
 </td>
 <td>
 <code><a href="reference/pv_pairs.html">pv_pairs()</a></code> — scatterplot matrix</td>
+</tr>
+<tr>
 <td>
 <code><a href="reference/pv_table.html">pv_table()</a></code> — sortable, in-cell bars, shading &amp; sparklines</td>
+<td></td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -249,7 +255,7 @@
 <div class="section level2">
 <h2 id="bundled-data">Bundled data<a class="anchor" aria-label="anchor" href="#bundled-data"></a>
 </h2>
-<p>Twelve real open-government datasets ship with the package, covering the population, economy, territory, and weather of Switzerland:</p>
+<p>Fourteen real open-government datasets ship with the package, covering the population, economy, energy, territory, tourism, and weather of Switzerland:</p>
 <ul>
 <li>
 <code>pv_city_population</code> — 180 Swiss cities at census years 1930–2024 (BFS)</li>
@@ -271,6 +277,10 @@
 <code>pv_city_coords</code> — one WGS84 point per city, the bubble-map companion (derived from BFS ThemaKart)</li>
 <li>
 <code>pv_weather</code> — daily temperature, precipitation, and sunshine in Lucerne, 2020–2025 (MeteoSwiss)</li>
+<li>
+<code>pv_electricity</code> — monthly Swiss electricity production by source, 2020–2025 (Bundesamt für Energie)</li>
+<li>
+<code>pv_tourism</code> — hotel arrivals and nights per canton by guest origin, 2005–2025 (BFS/HESTA)</li>
 </ul>
 <p>The one layer too big to bundle — all ~2100 municipal boundaries — is downloaded and cached on first use by <code>pv_fetch_map("municipalities")</code>, or simply by passing <code>map = "municipalities"</code> to a geo chart.</p>
 <p>All are openly licensed with source citation required (see each dataset’s help page for the exact attribution); the LUSTAT datasets additionally require the data owner’s permission for commercial use. Three simulated datasets (<code>pv_sales</code>, <code>pv_network</code>, <code>pv_flows</code>) remain for examples that need shapes the real data doesn’t provide.</p>

@@ -12,6 +12,8 @@ pv_scatter(
   size = NULL,
   label = NULL,
   legend = "auto",
+  density = FALSE,
+  canvas = "auto",
   xlab = NULL,
   ylab = NULL,
   title = NULL,
@@ -40,6 +42,36 @@ values keeps every pair distinguishable; more will error).}
 \item{legend}{Show the colour legend row above the chart? \code{TRUE} always
 shows it (when a \code{color} mapping exists), \code{FALSE} hides it; \code{"auto"}
 (default) shows it exactly when a \code{color} mapping exists.}
+
+\item{density}{Draw the joint distribution as filled density contours
+instead of point marks? \code{FALSE} (default) or \code{TRUE}. When on, a 2D
+kernel density estimate over the points (d3.contourDensity) replaces
+the cloud with filled bands on the theme's sequential ramp, light
+where points are sparse to dark at the peak, with thin
+surface-coloured separators between bands — the readable treatment
+for clouds too dense to show structure point by point. The
+bandwidth and the number of bands are picked adaptively from the
+point count and the plot size, and the tooltip reports the band
+under the cursor as a share of the peak density. Contours have no
+per-point aesthetics, so \code{color}, \code{size}, and \code{label} are refused;
+the drag-to-select brush and \code{\link[=pv_link]{pv_link()}} dimming have no marks to
+act on either, so both quietly stay off. \code{\link[=pv_trend]{pv_trend()}} and
+\code{\link[=pv_annotate]{pv_annotate()}} layers still draw, over the contours. When \code{canvas}
+is also requested, density wins — the contours are already the
+aggregate view, so \code{canvas} is ignored.}
+
+\item{canvas}{Draw the point marks on a \verb{<canvas>} layer instead of as
+SVG circles? \code{TRUE} forces it, \code{FALSE} keeps every mark an SVG
+element; \code{"auto"} (default) switches to canvas past 8,000 points,
+where one SVG node per point makes browsers sluggish. Only the
+marks move: axes, grid, labels, annotations, trends, and all chrome
+stay SVG, the hover tooltip and click events keep working (nearest
+point within a small radius), the drag-to-select brush and
+\code{\link[=pv_link]{pv_link()}} dimming behave as before, and the layer is
+device-pixel-ratio aware so it stays crisp on high-density screens.
+SVG exports embed the canvas layer as a raster image at the same
+position and size; PNG and PDF saves are unaffected. Ignored when
+\code{density = TRUE}.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
 \code{NA} or \code{""} suppresses the title entirely; any other string

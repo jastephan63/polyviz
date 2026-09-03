@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,30 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.9.2" id="polyviz-092">polyviz 0.9.2<a class="anchor" aria-label="anchor" href="#polyviz-092"></a></h2>
+<p>The last items from the public roadmap: two ways to see through big scatters, a new network view, and two curated datasets.</p>
+<ul><li>
+<code>pv_scatter(density = TRUE)</code> replaces the point marks with filled density contours on the sequential ramp (bundled d3-contour, ISC) — the aggregate view for clouds too dense to read as dots. (#6)</li>
+<li>
+<code>pv_scatter(canvas = "auto")</code> moves the marks to a canvas layer past 8,000 points while axes, labels, trends, and annotations stay vector; hover, brushing, and linked selection keep working through a spatial index, and SVG exports embed the raster layer in place. (#9)</li>
+<li>
+<code><a href="../reference/pv_arc.html">pv_arc()</a></code> — the 28th chart type: nodes on a line, links as arcs, the label-friendly network view. <code>order = "auto"</code> reduces arc crossings with a barycenter-and-swaps pass; explicit orders are validated. (#7)</li>
+<li>Two curated datasets join the bundle: <code>pv_electricity</code> (Swiss monthly electricity production by source, 2020–2025, BFE) and <code>pv_tourism</code> (hotel arrivals and nights per canton by guest origin, 2005–2025, BFS) — both fetched through the package’s own opendata machinery, licences documented. (#10)</li>
+</ul></div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.9.1" id="polyviz-091">polyviz 0.9.1<a class="anchor" aria-label="anchor" href="#polyviz-091"></a></h2>
+<p>A polish release on the road to 1.0: every loose end from the last five releases, resolved.</p>
+<ul><li>Locale completeness: the calendar’s month-initial row and weekday hints now derive from the active <code><a href="../reference/pv_locale.html">pv_locale()</a></code> (an Italian calendar reads GFMAMGLASOND), and the race and bump charts’ time labels and tooltips format through the chart’s own locale.</li>
+<li>The series-colour cap now reads the active theme instead of a hardcoded 8: under <code><a href="../reference/pv_theme_paper.html">pv_theme_paper()</a></code> (5 slots) a sixth area band is refused with the real number, and colours are never recycled.</li>
+<li>
+<code><a href="../reference/pv_pairs.html">pv_pairs()</a></code> explains constant columns in plain words instead of leaking base R’s standard-deviation warning.</li>
+<li>Faceted charts’ alt text now says so: “Shown as N small-multiple panels by <variable>.”</variable></li>
+<li>Faceted stacked bars share their y axis to the tallest stack total (and percent stacks correctly share nothing).</li>
+<li>
+<code><a href="../reference/pv_save.html">pv_save()</a></code> on a plain table no longer waits out the SVG settle timeout; in-cell bars keep their rounded ends in PDF exports; and <code><a href="../reference/pv_deck.html">pv_deck()</a></code> title slides ask for Inter.</li>
+<li>For the development machine: <code>R CMD check --as-cran</code> hanging at “checking use of S3 registration” was diagnosed as a broken XQuartz remnant intercepting tcltk’s display probe — run checks with <code>DISPLAY=</code> unset. Not a package issue; CI was never affected.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.9.0" id="polyviz-090">polyviz 0.9.0<a class="anchor" aria-label="anchor" href="#polyviz-090"></a></h2>
 <p>Tables, the scatterplot matrix, and deeper statistics.</p>

@@ -1,3 +1,26 @@
+# polyviz 0.9.2
+
+The last items from the public roadmap: two ways to see through big
+scatters, a new network view, and two curated datasets.
+
+* `pv_scatter(density = TRUE)` replaces the point marks with filled
+  density contours on the sequential ramp (bundled d3-contour, ISC) —
+  the aggregate view for clouds too dense to read as dots. (#6)
+* `pv_scatter(canvas = "auto")` moves the marks to a canvas layer past
+  8,000 points while axes, labels, trends, and annotations stay
+  vector; hover, brushing, and linked selection keep working through
+  a spatial index, and SVG exports embed the raster layer in place.
+  (#9)
+* `pv_arc()` — the 28th chart type: nodes on a line, links as arcs,
+  the label-friendly network view. `order = "auto"` reduces arc
+  crossings with a barycenter-and-swaps pass; explicit orders are
+  validated. (#7)
+* Two curated datasets join the bundle: `pv_electricity` (Swiss
+  monthly electricity production by source, 2020–2025, BFE) and
+  `pv_tourism` (hotel arrivals and nights per canton by guest origin,
+  2005–2025, BFS) — both fetched through the package's own
+  opendata machinery, licences documented. (#10)
+
 # polyviz 0.9.1
 
 A polish release on the road to 1.0: every loose end from the last five

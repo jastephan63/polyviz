@@ -40,11 +40,14 @@
 
   /* Formats one (possibly interpolated) time number for display. Years
      round to whole years; dates show the year alone once the span is a
-     few years, the month otherwise. */
+     few years, the month otherwise. The formatter is built through
+     ctx.fmtTime, so the big race readout and the tooltip timestamps
+     wear the chart's own locale (pv_locale) when it has one - German
+     month names under de-CH - and d3's stock English names otherwise. */
   function timeFormatter(ctx, timesN) {
     if (ctx.x.ttype === "date") {
       var years = (timesN[timesN.length - 1] - timesN[0]) / 31557600000;
-      var f = d3.timeFormat(years >= 4 ? "%Y" : "%b %Y");
+      var f = ctx.fmtTime(years >= 4 ? "%Y" : "%b %Y");
       return function (tn) { return f(new Date(tn)); };
     }
     return function (tn) { return String(Math.round(tn)); };

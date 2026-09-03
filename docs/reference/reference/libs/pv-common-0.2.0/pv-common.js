@@ -591,6 +591,33 @@ window.pv = (function () {
     });
   }
 
+  /* The outline of a box whose corners round unevenly, as SVG path
+     data: clockwise from the top-left, a straight edge to each corner
+     and a quarter-circle arc around the rounded ones (a corner at 0
+     stays sharp). Radii are clamped to half the box, as CSS clamps
+     them. */
+  function roundedRectPath(x, y, w, h, radii) {
+    var cap = Math.min(w, h) / 2;
+    var rr = radii.map(function (v) {
+      return Math.max(0, Math.min(cap, v));
+    });
+    var tl = rr[0], tr = rr[1], br = rr[2], bl = rr[3];
+    function arc(rad, ex, ey) {
+      return "A" + round2(rad) + " " + round2(rad) + " 0 0 1 " +
+        round2(ex) + " " + round2(ey);
+    }
+    var d = "M" + round2(x + tl) + " " + round2(y) +
+      "H" + round2(x + w - tr);
+    if (tr) d += arc(tr, x + w, y + tr);
+    d += "V" + round2(y + h - br);
+    if (br) d += arc(br, x + w - br, y + h);
+    d += "H" + round2(x + bl);
+    if (bl) d += arc(bl, x, y + h - bl);
+    d += "V" + round2(y + tl);
+    if (tl) d += arc(tl, x + tl, y);
+    return d + "Z";
+  }
+
   /* A plot svg goes in whole, as a nested <svg> pinned to the spot it
      occupies in the widget - that keeps its own coordinate system and
      clip paths intact without touching any of its content. */
@@ -635,15 +662,29 @@ window.pv = (function () {
       }
       if (!fill) fill = realBg(cs.backgroundColor);
       if (fill) {
-        var rect = svgNode("rect");
-        rect.setAttribute("x", round2(r.left - state.base.left));
-        rect.setAttribute("y", round2(r.top - state.base.top));
-        rect.setAttribute("width", round2(r.width));
-        rect.setAttribute("height", round2(r.height));
-        var radius = parseFloat(cs.borderTopLeftRadius) || 0;
-        if (radius) rect.setAttribute("rx", round2(radius));
-        rect.setAttribute("fill", fill);
-        state.root.appendChild(rect);
+        var tl = parseFloat(cs.borderTopLeftRadius) || 0;
+        var tr = parseFloat(cs.borderTopRightRadius) || 0;
+        var br = parseFloat(cs.borderBottomRightRadius) || 0;
+        var bl = parseFloat(cs.borderBottomLeftRadius) || 0;
+        var shape;
+        if (tl === tr && tr === br && br === bl) {
+          shape = svgNode("rect");
+          shape.setAttribute("x", round2(r.left - state.base.left));
+          shape.setAttribute("y", round2(r.top - state.base.top));
+          shape.setAttribute("width", round2(r.width));
+          shape.setAttribute("height", round2(r.height));
+          if (tl) shape.setAttribute("rx", round2(tl));
+        } else {
+          /* Corners rounding unevenly - a table's in-cell bar rounds
+             only its data end - are more than an rx rect can say, so
+             the outline is rebuilt as a path, one arc per corner. */
+          shape = svgNode("path");
+          shape.setAttribute("d", roundedRectPath(
+            r.left - state.base.left, r.top - state.base.top,
+            r.width, r.height, [tl, tr, br, bl]));
+        }
+        shape.setAttribute("fill", fill);
+        state.root.appendChild(shape);
       }
     }
     for (var i = 0; i < node.childNodes.length; i++) {
@@ -1151,6 +1192,68 @@ window.pv = (function () {
 
     ctx.el.appendChild(box);
     return box;
+  };
+
+})();
+
+/*
+ * Canvas layer in standalone SVG exports. The canvas scatter draws its
+ * point marks on a <canvas> pinned over the plot area, and the exporter
+ * walk skips canvas elements by tag - so a saved chart would come out
+ * with axes and chrome but no points. This wrapper steps in around the
+ * serialisation: each data canvas (.pv-canvas) is rasterised with
+ * canvas.toDataURL and stood in for by a temporary <svg> holding that
+ * raster as an <image> of the canvas's on-screen size, wearing the same
+ * absolute-position styles. The walk embeds that stand-in like any plot
+ * svg - at the canvas's exact position, in the canvas's exact place in
+ * the stacking order - and everything is put back the moment the
+ * (synchronous) serialisation returns. The raster carries the canvas's
+ * full devicePixelRatio resolution scaled into its CSS box, so a retina
+ * canvas exports as crisply as it renders.
+ */
+(function () {
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var serialise = pv.toStandaloneSvg;
+  pv.toStandaloneSvg = function (el, x, theme) {
+    var canvases = el && el.querySelectorAll ?
+      el.querySelectorAll("canvas.pv-canvas") : [];
+    var swaps = [];
+    for (var i = 0; i < canvases.length; i++) {
+      var c = canvases[i];
+      /* A canvas that cannot be read (toDataURL can throw on a tainted
+         or zero-sized canvas) is simply left out - an export missing
+         one layer beats no export, the walk's own rule. */
+      try {
+        var url = c.toDataURL("image/png");
+        var r = c.getBoundingClientRect();
+        var w = Math.max(1, Math.round(r.width));
+        var h = Math.max(1, Math.round(r.height));
+        var holder = document.createElementNS(SVG_NS, "svg");
+        holder.setAttribute("width", w);
+        holder.setAttribute("height", h);
+        holder.style.cssText = c.style.cssText;
+        var img = document.createElementNS(SVG_NS, "image");
+        img.setAttribute("width", w);
+        img.setAttribute("height", h);
+        img.setAttribute("preserveAspectRatio", "none");
+        img.setAttribute("href", url);
+        img.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href",
+          url);
+        holder.appendChild(img);
+        c.parentNode.insertBefore(holder, c);
+        swaps.push({ canvas: c, holder: holder, display: c.style.display });
+        c.style.display = "none";
+      } catch (e) {}
+    }
+    var out = serialise(el, x, theme);
+    for (var j = 0; j < swaps.length; j++) {
+      swaps[j].canvas.style.display = swaps[j].display;
+      if (swaps[j].holder.parentNode) {
+        swaps[j].holder.parentNode.removeChild(swaps[j].holder);
+      }
+    }
+    return out;
   };
 
 })();

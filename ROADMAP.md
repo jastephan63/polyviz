@@ -32,5 +32,5 @@ GitHub issue - the numbers below link to them.
 - [x] pkgdown site published via GitHub Pages — shipped in 0.4.0 at /reference
 - [x] Vignette: "Exploring a dataset with polyviz" end-to-end walkthrough — shipped in 0.4.0
 - [x] Vignette: "The polyglot backend" — how R drives SQL, SAS, Python, and d3 — shipped in 0.4.0
-- [ ] Shiny demo app in `inst/shiny` showcasing every widget with live controls (#13)
-- [ ] CRAN submission preparation: spell check, URL checks, win-builder run (#14)
+- [x] Shiny demo app in `inst/shiny` showcasing every widget with live controls (#13) — shipped in 1.0.0 as `pv_demo()`
+- [x] CRAN submission preparation: spell check, URL checks, win-builder run (#14) — decided against submitting: polyviz is a personal, repo-distributed package. The hygiene shipped anyway (spell and URL checks run clean as of 1.0.0; CI checks at CRAN strictness on every push).

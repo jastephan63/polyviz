@@ -87,8 +87,9 @@ motion_ranked <- function(data, time, id, value) {
 #' @param top_n How many ranked bars are visible at once (a whole number,
 #'   at least 2; capped at the number of entities that ever qualify).
 #' @param duration Tempo control: each step between consecutive time
-#'   points takes `duration / 500 * 900` ms, so the default `500` gives
-#'   roughly 900 ms per step. `0` skips the animation entirely and shows
+#'   points takes `duration / 500 * 900` ms (never under 200 ms), so the
+#'   default `500` gives roughly 900 ms per step. `0` skips the
+#'   animation entirely and shows
 #'   the final time point — no autoplay, but the replay control stays,
 #'   and pressing it runs the race at the default tempo.
 #' @inheritParams pv_bar

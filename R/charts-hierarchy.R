@@ -27,7 +27,7 @@
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
-#' # Summed over all 181 cities: what Swiss urban ground is made of.
+#' # Summed over all 180 cities: what Swiss urban ground is made of.
 #' pv_pack(pv_city_landuse, levels = c("group", "category"),
 #'         value = "hectares", title = "Urban land use in Switzerland")
 #' @export

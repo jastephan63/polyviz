@@ -223,7 +223,7 @@ pv_licence_lustat <- paste0(
 
 #' Fetch a dataset from the Swiss Federal Statistical Office (stats.swiss)
 #'
-#' Downloads an SDMX dataflow from the Bundesamt fuer Statistik's
+#' Downloads an SDMX dataflow from the Bundesamt für Statistik's
 #' dissemination API behind <https://stats.swiss> as a labelled CSV export
 #' and parses it into a tidy data frame. Downloads are cached (see
 #' [pv_cache_status()]).
@@ -234,7 +234,7 @@ pv_licence_lustat <- paste0(
 #' reference, source, and licence travel along as attributes
 #' (`pv_dataflow`, `pv_source`, `pv_licence`, `pv_url`).
 #'
-#' Two quirks of the "Statistik der Schweizer Staedte" city dataflows
+#' Two quirks of the "Statistik der Schweizer Städte" city dataflows
 #' (`DF_SSV_*`) are worth knowing: the pseudo-city with code `"_ST"` is the
 #' all-cities total, and the population indicator mixes explicit census
 #' years (`pop_ref_period_1930` ...) with current-period codes
@@ -244,7 +244,7 @@ pv_licence_lustat <- paste0(
 #' are the population counts.
 #'
 #' BFS publishes stats.swiss data under the opendata.swiss "OPEN BY" terms:
-#' free use with source citation ("Quelle: Bundesamt fuer Statistik").
+#' free use with source citation ("Quelle: Bundesamt für Statistik").
 #' Check the dataset page on stats.swiss should a dataflow state different
 #' terms.
 #'

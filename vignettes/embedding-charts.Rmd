@@ -171,8 +171,8 @@ pv_reset_theme()
 `pv_theme_paper()` is a complete print-first theme: a pure white
 surface, neutral near-black inks, sequential and diverging ramps
 re-anchored to match, and a five-colour categorical palette whose slots
-climb a luminance ladder — adjacent series stay tellable apart as pure
-greys. `serif = TRUE` sets the widget type in a serif stack for
+climb a luminance ladder — adjacent series can still be told apart as
+pure greys. `serif = TRUE` sets the widget type in a serif stack for
 journals that want figures to match their text. Like any theme it is
 session-wide: set it, build the figures, then `pv_reset_theme()`.
 

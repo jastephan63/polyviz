@@ -97,7 +97,7 @@ profile_moments <- function(clean) {
 #'   heavy the tails are compared to a normal distribution, which scores
 #'   0), and `jb_stat` with `jb_p` (the Jarque-Bera normality test built
 #'   from those two; a small `jb_p` means the column's shape would be
-#'   surprising for normal data). The shape columns are `NA` for columns
+#'   surprising for normal data). The shape columns are `NaN` for columns
 #'   with fewer than four observed values or zero variance. The engine
 #'   that produced the result is recorded in `attr(, "engine")`.
 #' @examples

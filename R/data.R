@@ -117,9 +117,12 @@
 #'
 #' Boundary polygons of the 79 Lucerne municipalities (status 1 January
 #' 2025) as a GeoJSON FeatureCollection stored as a plain R list, ready
-#' for [pv_choropleth()]. Each feature carries `id` (the official BFS
-#' municipality number, which joins [pv_fiscal] and [pv_elections]) and
-#' `name`.
+#' for [pv_choropleth()]. Each municipality feature carries `id` (the
+#' official BFS municipality number, which joins [pv_fiscal] and
+#' [pv_elections]) and `name`. The collection also holds 13 background
+#' features with empty `properties` — the lake surfaces, as BFS ships
+#' the layer — drawn as quiet background geography (no tooltip) and
+#' never part of a data join.
 #'
 #' @format A list mirroring GeoJSON: `type`, and `features` — one per
 #'   boundary polygon, with `properties` (`id`, `name`) and `geometry`

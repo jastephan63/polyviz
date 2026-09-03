@@ -205,7 +205,9 @@ as_axis_values <- function(x) {
 #'
 #' An animated bar chart rendered by the bundled D3.js — bars grow from the
 #' baseline, and hovering any bar shows a tooltip. Give `series` to get
-#' grouped bars with a legend.
+#' grouped bars with a legend, `stack` to pile those series into stacked
+#' or percent-stacked bars, and `horizontal` for the sideways layout that
+#' keeps long category names readable.
 #'
 #' @param data A data frame with one row per bar (per category, or per
 #'   category/series combination) — more than one is an error; aggregate
@@ -346,7 +348,9 @@ pv_bar <- function(data, x, y, series = NULL,
 #'
 #' Multi-series line chart with a draw-in animation and a crosshair
 #' tooltip that reads out every series at the hovered x position. Series
-#' are direct-labelled at the line ends.
+#' are direct-labelled at the line ends. `curve` picks how the line
+#' travels between observations, `show_points` marks each observation
+#' with a dot, and `zoom` adds a brush-to-zoom strip for long series.
 #'
 #' @param data A data frame with one row per x position per series —
 #'   more than one is an error; aggregate first. Rows with a missing x
@@ -443,7 +447,10 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #' Interactive D3 scatter plot
 #'
 #' Scatter plot with per-point tooltips; optional colour (categorical) and
-#' size (numeric) encodings.
+#' size (numeric) encodings. For clouds too dense to read point by point,
+#' `density = TRUE` redraws the joint distribution as filled contours,
+#' and `canvas` moves the marks to a canvas layer so very large clouds
+#' stay responsive.
 #'
 #' @param data A data frame. Rows missing an x, y, or (when mapped) size
 #'   value are dropped with a warning.
@@ -687,6 +694,16 @@ pv_sunburst <- function(data, levels, value,
 #'
 #' Output and render functions for using polyviz D3 widgets within Shiny
 #' apps.
+#'
+#' The widgets also talk back: inside a Shiny app a chart reports
+#' interactions as input values named `<outputId>_<event>`. Clicking a
+#' mark — a bar, slice, dot, node, region — arrives as
+#' `input$<outputId>_click`, with a payload naming what was clicked
+#' ([pv_arc()] documents its exact shape, as an example); some charts
+#' also report the hovered mark as `input$<outputId>_hover`, and the
+#' parallel coordinates report the rows surviving their axis filters as
+#' `input$<outputId>_brush`. Outside Shiny the events are simply not
+#' sent. For linked selections *without* a server, see [pv_link()].
 #'
 #' @param outputId Output variable to read from.
 #' @param width,height CSS sizes for the widget.

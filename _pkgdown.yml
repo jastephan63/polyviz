@@ -134,6 +134,7 @@ reference:
   - pv_plot_corr
   - pv_plot_missing
   - pv_report
+  - pv_demo
 
 - title: Theming & locale
   desc: >

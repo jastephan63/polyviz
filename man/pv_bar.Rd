@@ -88,7 +88,9 @@ An htmlwidget.
 \description{
 An animated bar chart rendered by the bundled D3.js — bars grow from the
 baseline, and hovering any bar shows a tooltip. Give \code{series} to get
-grouped bars with a legend.
+grouped bars with a legend, \code{stack} to pile those series into stacked
+or percent-stacked bars, and \code{horizontal} for the sideways layout that
+keeps long category names readable.
 }
 \examples{
 sales <- aggregate(revenue ~ region, pv_sales, sum)

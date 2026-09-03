@@ -21,7 +21,7 @@ font) ready to hand to \code{\link[=pv_set_theme]{pv_set_theme()}}.
 A complete theme tuned for figures that end up on paper: a pure white
 surface, near-black neutral inks, and a five-colour categorical
 palette whose slots climb a greyscale luminance ladder — so series
-stay tellable apart even when the journal prints your figure in
+can still be told apart even when the journal prints your figure in
 greyscale. Apply it with \code{pv_set_theme(pv_theme_paper())}.
 }
 \details{

@@ -56,6 +56,9 @@ The axes are interactive filters: drag along any axis to brush a value
 range — rows outside it fade out, and brushes on several axes combine
 so only rows passing all of them stay lit. Double-click an axis to
 clear its brush. Hovering a line raises it and reads out the full row.
+In Shiny, every brush change reports the rows passing all the active
+brushes (each row's \code{label}, or its row number when no \code{label} is
+mapped) as \verb{input$<outputId>_brush}.
 
 Rows with a missing value on any axis are dropped with a warning — a
 broken polyline would be unreadable.

@@ -94,7 +94,10 @@ An htmlwidget.
 }
 \description{
 Scatter plot with per-point tooltips; optional colour (categorical) and
-size (numeric) encodings.
+size (numeric) encodings. For clouds too dense to read point by point,
+\code{density = TRUE} redraws the joint distribution as filled contours,
+and \code{canvas} moves the marks to a canvas layer so very large clouds
+stay responsive.
 }
 \examples{
 pv_scatter(mtcars, x = "wt", y = "mpg", size = "hp")

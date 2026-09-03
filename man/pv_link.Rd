@@ -28,8 +28,11 @@ The correspondence is by row: mark \emph{i} of the chart is matched with
 row \emph{i} of the shared data, so \code{sd} must wrap the very table (or one
 row-aligned with it) that built the chart. Charts that respond to a
 linked selection by dimming unselected marks: scatter, beeswarm, bar,
-choropleth, force, and treemap. Every other chart type carries the
-link without complaint and simply ignores it.
+choropleth, and force. Other charts whose payload keeps one row per
+mark (line, area, lollipop, and friends) carry the link without
+complaint and simply ignore it; charts that aggregate their rows away
+(treemap, sunburst, chord, sankey, ...) have nothing to line the keys
+up with, and linking one errors.
 }
 \examples{
 f25 <- subset(pv_fiscal, year == 2025)

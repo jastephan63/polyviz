@@ -65,8 +65,8 @@ labelled on the left; lane labels may claim at most 45\% of the chart
 width — longer names are shortened with an ellipsis and stay complete
 in the tooltip. Dot size adapts to the crowd: 5px up to 150 dots,
 shrinking to 3px by 500. Past 800 dots the swarm stops reading as
-individuals, so that errors here with advice to aggregate. Hovering a
-dot grows it and shows its label, group, and exact value.
+individuals, so anything larger is refused with advice to aggregate.
+Hovering a dot grows it and shows its label, group, and exact value.
 }
 \examples{
 f25 <- subset(pv_fiscal, year == 2025)

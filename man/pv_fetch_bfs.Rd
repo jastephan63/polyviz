@@ -22,7 +22,7 @@ A data frame; source and licence are attached as attributes and
 printed on every fetch.
 }
 \description{
-Downloads an SDMX dataflow from the Bundesamt fuer Statistik's
+Downloads an SDMX dataflow from the Bundesamt für Statistik's
 dissemination API behind \url{https://stats.swiss} as a labelled CSV export
 and parses it into a tidy data frame. Downloads are cached (see
 \code{\link[=pv_cache_status]{pv_cache_status()}}).
@@ -34,7 +34,7 @@ the human-readable label, with the underlying code kept in a matching
 reference, source, and licence travel along as attributes
 (\code{pv_dataflow}, \code{pv_source}, \code{pv_licence}, \code{pv_url}).
 
-Two quirks of the "Statistik der Schweizer Staedte" city dataflows
+Two quirks of the "Statistik der Schweizer Städte" city dataflows
 (\verb{DF_SSV_*}) are worth knowing: the pseudo-city with code \code{"_ST"} is the
 all-cities total, and the population indicator mixes explicit census
 years (\code{pop_ref_period_1930} ...) with current-period codes
@@ -44,7 +44,7 @@ starts with \code{"pop_ref_period"} and whose label is a bare four-digit year
 are the population counts.
 
 BFS publishes stats.swiss data under the opendata.swiss "OPEN BY" terms:
-free use with source citation ("Quelle: Bundesamt fuer Statistik").
+free use with source citation ("Quelle: Bundesamt für Statistik").
 Check the dataset page on stats.swiss should a dataflow state different
 terms.
 }

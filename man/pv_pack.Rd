@@ -61,7 +61,7 @@ where the name honestly fits at the current zoom level; hovering any
 circle shows its full path, value, and share of the total.
 }
 \examples{
-# Summed over all 181 cities: what Swiss urban ground is made of.
+# Summed over all 180 cities: what Swiss urban ground is made of.
 pv_pack(pv_city_landuse, levels = c("group", "category"),
         value = "hectares", title = "Urban land use in Switzerland")
 }

@@ -18,10 +18,25 @@ support (\code{\link[=pv_read_sas]{pv_read_sas()}}, \code{\link[=pv_write_sas]{p
 \item \strong{Python} — numeric profiling and outlier detection delegated to a
 bundled Python module when available, with an identical pure-R fallback
 (\code{\link[=pv_profile]{pv_profile()}}, \code{\link[=pv_outliers]{pv_outliers()}}).
-\item \strong{JavaScript / D3} — interactive visualisations rendered by a bundled
-D3.js v7, driven from R data frames (\code{\link[=pv_bar]{pv_bar()}}, \code{\link[=pv_line]{pv_line()}},
-\code{\link[=pv_scatter]{pv_scatter()}}, \code{\link[=pv_force]{pv_force()}}, \code{\link[=pv_chord]{pv_chord()}}, \code{\link[=pv_sunburst]{pv_sunburst()}}).
+\item \strong{JavaScript / D3} — 28 kinds of interactive, animated chart
+rendered by a bundled D3.js v7 and driven entirely from R data
+frames: from \code{\link[=pv_bar]{pv_bar()}}, \code{\link[=pv_line]{pv_line()}}, and \code{\link[=pv_scatter]{pv_scatter()}} through
+distributions (\code{\link[=pv_histogram]{pv_histogram()}}, \code{\link[=pv_violin]{pv_violin()}}), maps
+(\code{\link[=pv_choropleth]{pv_choropleth()}}, \code{\link[=pv_bubble_map]{pv_bubble_map()}}), networks (\code{\link[=pv_force]{pv_force()}},
+\code{\link[=pv_arc]{pv_arc()}}, \code{\link[=pv_sankey]{pv_sankey()}}), hierarchies (\code{\link[=pv_treemap]{pv_treemap()}},
+\code{\link[=pv_sunburst]{pv_sunburst()}}), and motion (\code{\link[=pv_race]{pv_race()}}, \code{\link[=pv_bump]{pv_bump()}}) to the
+design-system table (\code{\link[=pv_table]{pv_table()}}).
 }
+
+Around the charts sit the pieces that carry them into real work:
+exports to PNG, SVG, PDF, GIF, self-contained HTML, and PowerPoint
+(\code{\link[=pv_save]{pv_save()}}, \code{\link[=pv_deck]{pv_deck()}}); automatic alt text on every chart
+(\code{\link[=pv_alt_text]{pv_alt_text()}}); themes gated by an accessibility check
+(\code{\link[=pv_set_theme]{pv_set_theme()}}, \code{\link[=pv_check_palette]{pv_check_palette()}}); Swiss number and date
+locales (\code{\link[=pv_locale]{pv_locale()}}); live fetchers for the Swiss open-data
+portals (\code{\link[=pv_fetch_bfs]{pv_fetch_bfs()}}, \code{\link[=pv_fetch_opendata]{pv_fetch_opendata()}}); and bundled
+Swiss datasets to learn on (\link{pv_city_population}, \link{pv_fiscal},
+\link{pv_weather}).
 }
 \author{
 \strong{Maintainer}: Jake Stephan \email{jake@stephan-j.com}

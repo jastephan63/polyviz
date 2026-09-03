@@ -20,7 +20,7 @@ positive for a long right tail), \code{kurtosis} (excess kurtosis: how
 heavy the tails are compared to a normal distribution, which scores
 0), and \code{jb_stat} with \code{jb_p} (the Jarque-Bera normality test built
 from those two; a small \code{jb_p} means the column's shape would be
-surprising for normal data). The shape columns are \code{NA} for columns
+surprising for normal data). The shape columns are \code{NaN} for columns
 with fewer than four observed values or zero variance. The engine
 that produced the result is recorded in \code{attr(, "engine")}.
 }

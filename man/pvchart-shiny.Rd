@@ -29,3 +29,14 @@ renderPvchart(expr, env = parent.frame(), quoted = FALSE)
 Output and render functions for using polyviz D3 widgets within Shiny
 apps.
 }
+\details{
+The widgets also talk back: inside a Shiny app a chart reports
+interactions as input values named \verb{<outputId>_<event>}. Clicking a
+mark — a bar, slice, dot, node, region — arrives as
+\verb{input$<outputId>_click}, with a payload naming what was clicked
+(\code{\link[=pv_arc]{pv_arc()}} documents its exact shape, as an example); some charts
+also report the hovered mark as \verb{input$<outputId>_hover}, and the
+parallel coordinates report the rows surviving their axis filters as
+\verb{input$<outputId>_brush}. Outside Shiny the events are simply not
+sent. For linked selections \emph{without} a server, see \code{\link[=pv_link]{pv_link()}}.
+}

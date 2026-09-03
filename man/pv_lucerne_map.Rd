@@ -20,8 +20,11 @@ pv_lucerne_map
 \description{
 Boundary polygons of the 79 Lucerne municipalities (status 1 January
 2025) as a GeoJSON FeatureCollection stored as a plain R list, ready
-for \code{\link[=pv_choropleth]{pv_choropleth()}}. Each feature carries \code{id} (the official BFS
-municipality number, which joins \link{pv_fiscal} and \link{pv_elections}) and
-\code{name}.
+for \code{\link[=pv_choropleth]{pv_choropleth()}}. Each municipality feature carries \code{id} (the
+official BFS municipality number, which joins \link{pv_fiscal} and
+\link{pv_elections}) and \code{name}. The collection also holds 13 background
+features with empty \code{properties} — the lake surfaces, as BFS ships
+the layer — drawn as quiet background geography (no tooltip) and
+never part of a data join.
 }
 \keyword{datasets}

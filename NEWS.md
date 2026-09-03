@@ -1,3 +1,32 @@
+# polyviz 1.0.0
+
+The complete package. Nothing in 1.0.0 changes how a chart looks or an
+API behaves — this release adds the last planned piece and the polish
+that makes the whole thing finished.
+
+* `pv_demo()` — a Shiny gallery of every chart family on the bundled
+  Swiss data, with live controls for the options worth learning,
+  global theme, locale, and mode switches, and a panel showing Shiny
+  events as they fire. One command to see everything the package
+  does; also the manual test bench. (#13)
+* A full documentation sweep: every one of the 92 help topics, all
+  four vignettes, and the README read critically against the code,
+  with the factual drift of ten releases corrected — the Shiny event
+  inputs are now documented, the front-door page lists all 28 chart
+  types, dataset counts match the data. Spell check (en-GB declared)
+  and URL check run clean.
+* Deck slides now carry each chart's full generated alt text, not
+  just its title.
+
+polyviz 1.0.0 is: 28 interactive d3 chart types with data-adaptive
+rendering; export to PNG, SVG, PDF, GIF, self-contained HTML, and
+PowerPoint; automatic knitting into Word and PDF documents; live
+fetchers for the Swiss open-data portals with a local cache; 14
+bundled, licence-documented Swiss datasets and country-wide map
+layers; print themes, texture fills, and four Swiss locales;
+generated alt text on every chart; and 2,782 tests, with every
+renderer executed in a real browser on every push.
+
 # polyviz 0.9.2
 
 The last items from the public roadmap: two ways to see through big

@@ -91,7 +91,9 @@ An htmlwidget.
 \description{
 Multi-series line chart with a draw-in animation and a crosshair
 tooltip that reads out every series at the hovered x position. Series
-are direct-labelled at the line ends.
+are direct-labelled at the line ends. \code{curve} picks how the line
+travels between observations, \code{show_points} marks each observation
+with a dot, and \code{zoom} adds a brush-to-zoom strip for long series.
 }
 \examples{
 monthly <- aggregate(revenue ~ month + region, pv_sales, sum)

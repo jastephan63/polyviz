@@ -41,8 +41,9 @@ at least 2; capped at the number of entities that ever qualify).}
 \code{"light"}, or \code{"dark"}.}
 
 \item{duration}{Tempo control: each step between consecutive time
-points takes \code{duration / 500 * 900} ms, so the default \code{500} gives
-roughly 900 ms per step. \code{0} skips the animation entirely and shows
+points takes \code{duration / 500 * 900} ms (never under 200 ms), so the
+default \code{500} gives roughly 900 ms per step. \code{0} skips the
+animation entirely and shows
 the final time point — no autoplay, but the replay control stays,
 and pressing it runs the race at the default tempo.}
 

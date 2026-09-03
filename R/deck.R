@@ -291,7 +291,12 @@ pv_deck <- function(charts, file, title = NULL, subtitle = NULL,
     doc <- officer::ph_with(
       doc,
       officer::external_img(pngs[[i]], width = width, height = height,
-                            unit = "in", alt = chart_title),
+                            # The slide image's alt text is the chart's own
+                            # generated description, not just its title, so
+                            # a deck read by a screen reader says what each
+                            # chart shows.
+                            unit = "in",
+                            alt = charts[[i]]$x$alt %||% chart_title),
       location = officer::ph_location(left = 0, top = 0, width = width,
                                       height = height))
     notes <- deck_notes(charts[[i]])

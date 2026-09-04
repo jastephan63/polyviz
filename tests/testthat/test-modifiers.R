@@ -277,3 +277,24 @@ test_that("pv_link aborts on row mismatches and non-SharedData input", {
   expect_error(pv_link(f25, crosstalk::SharedData$new(f25)),
                "polyviz chart")
 })
+
+test_that("pv_static stores the flag and validates it", {
+  sales <- aggregate(revenue ~ region, pv_sales, sum)
+  w <- pv_bar(sales, x = "region", y = "revenue")
+  # absent by default - existing charts are untouched
+  expect_null(w$x$static)
+  expect_true(pv_static(w)$x$static)
+  expect_false(pv_static(w, FALSE)$x$static)
+  expect_error(pv_static(w, "auto"), "TRUE or FALSE")
+  expect_error(pv_static(w, NA), "TRUE or FALSE")
+  expect_error(pv_static(sales), "polyviz chart")
+})
+
+test_that("pv_static composes with the other modifiers", {
+  sales <- aggregate(revenue ~ region, pv_sales, sum)
+  w <- pv_bar(sales, x = "region", y = "revenue") |>
+    pv_textures() |>
+    pv_static()
+  expect_true(w$x$static)
+  expect_true(w$x$textures)
+})

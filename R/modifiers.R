@@ -203,6 +203,41 @@ pv_annotate <- function(w, ...) {
   w
 }
 
+#' Render a chart as a still figure
+#'
+#' Turns one chart's interactivity off: no entry animation, no tooltips
+#' or hover effects, no brushes, no zoom strip, no download control -
+#' just the finished chart, drawn exactly as it always draws, sitting
+#' still on the page. Reach for it when a live widget would be a
+#' distraction: a figure embedded in prose, a chart beside interactive
+#' siblings that should not invite clicks, or a Shiny output that is
+#' display-only. (For a static *file* - PNG, SVG, PDF - use [pv_save()]
+#' instead; this modifier is for charts that stay in the page.)
+#'
+#' The chart still resizes with its container, follows light/dark mode,
+#' and carries its alt text - static means inert, not frozen.
+#'
+#' @param w A polyviz chart.
+#' @param enabled `TRUE` renders the chart still; `FALSE` (every
+#'   chart's default) keeps it interactive.
+#' @return The chart, with the setting attached - ready for more pipe
+#'   steps.
+#' @examples
+#' sales <- aggregate(revenue ~ region, pv_sales, sum)
+#' pv_bar(sales, x = "region", y = "revenue") |>
+#'   pv_static()
+#' @export
+pv_static <- function(w, enabled = TRUE) {
+  check_pv_widget(w, "pv_static")
+  # A plain on/off switch: there is nothing data-driven here for the
+  # JavaScript side to decide, so "auto" has no meaning.
+  if (!isTRUE(enabled) && !isFALSE(enabled)) {
+    rlang::abort("`enabled` must be TRUE or FALSE.")
+  }
+  w$x$static <- enabled
+  w
+}
+
 #' Toggle a chart's download control
 #'
 #' Every polyviz chart carries a small control in its top-right corner,

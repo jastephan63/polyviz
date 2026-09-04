@@ -155,6 +155,10 @@ function pvRender(el, x, width, height, mq) {
     el.setAttribute("role", "img");
     el.setAttribute("aria-label", x.alt);
   }
+  /* pv_static: the finished chart, inert. Blocking pointer events at
+     the container silences every renderer's hover, tooltip, brush, and
+     click wiring in one move, without touching how the chart draws. */
+  el.style.pointerEvents = x.static ? "none" : "";
   /* Whatever goes wrong below - a broken payload, a renderer bug -
      becomes a visible message in the widget itself; a silently blank
      box would look like the data's fault. The console keeps the
@@ -173,6 +177,9 @@ function pvRenderChart(el, x, width, height, mq) {
     pvNotice(el, "polyviz: no data to display", false);
     return;
   }
+  /* A static chart sheds its interactive affordances. The zoom strip
+     goes here, before layout, so the plot keeps the strip's space. */
+  if (x.static && x.zoom) x.zoom = false;
   /* Pick the light or dark colour set. "auto" follows the viewer's own
      system preference; the R side can also force one mode. */
   var mode = x.mode === "auto" ?
@@ -225,7 +232,7 @@ function pvRenderChart(el, x, width, height, mq) {
   /* The hover control for saving the chart, on unless pv_downloads(FALSE)
      turned it off. The header keeps clear of the corner it sits in, so
      a title or a wide legend never runs underneath it. */
-  if (x.downloads !== false) {
+  if (x.downloads !== false && !x.static) {
     pv.buildDownloadControl(el, x, theme);
     header.style.paddingRight = "48px";
   }
@@ -250,7 +257,9 @@ function pvRenderChart(el, x, width, height, mq) {
   var ctx = {
     el: el, x: x, theme: theme, tip: tip, header: header,
     width: width, height: innerH,
-    duration: pvHeadless ? 0 : (x.duration == null ? 500 : x.duration),
+    duration: (pvHeadless || x.static) ?
+      0 : (x.duration == null ? 500 : x.duration),
+    static: !!x.static,
     /* Tooltip number formatter and (for date read-outs) the matching
        time formatter factory, both wearing the chart's locale when it
        has one. Without a locale these are exactly d3's stock output. */

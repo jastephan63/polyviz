@@ -1,3 +1,12 @@
+# polyviz 1.0.1
+
+* `pv_static()` — render a chart as a still figure: no entry
+  animation, no tooltips or hover effects, no brush, no zoom strip,
+  no download control. The chart draws exactly as it always does and
+  still resizes, follows light/dark mode, and carries its alt text —
+  static means inert, not frozen. For a static *file*, `pv_save()`
+  remains the tool; this is for charts that stay in the page.
+
 # polyviz 1.0.0
 
 The complete package. Nothing in 1.0.0 changes how a chart looks or an

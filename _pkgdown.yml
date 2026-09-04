@@ -81,6 +81,7 @@ reference:
   - pv_save
   - pv_deck
   - pv_downloads
+  - pv_static
 
 - title: Alt text
   desc: >

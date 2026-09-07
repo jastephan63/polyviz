@@ -284,6 +284,29 @@ export_settle_count_js <- function(widget) {
   "document.querySelectorAll('svg *').length"
 }
 
+# Opens the headless-Chrome session every capture rides on. One failed
+# launch is usually transient - Chrome slow to open its debugging port
+# on a loaded machine - so a failure gets a short pause and one clean
+# retry on a fresh browser process before giving up.
+export_chrome_session <- function(width, height) {
+  new_session <- function(parent = NULL) {
+    if (is.null(parent)) {
+      chromote::ChromoteSession$new(width = width, height = height)
+    } else {
+      chromote::ChromoteSession$new(parent = parent,
+                                    width = width, height = height)
+    }
+  }
+  tryCatch(new_session(), error = function(first) {
+    Sys.sleep(2)
+    tryCatch(new_session(chromote::Chromote$new()), error = function(second) {
+      rlang::abort(sprintf(
+        "Chrome could not be started for the capture (tried twice): %s",
+        conditionMessage(second)), parent = second)
+    })
+  })
+}
+
 # Waits until the page has actually drawn the chart. The renderers draw
 # synchronously once their scripts run, but scripts and fonts arrive
 # asynchronously even from file://, so poll the number of drawn elements
@@ -624,8 +647,16 @@ pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
   page <- file.path(stage, "chart.html")
   htmlwidgets::saveWidget(w, page, selfcontained = FALSE, libdir = "lib")
 
-  b <- chromote::ChromoteSession$new(width = as.integer(round(width)),
-                                     height = as.integer(round(height)))
+  # Chrome gets more patience than chromote's 10-second default unless
+  # the caller chose their own timeout - a busy machine (a CI runner
+  # running the whole render suite, say) routinely needs longer to open
+  # the debugging port.
+  if (is.null(getOption("chromote.timeout"))) {
+    old_opts <- options(chromote.timeout = 30)
+    on.exit(options(old_opts), add = TRUE)
+  }
+  b <- export_chrome_session(as.integer(round(width)),
+                             as.integer(round(height)))
   on.exit(try(b$close(), silent = TRUE), add = TRUE)
   errors <- export_watch_errors(b)
   if (format %in% c("png", "gif") && scale != 1) {

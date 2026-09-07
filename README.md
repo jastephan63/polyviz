@@ -6,6 +6,8 @@
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
 
+**→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — a six-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, and an ageing no scenario escapes — every number computed from the data.
+
 **→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 **Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.

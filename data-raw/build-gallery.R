@@ -107,6 +107,9 @@ page <- tags$html(lang = "en", tags$head(
     nav a { color: #57544b; font-size: 13px; text-decoration: none;
             border-bottom: 1px solid transparent; }
     nav a:hover { border-bottom-color: #006ba2; color: #006ba2; }
+    header a { color: #006ba2; text-decoration: none;
+               border-bottom: 1px solid transparent; }
+    header a:hover { border-bottom-color: #006ba2; }
     section.chart { margin: 34px 0; }
     section.chart h2 { font-size: 21px; letter-spacing: -0.01em;
                        margin: 0 0 6px; }
@@ -131,7 +134,9 @@ page <- tags$html(lang = "en", tags$head(
       "package. Every chart can also be taken along: hover it and the",
       "button in its top-right corner downloads it as a standalone SVG",
       "or a high-resolution PNG. Install with",
-      'devtools::install_github("jastephan63/polyviz").'))
+      'devtools::install_github("jastephan63/polyviz").')),
+    tags$p(tags$a(href = "story.html",
+      "A Swiss canton in charts — a data story built with polyviz"))
   ),
   toc,
   sections,

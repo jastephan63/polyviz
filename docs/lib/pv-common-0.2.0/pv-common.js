@@ -1116,6 +1116,9 @@ window.pv = (function () {
      Only date and number axes ever get here - a category axis has no
      continuous window to brush, and the R side refuses it. */
   pv.zoomStrip = function (ctx, o) {
+    /* A static chart (pv_static) has no interaction to offer, so the
+       brush strip would be dead weight - draw nothing. */
+    if (ctx.static) return null;
     var box = document.createElement("div");
     box.className = "pv-zoom";
     box.style.cssText = "margin-top:" + pv.ZOOM_STRIP_GAP + "px;";

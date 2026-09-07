@@ -136,7 +136,7 @@ page <- tags$html(lang = "en", tags$head(
       "or a high-resolution PNG. Install with",
       'devtools::install_github("jastephan63/polyviz").')),
     tags$p(tags$a(href = "story.html",
-      "A Swiss canton in charts — a data story built with polyviz"))
+      "Anatomy of a Swiss canton — a data investigation built with polyviz"))
   ),
   toc,
   sections,

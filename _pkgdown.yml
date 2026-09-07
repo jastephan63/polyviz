@@ -126,7 +126,8 @@ reference:
 - title: Analysis
   desc: >
     Summaries, numeric profiling (Python-backed when available, pure R
-    otherwise), outlier flags, and the one-call HTML report.
+    otherwise), outlier flags, the one-call HTML report, plus the two
+    guides - the chart adviser and the live demo app.
   contents:
   - pv_summary
   - pv_profile
@@ -135,6 +136,7 @@ reference:
   - pv_plot_corr
   - pv_plot_missing
   - pv_report
+  - pv_suggest
   - pv_demo
 
 - title: Theming & locale

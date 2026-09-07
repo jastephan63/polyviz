@@ -8,6 +8,8 @@ polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wa
 
 **→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
+**Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.
+
 Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |

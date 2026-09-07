@@ -1,0 +1,168 @@
+---
+title: "Get started with polyviz"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get started with polyviz}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE, eval = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+polyviz draws interactive D3 charts from plain R data frames — no
+JavaScript, no grammar to learn, one function call per chart. This is
+the five-minute tour: a first chart, a second, the automatic behaviours
+and how to override them, layers, theming, and the way out to a printed
+page. The charts open in your Viewer as you go, so paste along; none of
+the chunks run while the vignette builds.
+
+## Install
+
+```{r install, eval = FALSE}
+# install.packages("devtools")
+devtools::install_github("jastephan63/polyviz")
+```
+
+Everything the charts need ships in the package, bundled D3 included.
+Python is optional (profiling falls back to pure R without it), and
+headless Chrome is only needed at the very end, for `pv_save()`.
+
+## A first chart, in one line
+
+Fourteen real Swiss open-government datasets are bundled. `pv_weather`
+holds six years of daily weather in Lucerne, from MeteoSwiss — hand it
+straight to a line chart:
+
+```{r first-chart, eval = FALSE}
+library(polyviz)
+
+pv_line(pv_weather, x = "date", y = "temp_mean")
+```
+
+The chart draws itself in, follows your light/dark setting, re-renders
+when its container resizes, and a crosshair tooltip reads out the exact
+value under the cursor. That is the whole interface: a data frame,
+column names, options.
+
+## Add a title and a source line
+
+Every chart shares the same heading options — `title`, `subtitle`, and
+a small grey `source` credit at the bottom left, newsroom style:
+
+```{r titled, eval = FALSE}
+pv_line(pv_weather, x = "date", y = "temp_mean",
+        title = "Six years of Lucerne weather",
+        subtitle = "Daily mean temperature",
+        source = "Source: MeteoSwiss")
+```
+
+## A second chart type
+
+All 28 chart types work the same way. Bars want one row per bar, so
+aggregate first — and invalid data fails with a clear R-side message
+rather than a broken chart:
+
+```{r second-chart, eval = FALSE}
+sales <- aggregate(revenue ~ region, pv_sales, sum)
+pv_bar(sales, x = "region", y = "revenue", title = "Revenue by region")
+```
+
+## The "auto" defaults, and overriding them
+
+Charts adapt to their data and their pixels at render time. Here
+fifteen municipality names are too long to sit side by side under
+vertical bars, so `horizontal = "auto"` — the default — flips the chart
+sideways: labels upright down the left, the exact value at each bar's
+end:
+
+```{r auto, eval = FALSE}
+f25 <- subset(pv_fiscal, year == 2025)
+top15 <- head(f25[order(-f25$equalization_chf), ], 15)
+
+pv_bar(top15, x = "municipality", y = "equalization_chf",
+       title = "Largest equalization payments, 2025",
+       source = "Source: LUSTAT Statistik Luzern")
+```
+
+Every automatic behaviour has an explicit `TRUE`/`FALSE`/`"auto"`
+override. Force the vertical layout back and you can see what the
+default saved you from — fifteen labels fighting for the same row:
+
+```{r override, eval = FALSE}
+pv_bar(top15, x = "municipality", y = "equalization_chf",
+       horizontal = FALSE)
+```
+
+## Layer with the pipe
+
+Modifiers pipe onto an existing chart. `pv_trend()` fits a smoother
+with a confidence ribbon:
+
+```{r trend, eval = FALSE}
+pv_scatter(f25, x = "resource_index", y = "equalization_chf") |>
+  pv_trend("loess")
+```
+
+The same shape gives you small multiples (`pv_facet()`), annotations
+(`pv_annotate()`), print-safe hatching (`pv_textures()`), and linked
+selection across charts (`pv_link()`).
+
+## Theme and locale, in two lines
+
+```{r theme-locale, eval = FALSE}
+pv_set_theme(pv_theme_paper())  # print-first: white surface, luminance-ordered colours
+pv_locale("de-CH")              # Swiss numbers (10'000) and German month names
+```
+
+Every chart built from here on wears both. `pv_set_theme()` also takes
+your own brand colours — with an accessibility check on the way in —
+and `pv_reset_theme()` and `pv_locale(NULL)` restore the defaults.
+
+## Into a paper
+
+`pv_save()` picks the format from the file extension — a crisp 2x PNG
+for Word and slides, true vector PDF for LaTeX, standalone SVG, or one
+self-contained interactive HTML file:
+
+```{r save, eval = FALSE}
+w <- pv_bar(sales, x = "region", y = "revenue",
+            title = "Revenue by region")
+pv_save(w, "revenue.png")
+pv_save(w, "revenue.pdf")
+```
+
+The capture formats render the chart for real in headless Chrome (the
+chromote package plus a Chrome-based browser). Knitting to Word or PDF
+needs no call at all — a chart in a chunk becomes a print-quality
+figure by itself. Sizing, alt text, animated GIFs, and whole PowerPoint
+decks: `vignette("embedding-charts")`.
+
+## Where to go next
+
+```{r next, eval = FALSE}
+pv_suggest(pv_weather)  # which charts fit this data frame?
+pv_demo()               # every chart family, live, with controls
+```
+
+* The **[live gallery](https://jastephan63.github.io/polyviz/)** — all
+  28 chart types, interactive, each explained and running on real Swiss
+  open data, with the R code that made it.
+* `pv_demo()` opens the same idea as a Shiny app on your machine, with
+  live controls for each chart's main options.
+* `pv_suggest()` inspects a data frame and prints runnable chart calls
+  with the real column names filled in, each with a line of reasoning —
+  every suggestion is proven to run before it is offered.
+* The **[cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf)**
+  fits the whole package on a desk-side sheet.
+* The **[reference site](https://jastephan63.github.io/polyviz/reference/)**
+  documents every function; the other vignettes go deeper — exploring a
+  dataset (`vignette("polyviz-eda")`), charts in papers
+  (`vignette("embedding-charts")`), live Swiss open data
+  (`vignette("swiss-open-data")`), and the SQL/SAS/Python backends
+  (`vignette("polyglot-backend")`).

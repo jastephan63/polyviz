@@ -17,7 +17,7 @@ deletes all of it.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -25,7 +25,8 @@ deletes all of it.'></head><body>
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/polyviz.html">Get started</a></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/embedding-charts.html">Embedding polyviz charts in papers and documents</a></li>
@@ -82,21 +83,39 @@ invisibly.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">pv_cache_status</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                                                                                  url</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4                                                            https://www.data.lustat.ch/fa-lu-ra.csv</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3                                    https://dam-api.bfs.admin.ch/hub/api/dam/assets/34367751/master</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2         https://dam-api.bfs.admin.ch/hub/api/dam/assets/34367751/master#municipalities-g1-wgs84-v1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 https://www.uvek-gis.admin.ch/BFE/ogd/35/ogd35_schweizerische_elektrizitaetsbilanz_monatswerte.csv</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   size_kb                  fetched</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4   128.1 2026-08-31 21:57:30 CEST</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 10336.5 2026-08-31 21:57:39 CEST</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1667.7 2026-08-31 21:57:55 CEST</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    25.2 2026-09-02 19:58:08 CEST</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                                                                               file</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/e446824e332e80d106bbad209f62e87b.dat</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/a80b1f283a383a98b335292b188140ff.dat</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/960b1ce7199fde1d5b7300d0b0f306ec.dat</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/11612051e57188b531d854c119c2acf6.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                                                                   url</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9                                                             https://www.data.lustat.ch/fa-lu-ra.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7                                     https://dam-api.bfs.admin.ch/hub/api/dam/assets/34367751/master</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4          https://dam-api.bfs.admin.ch/hub/api/dam/assets/34367751/master#municipalities-g1-wgs84-v1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  https://www.uvek-gis.admin.ch/BFE/ogd/35/ogd35_schweizerische_elektrizitaetsbilanz_monatswerte.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                                           https://www.data.lustat.ch/szbv-lu-2025-2055-referenz.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                                                          https://www.data.lustat.ch/gefis-lu-jr.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5                                                    https://www.data.lustat.ch/szbd-lu-2025-2039.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                                                          https://www.data.lustat.ch/grwahlen-lu.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8                                               https://www.data.lustat.ch/szbv-lu-2025-2055-hoch.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10                                              https://www.data.lustat.ch/szbv-lu-2025-2055-tief.csv</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     size_kb                  fetched</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9     128.1 2026-08-31 21:57:30 CEST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   10336.5 2026-08-31 21:57:39 CEST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    1667.7 2026-08-31 21:57:55 CEST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      25.2 2026-09-02 19:58:08 CEST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  113126.4  2026-09-07 13:02:14 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3   65013.2  2026-09-07 13:04:46 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     126.8  2026-09-07 13:04:51 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6      78.4  2026-09-07 13:04:51 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  109258.3  2026-09-07 13:06:09 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 109254.5  2026-09-07 13:12:40 BST</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                                                                file</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/e446824e332e80d106bbad209f62e87b.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/a80b1f283a383a98b335292b188140ff.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/960b1ce7199fde1d5b7300d0b0f306ec.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/11612051e57188b531d854c119c2acf6.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/260b5896162d8a40565f451f8201cebb.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/3f7cddd19ac1b22f9431276fcebf9ce5.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/a193304b3e894d9c7733b4b3c8536b88.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/a6cdd6442bbee6ebe411e560274be095.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/aa645130b95a2f1b0bf2336730b27288.dat</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 /Users/jakestephan/Library/Caches/org.R-project.R/R/polyviz/f572100539eb1892e0c1a671f57aba58.dat</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

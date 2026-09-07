@@ -1,3 +1,24 @@
+# polyviz 1.0.2
+
+Easier to pick up, and a worked example of what it is all for.
+
+* `pv_suggest(data)` — hand it a data frame and it prints a handful of
+  runnable chart calls with your real column names filled in, each
+  with one line of reasoning. Every suggestion is checked against the
+  data before it is offered, so nothing it prints can fail.
+* A [one-page cheatsheet](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf)
+  — the 28 charts grouped by intent, the option conventions, the
+  export recipes — typeset in the package's own design system,
+  print-ready.
+* `vignette("polyviz")` — the five-minute Get started: install to a
+  saved, paper-ready figure in ten short blocks. It is also the
+  reference site's Get Started tab.
+* [A Swiss canton in charts](https://jastephan63.github.io/polyviz/story.html)
+  — a data story built with the package on live-fetched LUSTAT
+  Statistik Luzern data across Bevölkerung, Wirtschaft, and Raum:
+  nine charts, each with analysis whose every number is computed from
+  the data in the build script.
+
 # polyviz 1.0.1
 
 * `pv_static()` — render a chart as a still figure: no entry

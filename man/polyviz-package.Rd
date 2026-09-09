@@ -18,7 +18,7 @@ support (\code{\link[=pv_read_sas]{pv_read_sas()}}, \code{\link[=pv_write_sas]{p
 \item \strong{Python} — numeric profiling and outlier detection delegated to a
 bundled Python module when available, with an identical pure-R fallback
 (\code{\link[=pv_profile]{pv_profile()}}, \code{\link[=pv_outliers]{pv_outliers()}}).
-\item \strong{JavaScript / D3} — 28 kinds of interactive, animated chart
+\item \strong{JavaScript / D3} — 34 kinds of interactive, animated chart
 rendered by a bundled D3.js v7 and driven entirely from R data
 frames: from \code{\link[=pv_bar]{pv_bar()}}, \code{\link[=pv_line]{pv_line()}}, and \code{\link[=pv_scatter]{pv_scatter()}} through
 distributions (\code{\link[=pv_histogram]{pv_histogram()}}, \code{\link[=pv_violin]{pv_violin()}}), maps

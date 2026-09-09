@@ -13,7 +13,7 @@ and go from there."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -91,14 +91,20 @@ numbered list; the object itself is returned for programmatic use.</p>
     <p>The suggestions come from what is actually in the data: column types
 and cardinalities, whether keys repeat (which decides between a direct
 call and an <code><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate()</a></code> step, printed as part of the code), a <code>Date</code>
-or year column (lines; a calendar for daily dates), pairs of numeric
-columns (scatter, with <code>density = TRUE</code> past a few thousand rows),
-many numeric columns (a pairs matrix), longitude/latitude pairs (a
-bubble map), id columns matching the bundled Swiss map layers (a
-choropleth), and grouped numeric columns (boxplot, violin, or
-ridgeline, by group count). Every candidate is built once behind the
-scenes before it is offered, so a printed suggestion never errors on
-the data it was suggested for.</p>
+or year column (lines; a calendar for daily dates; a slope chart when
+it holds exactly two moments per group), pairs of numeric columns
+(scatter, with <code>density = TRUE</code> past a few thousand rows; a dumbbell
+when exactly two share a scale with one row per category), many
+numeric columns (a pairs matrix), longitude/latitude pairs (a bubble
+map), id columns matching the bundled Swiss map layers (a
+choropleth), grouped numeric columns (boxplot, violin, or ridgeline,
+by group count), a signed measure whose losses are a real minority (a
+waterfall, offered as a guess), nested category columns (a sunburst,
+with the icicle named as its readable-label twin), and parts of a
+whole (a donut, with a waffle beside it as the precise-reading
+alternative). Every candidate is built once behind the scenes before
+it is offered, so a printed suggestion never errors on the data it
+was suggested for.</p>
     </div>
 
     <div class="section level2">
@@ -157,6 +163,25 @@ the data it was suggested for.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_table - a sortable table shows the raw rows while you decide</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    pv_table(fiscal25)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Exactly two census years per city: the slope chart's home ground.</span></span></span>
+<span class="r-in"><span><span class="va">census</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">pv_city_population</span>, <span class="va">year</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1930</span>, <span class="fl">2024</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">pv_suggest</span><span class="op">(</span><span class="va">census</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;pv_suggestions&gt; census: 358 rows, 4 columns</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1) pv_slope - `year` holds exactly two years (1930 and 2024), so each `city` draws one line whose slope is its change</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_slope(census, x = "year", y = "population", group = "city")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2) pv_bar - one number per `size_class` compares cleanly as bars (summed to one row per `size_class` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_size_class &lt;- aggregate(population ~ size_class, census, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_bar(by_size_class, x = "size_class", y = "population")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3) pv_boxplot - `population` repeats across 6 `size_class` groups; boxes compare the spreads</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_boxplot(census, value = "population", group = "size_class")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_histogram - the spread of `population` is worth a first look on its own</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_histogram(census, x = "population")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 </code></pre></div>
     </div>

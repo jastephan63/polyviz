@@ -1,3 +1,29 @@
+# polyviz 1.1.0
+
+The comparison release: six new chart types bring the family to 34,
+each one a form whose whole job is putting values side by side.
+
+* `pv_slope()` — two moments, one line per group between them; rising
+  and falling told apart by ink, a `highlight` argument for the group
+  the story is about.
+* `pv_dumbbell()` — two dots and the gap between them, one row per
+  category, sortable by the gap or either end.
+* `pv_waterfall()` — signed contributions building left to right to a
+  total bar, gains and losses inked apart, running levels connected.
+* `pv_bullet()` — a value bar over qualitative bands with a target
+  tick: measure against expectation, several rows to one scale.
+* `pv_waffle()` — parts of a whole as unit squares (largest-remainder
+  rounding, exact shares in legend and tooltip) — the precise-reading,
+  print-safe alternative to a donut, texture-ready.
+* `pv_icicle()` — the rectangular sunburst: same data contract, same
+  zooming, but horizontal labels you can actually read.
+
+All six carry the full contract from day one — exports, download
+control, Shiny events, locales, themes, textures where fills exist,
+`pv_static()`, and computed alt text. `pv_suggest()` learned the new
+shapes (two time points per group now argues for a slope chart), the
+gallery gained six sections, and the cheatsheet grew to match.
+
 # polyviz 1.0.2
 
 Easier to pick up, and a worked example of what it is all for.

@@ -1,5 +1,5 @@
 /*
- * Composition renderers: donut, treemap, lollipop.
+ * Composition renderers: donut, treemap, lollipop, waffle.
  * Part-of-whole and ranking charts. See basic.js for the ctx contract.
  */
 (function () {
@@ -389,6 +389,135 @@
           path: d.ancestors().reverse().slice(1)
             .map(function (a) { return a.data.name; }),
           value: d.value
+        });
+      });
+  };
+
+  /* ---------- waffle ---------- */
+
+  pvRenderers.waffle = function (ctx) {
+    var data = ctx.x.data;
+    var rows = ctx.x.rows || 10;
+    var nUnits = rows * rows;
+    var total = d3.sum(data, function (d) { return d.value; }) || 1;
+    var cats = data.map(function (d) { return d.category; });
+    var color = d3.scaleOrdinal().domain(cats).range(ctx.theme.palette);
+    var pct = d3.format(".1%");
+
+    /* The squares themselves only say "about this many hundredths", so
+       the legend carries the honest figures: each category's exact value
+       and exact share, next to its swatch. The swatch lookups key on the
+       full label text, mapped back to the category's own colour and
+       texture slot. */
+    var legendLabel = {};
+    data.forEach(function (d) {
+      legendLabel[d.category] = d.category + " \u00b7 " +
+        ctx.fmt(d.value) + " (" + pct(d.value / total) + ")";
+    });
+    var byLabel = {};
+    data.forEach(function (d) { byLabel[legendLabel[d.category]] = d; });
+    function colorOfLabel(nm) { return color(byLabel[nm].category); }
+    var legend = pv.buildLegend(ctx.header,
+      data.map(function (d) { return legendLabel[d.category]; }),
+      colorOfLabel, ctx.theme,
+      pv.textureLegend(ctx,
+        data.map(function (d) { return legendLabel[d.category]; }),
+        colorOfLabel));
+    /* These entries are long enough to wrap on narrow charts, so take
+       the legend's measured height rather than assuming one row. */
+    ctx.height = Math.max(120, ctx.height - (legend.offsetHeight + 7));
+
+    /* The grid is always rows-by-rows: only the squares grow and shrink
+       with the chart, so the shape a reader learnt to count stays put.
+       It sits centred in whichever box it gets, sized by the tighter
+       dimension, with a 2px surface gap between squares. */
+    var m = { top: 8, right: 16, bottom: 12, left: 16 };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    var gap = 2;
+    var unit = Math.max(3,
+      Math.floor((Math.min(iw, ih) - (rows - 1) * gap) / rows));
+    var side = unit * rows + (rows - 1) * gap;
+    var x0 = m.left + Math.max(0, (iw - side) / 2);
+    var y0 = m.top + Math.max(0, (ih - side) / 2);
+
+    /* The R side already rounded every category to whole squares (by
+       largest remainder, so the grid is exactly full); here they are
+       just counted out, column by column from the bottom-left corner -
+       the way a bar would fill. */
+    var units = [];
+    data.forEach(function (d) {
+      for (var k = 0; k < d.units; k++) {
+        var u = units.length;
+        units.push({
+          cat: d, index: k,
+          cx: x0 + Math.floor(u / rows) * (unit + gap) + unit / 2,
+          cy: y0 + side - (u % rows) * (unit + gap) - unit / 2
+        });
+      }
+    });
+
+    var svg = pv.baseSvg(ctx);
+    /* Texture fills (pv_textures), one hatch per category slot - the
+       print story: hatched squares survive greyscale where solid hues
+       collapse into each other. */
+    var tex = pv.textureFill(ctx, svg, cats, color);
+    var rx = Math.min(3, unit * 0.25);
+
+    /* Each square is drawn centred on its own spot, so the entrance can
+       scale it up around its own middle. */
+    var sq = svg.append("g").selectAll("rect").data(units).enter()
+      .append("rect")
+      .attr("x", function (d) { return d.cx - unit / 2; })
+      .attr("y", function (d) { return d.cy - unit / 2; })
+      .attr("width", unit).attr("height", unit)
+      .attr("rx", rx)
+      .attr("fill", function (d) {
+        return tex ? tex(d.cat.category) : color(d.cat.category);
+      });
+
+    /* Entrance: the squares pop in one after the other in fill order,
+       so the grid appears to count itself up. In instant mode they are
+       already drawn in place. */
+    if (ctx.duration > 0) {
+      sq.attr("transform", function (d) {
+        return "translate(" + d.cx + "," + d.cy + ") scale(0) " +
+          "translate(" + (-d.cx) + "," + (-d.cy) + ")";
+      })
+        .transition().duration(300)
+        .delay(function (d, i) {
+          return Math.min(i * (ctx.duration / nUnits), ctx.duration);
+        })
+        .ease(d3.easeCubicOut)
+        .attr("transform", "translate(0,0) scale(1)");
+    }
+
+    /* Hovering any square lights its whole category, dims the rest, and
+       reads out the exact value, exact share, and the square count the
+       grid actually drew. */
+    sq
+      .on("pointerenter pointermove", function (event, d) {
+        sq.attr("opacity", function (s) {
+          return s.cat === d.cat ? 1 : 0.35;
+        });
+        pv.showTip(ctx, event, "<b>" + pv.esc(d.cat.category) + "</b><br>" +
+          pv.swatchRow(color(d.cat.category), ctx.x.vlab || "value",
+                       ctx.fmt(d.cat.value)) +
+          " &middot; " + pct(d.cat.value / total) + " of total<br>" +
+          d.cat.units + " of " + nUnits + " squares");
+      })
+      .on("pointerleave", function () {
+        sq.attr("opacity", 1);
+        pv.hideTip(ctx);
+      })
+      /* In Shiny, clicking any square reports its category as
+         input$<id>_click. */
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          category: d.cat.category,
+          value: d.cat.value,
+          share: d.cat.value / total,
+          units: d.cat.units
         });
       });
   };

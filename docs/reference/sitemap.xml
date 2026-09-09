@@ -25,6 +25,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_beeswarm.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_boxplot.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_bubble_map.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_bullet.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_bump.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_cache_status.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_calendar.html</loc></url>
@@ -46,6 +47,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_dendrogram.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_donut.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_downloads.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_dumbbell.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_elections.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_electricity.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_facet.html</loc></url>
@@ -58,6 +60,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_force.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_heatmap.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_histogram.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_icicle.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_labels.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_line.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_link.html</loc></url>
@@ -89,6 +92,7 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_search_opendata.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_set_labels.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_set_theme.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_slope.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_static.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_suggest.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_summary.html</loc></url>
@@ -103,6 +107,8 @@
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_treemap.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_trend.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_violin.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_waffle.html</loc></url>
+<url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_waterfall.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_weather.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pv_write_sas.html</loc></url>
 <url><loc>https://jastephan63.github.io/polyviz/reference/reference/pvchart-shiny.html</loc></url>

@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,7 +69,8 @@
 <p><a href="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/jastephan63/polyviz/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></p>
 <p><strong>D3-quality interactive visualisation and polyglot data analysis, with a pure R interface.</strong></p>
 <p>polyviz was born from loving <a href="https://d3js.org" class="external-link">d3.js</a> visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.</p>
-<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
+<p><strong>→ <a href="https://jastephan63.github.io/polyviz/story.html" class="external-link">Anatomy of a Swiss canton</a></strong> — a six-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn’t happening, rising inequality and the transfers that compress it, four statistical families of municipalities, and an ageing no scenario escapes — every number computed from the data.</p>
+<p><strong>→ <a href="https://jastephan63.github.io/polyviz/" class="external-link">Live demo gallery</a></strong> — all 34 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.</p>
 <p><strong>Getting started:</strong> <code><a href="articles/polyviz.html">vignette("polyviz")</a></code> is the five-minute tour, <code><a href="reference/pv_demo.html">pv_demo()</a></code> launches the live gallery as a Shiny app, <code>pv_suggest(data)</code> prints runnable chart calls that fit your data frame, and the <a href="https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf" class="external-link">cheatsheet (PDF)</a> fits the whole package on a desk-side sheet.</p>
 <p>Behind the R interface, the package deliberately spans four backend languages:</p>
 <table class="table">
@@ -87,7 +88,7 @@
 <tr>
 <td><strong>JavaScript (D3 v7)</strong></td>
 <td><code>inst/htmlwidgets/</code></td>
-<td>Renders all 28 interactive chart types</td>
+<td>Renders all 34 interactive chart types</td>
 </tr>
 <tr>
 <td><strong>SQL</strong></td>
@@ -180,6 +181,22 @@
 </td>
 <td>
 <code><a href="reference/pv_pairs.html">pv_pairs()</a></code> — scatterplot matrix</td>
+</tr>
+<tr>
+<td>
+<code><a href="reference/pv_slope.html">pv_slope()</a></code> — two moments compared</td>
+<td>
+<code><a href="reference/pv_dumbbell.html">pv_dumbbell()</a></code> — the gap on every row</td>
+<td>
+<code><a href="reference/pv_waterfall.html">pv_waterfall()</a></code> — running totals</td>
+</tr>
+<tr>
+<td>
+<code><a href="reference/pv_bullet.html">pv_bullet()</a></code> — value, target, bands</td>
+<td>
+<code><a href="reference/pv_waffle.html">pv_waffle()</a></code> — countable squares</td>
+<td>
+<code><a href="reference/pv_icicle.html">pv_icicle()</a></code> — zoomable</td>
 </tr>
 <tr>
 <td>

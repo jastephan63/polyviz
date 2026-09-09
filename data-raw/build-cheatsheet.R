@@ -1,5 +1,5 @@
 # Builds the printable cheatsheet: one A4 landscape page that groups all
-# 28 chart constructors by intent, states the shared grammar, and lists
+# 34 chart constructors by intent, states the shared grammar, and lists
 # the ways in (data) and out (paper). The page is laid out as HTML in the
 # package's own light-mode design tokens (pv_colors), set in the bundled
 # Inter, and printed to a true vector PDF by headless Chrome - the same
@@ -32,6 +32,10 @@ chooser <- list(
     entries = list(
       c("pv_bar()", "magnitudes by category; stacks by value or to 100%"),
       c("pv_lollipop()", "a ranking with less ink than bars"),
+      c("pv_slope()", "two moments, one line per group; the slope is the change"),
+      c("pv_dumbbell()", "two values per category, the gap on every row"),
+      c("pv_waterfall()", "signed contributions building to a total"),
+      c("pv_bullet()", "measures against their targets, in compact rows"),
       c("pv_heatmap()", "one value across two category axes"))),
   list(
     label = "Change over time",
@@ -53,8 +57,10 @@ chooser <- list(
     label = "Composition",
     entries = list(
       c("pv_donut()", "a few shares of one whole"),
+      c("pv_waffle()", "shares as countable unit squares"),
       c("pv_treemap()", "many parts sized by value, one or two levels"),
       c("pv_sunburst()", "a hierarchy in rings from the root; zoomable"),
+      c("pv_icicle()", "the same hierarchy as columns, labels legible"),
       c("pv_pack()", "a hierarchy as nested circles; zoomable"))),
   list(
     label = "Relationships",
@@ -79,7 +85,7 @@ chooser <- list(
       c("pv_dendrogram()", "an hclust tree, cut into k groups"))))
 
 n_charts <- sum(vapply(chooser, function(g) length(g$entries), integer(1)))
-stopifnot(n_charts == 28L)
+stopifnot(n_charts == 34L)
 
 # ---------------------------------------------------------------------
 # Small builders, so the markup below reads like the sheet.
@@ -137,7 +143,8 @@ col3 <- tag$div(class = "col",
              '       title, subtitle, source,\n',
              '       mode = "auto")')),
     tag$p(class = "note",
-      "All 28 constructors share the title block, the source line and ",
+      sprintf("All %d constructors share the title block, the source line and ",
+              n_charts),
       fn("mode"), ": ", fn('"auto"'),
       " follows the reader\u2019s light or dark side, ", fn('"light"'),
       " and ", fn('"dark"'), " pin it. Wherever a chart decides for ",
@@ -332,8 +339,8 @@ header h1 { font-size: 19pt; font-weight: 760; letter-spacing: -0.022em;
 
 .entry { display: grid; grid-template-columns: 22.5mm 1fr; gap: 0 2mm;
   padding: 0.5mm 0; }
-.pick .entry { padding: 0.8mm 0; }
-.pick .group { margin-bottom: 3.2mm; }
+.pick .entry { padding: 0.45mm 0; }
+.pick .group { margin-bottom: 2.2mm; }
 .fn { font-size: 7pt; color: ', ink$primary, '; white-space: nowrap; }
 .when { color: ', ink$secondary, '; }
 
@@ -378,7 +385,12 @@ page <- gsub("\\(\\s+<code", "(<code", page, perl = TRUE)
 used <- setdiff(
   unique(regmatches(page, gregexpr("pv_[a-z0-9_]+", page))[[1]]),
   "pv_fonts")  # the font library's path name, not an R object
+# The namespace's declared exports, plus everything living in the dev
+# load - between adding a chart and regenerating NAMESPACE, the new
+# constructor exists in the namespace before it shows up in the export
+# list. A typo'd or invented name still fails either way.
 known <- c(getNamespaceExports("polyviz"),
+           ls(envir = asNamespace("polyviz")),
            utils::data(package = "polyviz")$results[, "Item"])
 missing <- setdiff(used, known)
 if (length(missing)) {
@@ -388,9 +400,11 @@ if (length(missing)) {
 constructors <- unlist(lapply(chooser, function(g) {
   vapply(g$entries, function(e) sub("\\(\\)$", "", e[[1]]), character(1))
 }))
-stopifnot(length(constructors) == 28L,
+stopifnot(length(constructors) == 34L,
           !anyDuplicated(constructors),
-          all(constructors %in% getNamespaceExports("polyviz")))
+          all(vapply(constructors, function(f) {
+            is.function(get0(f, envir = asNamespace("polyviz")))
+          }, logical(1))))
 cat(sprintf("checked: %d pv_* names on the sheet, %d chart constructors\n",
             length(used), n_charts))
 

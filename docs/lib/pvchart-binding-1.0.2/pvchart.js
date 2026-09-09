@@ -74,9 +74,11 @@ var pvDataKeys = {
   lollipop: "data", beeswarm: "data", parallel: "data", race: "data",
   bump: "data", choropleth: "data", bubblemap: "data",
   table: "data", pairs: "data",
+  slope: "data", dumbbell: "data", waterfall: "data", bullet: "data",
+  waffle: "data",
   force: "nodes", sankey: "nodes", arc: "nodes",
   chord: "matrix",
-  sunburst: "root", pack: "root", treemap: "root",
+  sunburst: "root", pack: "root", treemap: "root", icicle: "root",
   dendrogram: "tree",
   boxplot: "boxes", violin: "violins", ridgeline: "ridges",
   facet: "panels"

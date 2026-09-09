@@ -1,7 +1,7 @@
-# Gallery snippets for the composition family: donut, treemap, lollipop.
-# Each block: an id, an explanation for the demo page, and one runnable
-# expression on the real bundled data. data-raw/build-gallery.R assembles
-# these into docs/.
+# Gallery snippets for the composition family: donut, waffle, treemap,
+# lollipop. Each block: an id, an explanation for the demo page, and one
+# runnable expression on the real bundled data. data-raw/build-gallery.R
+# assembles these into docs/.
 
 ## donut
 # explain: The donut shows how one whole divides into parts - each slice's
@@ -30,6 +30,35 @@
     source = "Source: LUSTAT Statistik Luzern"
   )
 }
+
+## waffle
+# explain: The waffle shows the same parts-of-a-whole as the donut, but
+#   as countable unit squares: a 10-by-10 grid where every square is one
+#   percent, categories filling it column by column from the bottom
+#   left. Reach for it when the shares should be read as numbers rather
+#   than compared as angles - the eye counts squares far better than it
+#   judges arcs - and when the chart must survive printing: piped
+#   through pv_textures(), each party's squares also wear their own
+#   hatch. The rounding is honest by largest remainder - no category is
+#   ever more than one square from its exact share, and the legend and
+#   tooltip always carry the exact seats and percentage. The same 385
+#   Lucerne council seats as the donut above, and the waffle makes the
+#   arithmetic visible: Mitte's 46 squares are nearly half the grid,
+#   Mitte and FDP together hold 72 of the 100, and the third-largest
+#   block is no party at all - 48 independents, an eighth of all seats,
+#   well clear of the SVP's 38. Hovering any square lights up its whole
+#   party.
+local({
+  seats <- aggregate(elected ~ party,
+                     pv_elections[pv_elections$year == 2024, ], sum)
+  # Largest first, so the grid fills in rank order and the palette's
+  # strongest colours go to the biggest parties.
+  seats <- seats[order(-seats$elected), ]
+  pv_waffle(seats, category = "party", value = "elected",
+            title = "The council seats, one square per percent",
+            subtitle = "385 municipal council seats won in Lucerne's 2024 elections",
+            source = "Source: LUSTAT Statistik Luzern")
+})
 
 ## treemap
 # explain: The treemap packs a hierarchy into nested rectangles - each

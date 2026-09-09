@@ -1,6 +1,7 @@
-# Gallery snippets for the hierarchy charts. Each block: an id, an
-# explanation for the demo page, and one runnable expression on the real
-# bundled data. data-raw/build-gallery.R assembles these into docs/.
+# Gallery snippets for the hierarchy charts: pack, icicle, dendrogram.
+# Each block: an id, an explanation for the demo page, and one runnable
+# expression on the real bundled data. data-raw/build-gallery.R
+# assembles these into docs/.
 
 ## pack
 # explain: Circle packing nests a hierarchy as circles within circles -
@@ -17,6 +18,30 @@ pv_pack(
   pv_city_landuse, levels = c("group", "category"), value = "hectares",
   title = "What Swiss urban ground is made of",
   subtitle = "Hectares across all 181 statistical cities — click a circle to zoom",
+  source = "Source: Bundesamt für Statistik – Arealstatistik"
+)
+
+## icicle
+# explain: The icicle is the sunburst unrolled: the same hierarchy, but
+#   as stacked rectangles - the root band at the left edge, each level
+#   one column further right, every segment's height its share of its
+#   parent. The reason to reach for it over the sunburst is legibility:
+#   a sunburst has to bend names around an arc and gives most of them
+#   up, while the icicle's upright rectangles write their labels
+#   horizontally, so far more names fit and every one reads at a
+#   glance - compare the ring chart above, where "Urban green" and
+#   "Industrial" go unlabelled, with the columns here, where they are
+#   plainly written. Click a segment to zoom into its branch, click the
+#   left band to step back out; slivers too short for a line of text
+#   stay blank, and hovering anything gives the full path, exact
+#   hectares, and share. The hierarchy is Lucerne's land use again:
+#   settlement, cultivated, and natural ground, each split into its
+#   categories.
+pv_icicle(
+  pv_city_landuse[pv_city_landuse$city == "Luzern", ],
+  levels = c("group", "category"), value = "hectares",
+  title = "Lucerne's land, column by column",
+  subtitle = "Click a segment to zoom in; click the left band to zoom back out",
   source = "Source: Bundesamt für Statistik – Arealstatistik"
 )
 

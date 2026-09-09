@@ -78,16 +78,78 @@ render_charts <- list(
     pv_donut(seats, category = "party", value = "elected",
              title = "Council seats by party")
   },
+  waffle = function() {
+    seats <- aggregate(elected ~ party,
+                       pv_elections[pv_elections$year == 2024, ], sum)
+    seats <- seats[order(-seats$elected), ]
+    pv_waffle(seats, category = "party", value = "elected",
+              title = "Council seats, one square per percent")
+  },
   treemap = function() {
     pv_treemap(pv_city_landuse[pv_city_landuse$city == "Luzern", ],
                levels = c("group", "category"), value = "hectares",
                title = "How Lucerne uses its land")
+  },
+  icicle = function() {
+    pv_icicle(pv_city_landuse[pv_city_landuse$city == "Luzern", ],
+              levels = c("group", "category"), value = "hectares",
+              title = "Lucerne's land, column by column")
   },
   lollipop = function() {
     f25 <- pv_fiscal[pv_fiscal$year == 2025, ]
     top <- head(f25[order(-f25$equalization_chf), ], 25)
     pv_lollipop(top, x = "municipality", y = "equalization_chf",
                 title = "Where fiscal equalization flows")
+  },
+  slope = function() {
+    big <- c("Z\u00fcrich", "Basel", "Gen\u00e8ve", "Bern", "Winterthur",
+             "Luzern")
+    pv_slope(pv_city_population[pv_city_population$city %in% big &
+                                  pv_city_population$year %in%
+                                    c(1970, 2024), ],
+             x = "year", y = "population", group = "city",
+             highlight = "Winterthur",
+             title = "Half a century between two censuses")
+  },
+  dumbbell = function() {
+    f20 <- pv_fiscal[pv_fiscal$year == 2020,
+                     c("municipality", "resource_index")]
+    f27 <- pv_fiscal[pv_fiscal$year == 2027,
+                     c("municipality", "resource_index")]
+    both <- merge(f20, f27, by = "municipality",
+                  suffixes = c("_2020", "_2027"))
+    movers <- head(both[order(-abs(both$resource_index_2027 -
+                                     both$resource_index_2020)), ], 12)
+    pv_dumbbell(movers, y = "municipality", x1 = "resource_index_2020",
+                x2 = "resource_index_2027", labels = c("2020", "2027"),
+                title = "Whose tax base moved most")
+  },
+  waterfall = function() {
+    e20 <- aggregate(gwh ~ source,
+                     pv_electricity[pv_electricity$year == 2020, ], sum)
+    e25 <- aggregate(gwh ~ source,
+                     pv_electricity[pv_electricity$year == 2025, ], sum)
+    chg <- merge(e20, e25, by = "source", suffixes = c("_2020", "_2025"))
+    chg$change <- chg$gwh_2025 - chg$gwh_2020
+    chg <- chg[order(-chg$change), ]
+    pv_waterfall(chg, x = "source", y = "change",
+                 start = sum(chg$gwh_2020), total = "2025",
+                 title = "What changed Swiss electricity production")
+  },
+  bullet = function() {
+    n24 <- aggregate(nights ~ canton,
+                     pv_tourism[pv_tourism$year == 2024, ], sum)
+    n19 <- aggregate(nights ~ canton,
+                     pv_tourism[pv_tourism$year == 2019, ], sum)
+    rec <- merge(n24, n19, by = "canton", suffixes = c("", "_2019"))
+    rec <- head(rec[order(-rec$nights), ], 8)
+    # Honest synthetic context: each canton's own pre-pandemic level is
+    # the target, with bands at half and 80% of it.
+    rec$half <- 0.5 * rec$nights_2019
+    rec$most <- 0.8 * rec$nights_2019
+    pv_bullet(rec, label = "canton", value = "nights",
+              target = "nights_2019", bands = c("half", "most"),
+              title = "Tourism against its pre-pandemic mark")
   },
   area = function() {
     cities <- c("Luzern", "Emmen", "Kriens", "Horw", "Ebikon")

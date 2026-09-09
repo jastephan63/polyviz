@@ -14,7 +14,8 @@ test_that("every chart type has a render check", {
   expect_setequal(names(render_charts), c(
     "bar", "line", "scatter", "force", "chord", "arc", "sunburst",
     "histogram", "boxplot", "violin", "ridgeline",
-    "donut", "treemap", "lollipop",
+    "donut", "waffle", "treemap", "icicle", "lollipop",
+    "slope", "dumbbell", "waterfall", "bullet",
     "area", "heatmap", "calendar",
     "sankey", "parallel",
     "pack", "dendrogram",
@@ -75,12 +76,36 @@ test_that("donut renders without JavaScript errors", {
   expect_chart_renders("donut")
 })
 
+test_that("waffle renders without JavaScript errors", {
+  expect_chart_renders("waffle")
+})
+
 test_that("treemap renders without JavaScript errors", {
   expect_chart_renders("treemap")
 })
 
+test_that("icicle renders without JavaScript errors", {
+  expect_chart_renders("icicle")
+})
+
 test_that("lollipop renders without JavaScript errors", {
   expect_chart_renders("lollipop")
+})
+
+test_that("slope renders without JavaScript errors", {
+  expect_chart_renders("slope")
+})
+
+test_that("dumbbell renders without JavaScript errors", {
+  expect_chart_renders("dumbbell")
+})
+
+test_that("waterfall renders without JavaScript errors", {
+  expect_chart_renders("waterfall")
+})
+
+test_that("bullet renders without JavaScript errors", {
+  expect_chart_renders("bullet")
 })
 
 test_that("area renders without JavaScript errors", {

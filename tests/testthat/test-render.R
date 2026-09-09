@@ -176,13 +176,15 @@ test_that("table renders without JavaScript errors", {
 # above never reach - stacked layouts, marker dots, curve interpolation,
 # the zoom strip, violin overlays, texture patterns, locale formatting,
 # the scatter's density contours, its hexagon bins, and its canvas mark
-# layer. One variant per option keeps those paths under the same render
-# contract.
+# layer - and so do the time-series layers: the forecast fan, the
+# changepoint marks, and the decomposition's four-panel facet. One
+# variant per option keeps those paths under the same render contract.
 
 test_that("every option variant builds its base chart type", {
   expect_setequal(names(render_variants), c(
     "bar_stacked", "bar_percent", "bar_textured", "bar_locale",
     "violin_overlays", "line_markers", "line_zoom",
+    "line_forecast", "line_changepoints", "facet_decompose",
     "scatter_density", "scatter_canvas", "scatter_hex",
     "choropleth_cantons"))
   for (id in names(render_variants)) {
@@ -218,6 +220,18 @@ test_that("line with markers and curve renders without JavaScript errors", {
 
 test_that("zoomed line renders without JavaScript errors", {
   expect_chart_renders("line_zoom")
+})
+
+test_that("line with a forecast fan renders without JavaScript errors", {
+  expect_chart_renders("line_forecast")
+})
+
+test_that("line with changepoint marks renders without JavaScript errors", {
+  expect_chart_renders("line_changepoints")
+})
+
+test_that("the four-panel decomposition renders without JavaScript errors", {
+  expect_chart_renders("facet_decompose")
 })
 
 test_that("scatter density contours render without JavaScript errors", {

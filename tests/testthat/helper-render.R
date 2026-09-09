@@ -347,6 +347,29 @@ render_variants <- list(
     pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
                density = "hex", title = "Six years of days, in hexagons")
   },
+  # The three time-series layers of v1.3.0. Each computes in R and draws
+  # through existing machinery, but each also exercises drawing code the
+  # canonical line chart never reaches: the forecast fan (nested bands,
+  # the dashed continuation, the end-of-data rule), the changepoint
+  # marks piped through pv_annotate, and the decomposition's four-panel
+  # facet path (shared x, per-panel y, the zero hline in every panel).
+  line_forecast = function() {
+    nights <- aggregate(nights ~ year, pv_tourism, sum)
+    pv_line(nights, x = "year", y = "nights",
+            title = "Hotel nights with a forecast fan") |>
+      pv_forecast(horizon = 4)
+  },
+  line_changepoints = function() {
+    nuclear <- pv_electricity[pv_electricity$source == "Nuclear", ]
+    pv_line(nuclear, x = "date", y = "gwh",
+            title = "Nuclear output and its level shift") |>
+      pv_changepoints(levels = TRUE)
+  },
+  facet_decompose = function() {
+    monthly <- aggregate(gwh ~ date, pv_electricity, sum)
+    pv_decompose(monthly, x = "date", y = "gwh",
+                 title = "Electricity production, decomposed")
+  },
   # The two country-wide geo paths, on bundled layers only - the
   # municipality layer would need a network fetch, which tests never do.
   choropleth_cantons = function() {

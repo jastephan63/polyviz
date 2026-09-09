@@ -1,6 +1,6 @@
-# Composition charts: donut, treemap, lollipop. Part-of-whole and ranking
-# forms. Each function validates here in R and ships a tidy payload to the
-# renderers in inst/htmlwidgets/lib/pv-renderers/composition.js.
+# Composition charts: donut, treemap, lollipop, waffle. Part-of-whole and
+# ranking forms. Each function validates here in R and ships a tidy payload
+# to the renderers in inst/htmlwidgets/lib/pv-renderers/composition.js.
 
 # The display flags below are tri-state: TRUE and FALSE force a look, and
 # "auto" leaves the decision to the JavaScript side, which resolves it at
@@ -150,6 +150,101 @@ pv_treemap <- function(data, levels, value, labels = "auto",
   root <- list(name = "root", children = build(data, levels))
   pv_widget("treemap", c(list(
     root = root, labels = labels, vlab = value
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Interactive D3 waffle chart
+#'
+#' Parts of a whole as countable unit squares: a `rows`-by-`rows` grid of
+#' small rounded squares, each square standing for one part in
+#' `rows * rows` of the total (1% on the default 10-by-10 grid), with
+#' the categories filling
+#' the grid column by column from the bottom left in the order they first
+#' appear in the data. Where a donut asks the eye to compare angles, a
+#' waffle lets it count — and with [pv_textures()] each category's squares
+#' also wear their own hatch, so the chart survives greyscale printing
+#' better than any donut. Hovering a square lights up its whole category
+#' and shows the exact value and share.
+#'
+#' Values rarely divide into whole squares, so each category's square
+#' count is rounded honestly: every category first takes the whole
+#' squares its exact share contains, then the leftover squares go to the
+#' categories with the largest remainders (first appearance breaks ties)
+#' until the grid is exactly full. A category is therefore never more
+#' than one square away from its exact share — but a very small one may
+#' draw no squares at all. The legend and the tooltip always carry the
+#' exact value and percentage, never the rounded ones.
+#'
+#' @param data A data frame. Rows sharing a category are summed into one
+#'   category, keeping first-appearance order — that order also assigns
+#'   the palette colours and fills the grid.
+#' @param category Name of the category column. The active theme's
+#'   palette caps how many distinct categories fit (8 in the packaged
+#'   theme); fold the smallest into an `"Other"` bin first.
+#' @param value Name of the numeric column giving category sizes. Values
+#'   must be non-negative, and must not all be zero — a square is a share
+#'   of the total.
+#' @param rows Number of rows (and columns) in the unit grid, a whole
+#'   number from 2 to 20. The default 10 draws the classic 100-square
+#'   waffle where every square is 1%. The grid keeps this shape at every
+#'   chart size — only the squares themselves grow and shrink.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' seats <- aggregate(elected ~ party,
+#'                    pv_elections[pv_elections$year == 2024, ], sum)
+#' pv_waffle(seats, category = "party", value = "elected",
+#'           title = "Council seats by party, 2024")
+#' @export
+pv_waffle <- function(data, category, value, rows = 10,
+                      title = NULL, subtitle = NULL, mode = "auto",
+                      duration = 650, source = NULL, width = NULL,
+                      height = NULL, elementId = NULL) {
+  check_columns(data, list(category, value))
+  check_nonempty(data)
+  check_value_column(data, value)
+  if (!is.numeric(rows) || length(rows) != 1 || is.na(rows) ||
+      rows != round(rows) || rows < 2 || rows > 20) {
+    rlang::abort(paste(
+      "`rows` must be a single whole number from 2 to 20 -",
+      "the grid holds rows * rows squares, and beyond 400 they stop",
+      "being countable."))
+  }
+  df <- data.frame(category = as.character(data[[category]]),
+                   value = as.numeric(data[[value]]))
+  if (anyNA(df$value) || any(df$value < 0)) {
+    rlang::abort("Category values must be non-negative and not missing.")
+  }
+  # One category per label: rows that share one are summed, keeping
+  # first-appearance order so colours (and the fill order) stay stable.
+  if (anyDuplicated(df$category)) {
+    lv <- unique(df$category)
+    sums <- tapply(df$value, factor(df$category, levels = lv), sum)
+    df <- data.frame(category = lv, value = as.numeric(sums))
+  }
+  check_theme_palette_fit(df$category, category)
+  total <- sum(df$value)
+  if (total <= 0) {
+    rlang::abort(sprintf(
+      "`%s` sums to zero; a waffle has no squares to fill.", value))
+  }
+  # Round the shares to whole squares by largest remainder: everyone
+  # keeps the whole squares their exact share contains, then the
+  # leftovers go to the biggest remainders (first appearance breaks
+  # ties) until the grid is exactly full. The JavaScript side just
+  # counts these out - the exact values ride along for the tooltip.
+  n_units <- as.integer(rows)^2
+  exact <- df$value / total * n_units
+  units <- floor(exact)
+  short <- n_units - sum(units)
+  if (short > 0) {
+    take <- order(-(exact - units), seq_along(units))[seq_len(short)]
+    units[take] <- units[take] + 1
+  }
+  df$units <- as.integer(units)
+  pv_widget("waffle", c(list(
+    data = df, rows = as.integer(rows), vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

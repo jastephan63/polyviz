@@ -493,3 +493,384 @@ test_that("the bubble map renders without JavaScript errors", {
   expect_gt(file.size(path), 20000)
   render_publish(path)
 })
+
+# ---- flow map --------------------------------------------------------------
+
+# The flagship commuter flows: every exchange between Zug and its named
+# neighbours in the latest period, both directions, so bidirectional
+# pairs are part of the canonical build.
+zug_flows <- function() {
+  latest <- pv_commuters[pv_commuters$period == "2022-2024" &
+                           pv_commuters$region != "Restliche Schweiz", ]
+  data.frame(
+    from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+    to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+    commuters = latest$commuters)
+}
+
+test_that("flow map builds its payload from flows and place centroids", {
+  flows <- zug_flows()
+  w <- expect_pvchart(
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters"),
+    "flowmap")
+  # Flows travel exactly as given - names, order, and values.
+  expect_named(w$x$data, c("from", "to", "value"))
+  expect_equal(w$x$data$from, flows$from)
+  expect_equal(w$x$data$to, flows$to)
+  expect_equal(w$x$data$value, flows$commuters)
+  expect_equal(w$x$vlab, "commuters")
+  # "cantons" is the default base, with the lakes over it.
+  expect_identical(w$x$map, pv_swiss_cantons)
+  expect_identical(w$x$lakes, pv_swiss_lakes)
+  # One place row per endpoint, each on its feature's centroid.
+  expect_setequal(w$x$places$place,
+                  c("Zug", "Aargau", "Luzern", "Schwyz", "Z\u00fcrich"))
+  cent <- polyviz:::pv_layer_centroids(pv_swiss_cantons)
+  zug <- w$x$places[w$x$places$place == "Zug", ]
+  expect_equal(zug$lon, cent$lon[cent$name == "Zug"])
+  expect_equal(zug$lat, cent$lat[cent$name == "Zug"])
+  # Total throughput is everything in plus everything out: every flow
+  # touches Zug, and Luzern carries just its own two directions.
+  expect_equal(zug$total, sum(flows$commuters))
+  lu <- w$x$places[w$x$places$place == "Luzern", ]
+  expect_equal(lu$total, sum(flows$commuters[flows$from == "Luzern" |
+                                               flows$to == "Luzern"]))
+  # Every endpoint is labelled by default.
+  expect_true(all(w$x$places$labelled))
+})
+
+test_that("layer centroids mirror the pv_city_coords construction", {
+  # pv_city_coords was built with sf in the metric LV95 plane; the
+  # runtime centroids use the same area-weighted idea on the raw rings,
+  # so on the same municipality polygons the two must agree to within
+  # the published rounding.
+  cent <- polyviz:::pv_layer_centroids(pv_lucerne_map)
+  for (city in c("Luzern", "Kriens", "Emmen", "Willisau")) {
+    mine <- cent[cent$name == city, ]
+    ref <- pv_city_coords[pv_city_coords$city == city, ]
+    expect_lt(abs(mine$lon - ref$lon), 2e-4)
+    expect_lt(abs(mine$lat - ref$lat), 2e-4)
+  }
+  # Background features without keys (the Lucerne lakes) stay out.
+  expect_false(anyNA(cent$lon))
+  expect_equal(nrow(cent), 79)
+})
+
+test_that("flow endpoints match feature names first and ids second", {
+  # Canton numbers name the same places the canton names do.
+  by_id <- data.frame(a = c("3", "19"), b = c("9", "9"), n = c(10, 20))
+  w <- pv_flow_map(by_id, from = "a", to = "b", value = "n")
+  cent <- polyviz:::pv_layer_centroids(pv_swiss_cantons)
+  p3 <- w$x$places[w$x$places$place == "3", ]
+  expect_equal(p3$lon, cent$lon[cent$name == "Luzern"])
+  # And numeric id columns work like their string form.
+  by_num <- data.frame(a = c(3, 19), b = c(9, 9), n = c(10, 20))
+  wn <- pv_flow_map(by_num, from = "a", to = "b", value = "n")
+  expect_equal(wn$x$places$lon, w$x$places$lon)
+})
+
+test_that("flow map aborts loudly on unmatched endpoints", {
+  bad <- data.frame(from = c("Luzern", "Atlantis", "Narnia"),
+                    to = c("Zug", "Zug", "Mordor"),
+                    n = c(1, 2, 3))
+  expect_error(
+    pv_flow_map(bad, from = "from", to = "to", value = "n"),
+    "3 endpoint\\(s\\) match no feature.*Atlantis, Narnia, Mordor")
+  # No overlap at all points at the map itself, not the names.
+  none <- data.frame(from = c("Atlantis", "Lemuria"),
+                     to = c("Mu", "Avalon"), n = c(1, 2))
+  expect_error(
+    pv_flow_map(none, from = "from", to = "to", value = "n"),
+    "Wrong columns, or wrong map\\?")
+  # More than five unmatched names are counted, not all spelled out.
+  many <- data.frame(from = paste0("Nowhere", 1:7), to = "Zug",
+                     n = 1:7)
+  expect_error(
+    pv_flow_map(many, from = "from", to = "to", value = "n"),
+    "7 endpoint\\(s\\).*and 2 more")
+})
+
+test_that("flow map refuses duplicate pairs but keeps opposite directions", {
+  dup <- data.frame(from = c("Luzern", "Luzern"), to = c("Zug", "Zug"),
+                    n = c(1, 2))
+  expect_error(
+    pv_flow_map(dup, from = "from", to = "to", value = "n"),
+    "aggregate it first")
+  # A to B and B to A are two legitimate flows, not duplicates.
+  both <- data.frame(from = c("Luzern", "Zug"), to = c("Zug", "Luzern"),
+                     n = c(1, 2))
+  expect_equal(nrow(pv_flow_map(both, from = "from", to = "to",
+                                value = "n")$x$data), 2)
+  # A place flowing to itself has no chord to draw.
+  loop <- data.frame(from = c("Luzern", "Zug"), to = c("Zug", "Zug"),
+                     n = c(1, 2))
+  expect_error(
+    pv_flow_map(loop, from = "from", to = "to", value = "n"),
+    "from a place to itself")
+})
+
+test_that("flow map validates its columns and values", {
+  flows <- zug_flows()
+  expect_error(
+    pv_flow_map(flows, from = "nope", to = "to", value = "commuters"),
+    "not in `data`")
+  expect_error(
+    pv_flow_map(flows, from = "from", to = "to", value = "from"),
+    "not numeric")
+  expect_error(
+    pv_flow_map(flows[0, ], from = "from", to = "to", value = "commuters"),
+    "no rows")
+  neg <- flows
+  neg$commuters[2] <- -5
+  expect_error(
+    pv_flow_map(neg, from = "from", to = "to", value = "commuters"),
+    "negative")
+  zero <- flows
+  zero$commuters <- 0
+  expect_error(
+    pv_flow_map(zero, from = "from", to = "to", value = "commuters"),
+    "no positive values")
+  nas <- flows
+  nas$commuters[3] <- NA
+  expect_warning(
+    w <- pv_flow_map(nas, from = "from", to = "to", value = "commuters"),
+    "Dropped 1 row\\(s\\) with missing `commuters`")
+  expect_equal(nrow(w$x$data), nrow(flows) - 1)
+  naf <- flows
+  naf$from[1] <- NA
+  expect_warning(
+    pv_flow_map(naf, from = "from", to = "to", value = "commuters"),
+    "missing `from`")
+})
+
+test_that("the labels argument picks which endpoints get named", {
+  flows <- zug_flows()
+  w <- pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                   labels = c("Zug", "Luzern"))
+  expect_equal(sort(w$x$places$place[w$x$places$labelled]),
+               c("Luzern", "Zug"))
+  # An empty selection labels nothing but still draws the dots.
+  w0 <- pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                    labels = character(0))
+  expect_false(any(w0$x$places$labelled))
+  expect_equal(nrow(w0$x$places), 5)
+  expect_error(
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                labels = c("Zug", "Bermuda")),
+    "carry no flow: Bermuda")
+  expect_error(
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                labels = 1:2),
+    "`labels` must be NULL or a character vector")
+})
+
+test_that("explicit endpoint coordinates override the centroid lookup", {
+  df <- data.frame(from = c("HQ", "Plant"), to = c("Plant", "Depot"),
+                   n = c(10, 4),
+                   flon = c(8.31, 7.44), flat = c(47.05, 46.95),
+                   tlon = c(7.44, 8.95), tlat = c(46.95, 46.01))
+  # All four columns or none - a half-given override is a mistake.
+  expect_error(
+    pv_flow_map(df, from = "from", to = "to", value = "n",
+                from_lon = "flon"),
+    "all four columns")
+  w <- pv_flow_map(df, from = "from", to = "to", value = "n",
+                   from_lon = "flon", from_lat = "flat",
+                   to_lon = "tlon", to_lat = "tlat")
+  # The names never touch the map; the coordinates are the columns' own.
+  hq <- w$x$places[w$x$places$place == "HQ", ]
+  expect_equal(hq$lon, 8.31)
+  expect_equal(hq$lat, 47.05)
+  expect_equal(nrow(w$x$places), 3)
+  # One name at two different spots would tear its endpoint dot apart.
+  torn <- df
+  torn$tlon[1] <- 7.5
+  torn$from[2] <- "Plant"
+  torn$flon[2] <- 7.44
+  torn$flat[2] <- 46.95
+  expect_error(
+    pv_flow_map(torn, from = "from", to = "to", value = "n",
+                from_lon = "flon", from_lat = "flat",
+                to_lon = "tlon", to_lat = "tlat"),
+    "more than one set of coordinates: Plant")
+})
+
+test_that("explicit coordinates get the bubble map's sanity checks", {
+  # Swapped columns put a longitude-sized number into latitude.
+  far <- data.frame(from = "A", to = "B", n = 1,
+                    flon = 1.35, flat = 103.8, tlon = 22.3, tlat = 114.2)
+  expect_error(
+    pv_flow_map(far, from = "from", to = "to", value = "n",
+                from_lon = "flon", from_lat = "flat",
+                to_lon = "tlon", to_lat = "tlat"),
+    "swapped")
+  # A flow with an endpoint beyond the map is dropped, loudly.
+  mixed <- data.frame(from = c("Luzern", "Paris"), to = c("Bern", "Bern"),
+                      n = c(1, 2),
+                      flon = c(8.31, 2.35), flat = c(47.05, 48.86),
+                      tlon = c(7.44, 7.44), tlat = c(46.95, 46.95))
+  expect_warning(
+    w <- pv_flow_map(mixed, from = "from", to = "to", value = "n",
+                     from_lon = "flon", from_lat = "flat",
+                     to_lon = "tlon", to_lat = "tlat"),
+    "outside the map.*Paris -> Bern")
+  expect_equal(w$x$data$from, "Luzern")
+  # Nothing on the map at all is an error, not an empty sea.
+  off <- data.frame(from = "Paris", to = "London", n = 1,
+                    flon = 2.35, flat = 48.86, tlon = -0.13, tlat = 51.5)
+  expect_error(
+    pv_flow_map(off, from = "from", to = "to", value = "n",
+                from_lon = "flon", from_lat = "flat",
+                to_lon = "tlon", to_lat = "tlat"),
+    "No flow falls on the map")
+})
+
+test_that("flow map lakes and layers behave like the geo siblings", {
+  flows <- zug_flows()
+  # Explicit words win; "auto" leaves regional maps dry.
+  wf <- pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                    lakes = FALSE)
+  expect_null(wf$x$lakes)
+  lu <- data.frame(from = c("Emmen", "Kriens"), to = "Luzern", n = c(2, 1))
+  wl <- pv_flow_map(lu, from = "from", to = "to", value = "n",
+                    map = "lucerne")
+  expect_identical(wl$x$map, pv_lucerne_map)
+  expect_null(wl$x$lakes)
+  expect_error(
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                lakes = "yes"),
+    '`lakes` must be TRUE, FALSE, or "auto"')
+  expect_error(
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                map = "krantons"),
+    "Unknown map layer")
+})
+
+test_that("flow map works on an sf layer through the usual conversion", {
+  skip_if_not_installed("sf")
+  x <- sf_from_layer(pv_swiss_cantons)
+  flows <- zug_flows()
+  w <- pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                   map = x)
+  expect_equal(nrow(w$x$places), 5)
+  # The converted features carry the same polygons, so the centroids
+  # land where the bundled layer puts them.
+  cent <- polyviz:::pv_layer_centroids(pv_swiss_cantons)
+  zug <- w$x$places[w$x$places$place == "Zug", ]
+  expect_lt(abs(zug$lon - cent$lon[cent$name == "Zug"]), 1e-6)
+})
+
+test_that("the flow map renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  w <- pv_flow_map(zug_flows(), from = "from", to = "to",
+                   value = "commuters",
+                   title = "Commuter exchange with Canton Zug")
+  path <- file.path(render_out_dir(), "flowmap.png")
+  expect_no_warning(pv_save(w, path, quiet = TRUE))
+  expect_true(file.exists(path))
+  expect_gt(file.size(path), 20000)
+  render_publish(path)
+
+  # A lone bidirectional pair and a regional layer go through the same
+  # real-Chrome treatment - the offset arcs and the no-lakes path.
+  bi <- data.frame(a = c("Bern", "Ticino"), b = c("Ticino", "Bern"),
+                   n = c(9000, 3000))
+  wb <- pv_flow_map(bi, from = "a", to = "b", value = "n",
+                    title = "Two directions, two sides of the chord")
+  pb <- file.path(render_out_dir(), "flowmap_bidirectional.png")
+  expect_no_warning(pv_save(wb, pb, quiet = TRUE))
+  expect_gt(file.size(pb), 20000)
+  render_publish(pb)
+
+  lu <- data.frame(from = c("Emmen", "Kriens", "Horw", "Ebikon"),
+                   to = "Luzern", n = c(5200, 4100, 2300, 2900))
+  wu <- pv_flow_map(lu, from = "from", to = "to", value = "n",
+                    map = "lucerne",
+                    title = "Commuting into the city of Lucerne")
+  pu <- file.path(render_out_dir(), "flowmap_lucerne.png")
+  expect_no_warning(pv_save(wu, pu, quiet = TRUE))
+  expect_gt(file.size(pu), 20000)
+  render_publish(pu)
+})
+
+test_that("the flow map exports a standalone SVG", {
+  render_skip_if_no_chrome()
+  w <- pv_flow_map(zug_flows(), from = "from", to = "to",
+                   value = "commuters",
+                   title = "Commuter exchange with Canton Zug")
+  f <- withr::local_tempfile(fileext = ".svg")
+  expect_no_warning(pv_save(w, f, quiet = TRUE))
+  svg <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"),
+               collapse = "\n")
+  expect_match(svg, "^<\\?xml")
+  expect_match(svg, "Commuter exchange with Canton Zug", fixed = TRUE)
+  # All eight flow bands made it into the standalone document.
+  expect_equal(
+    lengths(regmatches(svg, gregexpr('class="band"', svg))), 8)
+})
+
+# Stages a widget the way pv_save() does (light mode, no entrance
+# animation, filling a page opened at a fixed size) and hands back the
+# live Chrome session - the comparison charts' hover-check pattern.
+geo_page_session <- function(w, width = 700, height = 460) {
+  w$x$mode <- "light"
+  w$x$duration <- 0
+  w$width <- NULL
+  w$height <- NULL
+  w$sizingPolicy$browser$fill <- TRUE
+  w$sizingPolicy$browser$padding <- 0
+  stage <- tempfile("pv-geo-page-")
+  dir.create(stage)
+  page <- file.path(stage, "chart.html")
+  htmlwidgets::saveWidget(w, page, selfcontained = FALSE, libdir = "lib")
+  b <- chromote::ChromoteSession$new(width = width, height = height)
+  errors <- polyviz:::export_watch_errors(b)
+  loaded <- b$Page$loadEventFired(wait_ = FALSE)
+  b$Page$navigate(utils::URLencode(paste0("file://", normalizePath(page))),
+                  wait_ = FALSE)
+  b$wait_for(loaded)
+  polyviz:::export_wait_settled(b, errors, 0,
+                                polyviz:::export_settle_count_js(w))
+  list(b = b, errors = errors)
+}
+
+test_that("hovering a flow lights it, dims the rest, and names both ends", {
+  render_skip_if_no_chrome()
+  s <- geo_page_session(
+    pv_flow_map(zug_flows(), from = "from", to = "to", value = "commuters",
+                title = "Commuter exchange with Canton Zug"))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      /* Each flow group's second path is its invisible fat hover twin
+         along the centerline; poke the pointer at the biggest flow's
+         twin and read the tooltip. */
+      var gs = document.querySelectorAll('g.flow');
+      if (!gs.length) return 'no flows';
+      var over = gs[0].querySelector('path.hover');
+      var r = over.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      over.dispatchEvent(new PointerEvent('pointerenter',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      over.dispatchEvent(new PointerEvent('pointermove',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      var tip = document.querySelector('.pv-tooltip');
+      var ops = Array.prototype.map.call(
+        document.querySelectorAll('path.band'),
+        function (p) { return +p.getAttribute('fill-opacity'); });
+      return JSON.stringify({ flows: gs.length, opacity: tip.style.opacity,
+        html: tip.innerHTML, lit: ops.filter(function (o) {
+          return o > 0.5; }).length,
+        dimmed: ops.filter(function (o) { return o < 0.1; }).length });
+    })()", returnByValue = TRUE)$result$value
+  got <- jsonlite::fromJSON(res)
+  expect_equal(got$flows, 8)
+  expect_equal(got$opacity, "1")
+  # The biggest flow leads the drawing order: Zurich into Zug.
+  expect_match(got$html, "Z\u00fcrich \u2192 Zug")
+  expect_match(got$html, "commuters: <b>")
+  # Exactly one band lights up; every other flow steps back.
+  expect_equal(got$lit, 1)
+  expect_equal(got$dimmed, 7)
+})

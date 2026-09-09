@@ -457,3 +457,363 @@ pv_bubble_map <- function(data, lon, lat, size, color = NULL, label = NULL,
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }
+
+# ---- flow map --------------------------------------------------------------
+
+# The planar area-weighted centroid of one GeoJSON geometry (a Polygon or
+# MultiPolygon stored as nested lists), as c(lon, lat). This mirrors the
+# metric-plane centroids that built pv_city_coords in
+# data-raw/process-boundaries.R, but without needing sf at run time:
+# longitude is scaled by the cosine of the feature's mid-latitude so a
+# degree east weighs the same as a degree north (a fine stand-in for the
+# LV95 plane at Swiss latitudes), then every ring contributes its
+# shoelace area and centroid. Holes wind opposite their outer ring in
+# GeoJSON, so their signed area subtracts by itself, and a MultiPolygon's
+# pieces (exclaves) weigh in by their area - exactly what st_centroid
+# over a union does.
+pv_geometry_centroid <- function(geometry) {
+  polys <- switch(geometry$type,
+    Polygon = list(geometry$coordinates),
+    MultiPolygon = geometry$coordinates)
+  if (is.null(polys)) {
+    return(c(NA_real_, NA_real_))
+  }
+  rings <- unlist(polys, recursive = FALSE)
+  # Each ring becomes a two-column lon/lat matrix; the innermost lists
+  # are always [lon, lat] pairs (the same layout pv_map_bbox leans on).
+  mats <- lapply(rings, function(ring) {
+    matrix(unlist(ring, use.names = FALSE), ncol = 2, byrow = TRUE)
+  })
+  lat_all <- unlist(lapply(mats, function(m) m[, 2]), use.names = FALSE)
+  cosphi <- cos(mean(range(lat_all)) * pi / 180)
+  ax <- 0
+  ay <- 0
+  aa <- 0
+  for (m in mats) {
+    x <- m[, 1] * cosphi
+    y <- m[, 2]
+    j <- c(seq_len(nrow(m))[-1], 1L)
+    cr <- x * y[j] - x[j] * y
+    aa <- aa + sum(cr) / 2
+    ax <- ax + sum((x + x[j]) * cr) / 6
+    ay <- ay + sum((y + y[j]) * cr) / 6
+  }
+  if (abs(aa) < 1e-12) {
+    # A degenerate sliver has no usable area; the plain mean of its
+    # vertices is the best remaining anchor point.
+    lon_all <- unlist(lapply(mats, function(m) m[, 1]), use.names = FALSE)
+    return(c(mean(lon_all), mean(lat_all)))
+  }
+  c(ax / aa / cosphi, ay / aa)
+}
+
+# One centroid row per matchable feature of a FeatureCollection: the
+# feature's id and name (as strings, NA where absent - the same
+# "only plain strings and numbers count" rule the renderer's propOf
+# applies) and its centroid. Features without drawable coordinates or
+# without either key (background geography like the Lucerne map's lakes)
+# stay out.
+pv_layer_centroids <- function(geo) {
+  as_key <- function(v) {
+    if ((is.character(v) || is.numeric(v)) && length(v) == 1 && !is.na(v)) {
+      as.character(v)
+    } else {
+      NA_character_
+    }
+  }
+  rows <- lapply(geo$features, function(f) {
+    if (is.null(f$geometry) || !length(f$geometry$coordinates)) {
+      return(NULL)
+    }
+    id <- as_key(f$properties$id)
+    nm <- as_key(f$properties$name)
+    if (is.na(id) && is.na(nm)) {
+      return(NULL)
+    }
+    ctr <- pv_geometry_centroid(f$geometry)
+    if (!is.finite(ctr[1]) || !is.finite(ctr[2])) {
+      return(NULL)
+    }
+    data.frame(id = id, name = nm, lon = ctr[1], lat = ctr[2])
+  })
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (!length(rows)) {
+    return(NULL)
+  }
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
+}
+
+#' Interactive D3 flow map
+#'
+#' Origin-destination flows drawn as curved, tapered bands on a map —
+#' the chart for movement between places: commuters, migration, freight.
+#' Each row of `data` is one directed flow; its band starts wide at the
+#' origin and narrows toward the destination, so the thin end points the
+#' way without an arrowhead, and its width follows the square root of
+#' the value (the honest encoding, as for circle areas). Every arc bows
+#' to the same side of its own travel direction, so a pair of opposite
+#' flows (A to B and B to A) parts to the two sides of their shared
+#' chord instead of overprinting.
+#'
+#' The `from` and `to` columns name places. Each name is matched against
+#' the map's feature `properties$name` first and `properties$id` second
+#' (both as strings, so canton 3 and `"3"` are the same place), and the
+#' endpoint lands on that feature's centroid, computed from the layer's
+#' polygons the way the [pv_city_coords] centroids were: an area-weighted
+#' planar centroid with longitude rescaled so east-west and north-south
+#' distances weigh equally. Endpoints matching no feature are an error
+#' that lists the unmatched names — a flow with a missing end cannot be
+#' drawn at all. Alternatively, explicit coordinate columns
+#' (`from_lon`/`from_lat`/`to_lon`/`to_lat`, all four together) place the
+#' endpoints directly and skip the matching; `from` and `to` then only
+#' name the places for labels and tooltips.
+#'
+#' Every flow wears the theme's single accent colour, deliberately:
+#' crossing translucent bands in several hues become unreadable mud, so
+#' the flow map has no colour grouping — split the data and facet, or
+#' filter, when groups of flows must be compared. Endpoint dots are
+#' sized by each place's total throughput (flow in plus flow out), and
+#' hovering a band lights that one flow, dims the rest, and shows the
+#' origin, the destination, and the exact value.
+#'
+#' @param data A data frame with one row per directed flow. More than
+#'   one row for the same origin-destination pair is an error —
+#'   aggregate it first. Opposite flows (A to B and B to A) are two
+#'   legitimate rows.
+#' @param from,to Names of the columns holding each flow's origin and
+#'   destination place. A place flowing to itself cannot be drawn and is
+#'   an error.
+#' @param value Name of the numeric column mapped to band width. Must be
+#'   non-negative; rows with a missing value are dropped with a warning.
+#' @param map The base map: a layer name (`"cantons"`, the default;
+#'   `"districts"`; `"municipalities"`; `"lucerne"`), a FeatureCollection
+#'   list like [pv_swiss_cantons], or an sf polygon object — the same
+#'   forms [pv_choropleth()] takes. Its features' names and ids are what
+#'   `from` and `to` match against.
+#' @param labels Which endpoint places get a name label on the map.
+#'   `NULL` (default) labels every place that carries a flow; a character
+#'   vector labels just those places (and `character(0)` labels none).
+#'   Names in `labels` that carry no flow are an error.
+#' @param lakes Draw the Swiss lakes beneath the flows? `TRUE`, `FALSE`,
+#'   or `"auto"` (default: only on maps showing the whole of Switzerland)
+#'   — exactly as in [pv_choropleth()].
+#' @param from_lon,from_lat,to_lon,to_lat Optional names of numeric
+#'   WGS84 coordinate columns placing each flow's endpoints directly,
+#'   overriding the centroid lookup. All four must be given together,
+#'   and a place name must keep one single location across the rows.
+#'   Flows with an endpoint outside the map are dropped with a warning.
+#' @param join_id Only for an sf `map`: name of the column holding each
+#'   feature's id, as in [pv_choropleth()].
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' # Commuter exchange between Zug and its neighbours, both directions.
+#' latest <- subset(pv_commuters,
+#'                  period == "2022-2024" & region != "Restliche Schweiz")
+#' flows <- data.frame(
+#'   from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+#'   to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+#'   commuters = latest$commuters)
+#' pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+#'             title = "Commuter exchange with Canton Zug")
+#' @export
+pv_flow_map <- function(data, from, to, value, map = "cantons",
+                        labels = NULL, lakes = "auto", from_lon = NULL,
+                        from_lat = NULL, to_lon = NULL, to_lat = NULL,
+                        join_id = NULL, title = NULL, subtitle = NULL,
+                        mode = "auto", duration = 500, source = NULL,
+                        width = NULL, height = NULL, elementId = NULL) {
+  check_columns(data, list(from, to, value, from_lon, from_lat,
+                           to_lon, to_lat))
+  check_nonempty(data)
+  check_value_column(data, value)
+  coord_args <- list(from_lon, from_lat, to_lon, to_lat)
+  given <- !vapply(coord_args, is.null, logical(1))
+  if (any(given) && !all(given)) {
+    rlang::abort(paste(
+      "Explicit endpoint coordinates need all four columns:",
+      "`from_lon`, `from_lat`, `to_lon`, and `to_lat`."))
+  }
+  explicit <- all(given)
+  if (explicit) {
+    for (col in coord_args) check_value_column(data, col)
+  }
+  resolved <- pv_resolve_map(map, join_id)
+  geo <- resolved$geo
+  lakes <- pv_resolve_lakes(lakes, geo, resolved$layer)
+
+  df <- data.frame(from = as.character(data[[from]]),
+                   to = as.character(data[[to]]),
+                   value = as.numeric(data[[value]]))
+  if (explicit) {
+    df$flon <- as.numeric(data[[from_lon]])
+    df$flat <- as.numeric(data[[from_lat]])
+    df$tlon <- as.numeric(data[[to_lon]])
+    df$tlat <- as.numeric(data[[to_lat]])
+  }
+  df <- drop_missing(df, is.na(df$from), from)
+  df <- drop_missing(df, is.na(df$to), to)
+  df <- drop_missing(df, is.na(df$value), value)
+  if (explicit) {
+    df <- drop_missing(df, is.na(df$flon) | is.na(df$flat), from_lon)
+    df <- drop_missing(df, is.na(df$tlon) | is.na(df$tlat), to_lon)
+  }
+
+  # A band's width cannot encode a negative flow, and all-zero flows
+  # leave nothing to draw.
+  if (any(df$value < 0)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; a flow band's width cannot be negative.",
+      value))
+  }
+  if (max(df$value) <= 0) {
+    rlang::abort(sprintf(
+      "`%s` has no positive values; nothing to draw.", value))
+  }
+
+  # A place flowing to itself has no chord to draw an arc over.
+  loops <- df$from == df$to
+  if (any(loops)) {
+    shown <- utils::head(unique(df$from[loops]), 5)
+    rlang::abort(sprintf(
+      "`data` has %d flow(s) from a place to itself (%s); a flow map cannot draw those.",
+      sum(loops), paste(shown, collapse = ", ")))
+  }
+
+  # One row per directed pair, or the widths would silently overprint.
+  # A to B twice is a duplicate; A to B and B to A are two real flows.
+  pair <- paste(df$from, df$to, sep = "\r")
+  if (anyDuplicated(pair)) {
+    dups <- unique(pair[duplicated(pair)])
+    shown <- utils::head(sub("\r", " -> ", dups), 5)
+    rlang::abort(sprintf(
+      "`data` has more than one row for %d flow pair(s) (%s); aggregate it first.",
+      length(dups), paste(shown, collapse = ", ")))
+  }
+
+  if (explicit) {
+    # The bubble map's sanity checks, applied to both endpoints: swapped
+    # columns first, then endpoints beyond the map's extent - a flow
+    # with an end off the map would draw off into the margins.
+    lat_v <- c(df$flat, df$tlat)
+    lon_v <- c(df$flon, df$tlon)
+    if (any(abs(lat_v) > 90) || any(abs(lon_v) > 180)) {
+      rlang::abort(paste(
+        "The endpoint coordinate columns hold values outside the",
+        "possible longitude/latitude ranges. Are the lon and lat",
+        "columns swapped?"))
+    }
+    bb <- pv_map_bbox(geo)
+    tol <- 0.25
+    off_pt <- function(lon, lat) {
+      lon < bb[1] - tol | lon > bb[2] + tol |
+        lat < bb[3] - tol | lat > bb[4] + tol
+    }
+    out <- off_pt(df$flon, df$flat) | off_pt(df$tlon, df$tlat)
+    if (all(out)) {
+      rlang::abort(paste(
+        "No flow falls on the map. Wrong map, or are the coordinate",
+        "columns not WGS84 degrees?"))
+    }
+    if (any(out)) {
+      shown <- utils::head(paste(df$from[out], "->", df$to[out]), 5)
+      extra <- sum(out) - length(shown)
+      rlang::warn(sprintf(
+        "%d flow(s) have an endpoint outside the map and will not be drawn: %s%s.",
+        sum(out), paste(shown, collapse = ", "),
+        if (extra > 0) sprintf(" and %d more", extra) else ""))
+      df <- df[!out, , drop = FALSE]
+      rownames(df) <- NULL
+    }
+    # Each place must sit in one spot; the same name at two different
+    # coordinates would tear its endpoint dot apart.
+    ends <- rbind(data.frame(place = df$from, lon = df$flon, lat = df$flat),
+                  data.frame(place = df$to, lon = df$tlon, lat = df$tlat))
+    key <- paste(ends$place, round(ends$lon, 6), round(ends$lat, 6))
+    torn <- names(which(tapply(key, ends$place,
+                               function(k) length(unique(k))) > 1))
+    if (length(torn)) {
+      rlang::abort(sprintf(
+        "Place(s) with more than one set of coordinates: %s. Each place must keep a single location.",
+        paste(utils::head(torn, 5), collapse = ", ")))
+    }
+    ends <- ends[!duplicated(ends$place), , drop = FALSE]
+    place_lon <- stats::setNames(ends$lon, ends$place)
+    place_lat <- stats::setNames(ends$lat, ends$place)
+  } else {
+    # Resolve each endpoint to a feature centroid: names first, ids
+    # second, both compared as strings - the choropleth's join rules.
+    cent <- pv_layer_centroids(geo)
+    if (is.null(cent)) {
+      rlang::abort(paste(
+        "`map` has no feature with a `properties$name` or `properties$id`",
+        "to match endpoints against. For an sf `map`, name the id column",
+        "with `join_id`."))
+    }
+    match_place <- function(p) {
+      i <- match(p, cent$name)
+      miss <- is.na(i)
+      i[miss] <- match(p[miss], cent$id)
+      i
+    }
+    place <- unique(c(df$from, df$to))
+    idx <- match_place(place)
+    unmatched <- place[is.na(idx)]
+    if (length(unmatched) == length(place)) {
+      keys <- unique(c(cent$name[!is.na(cent$name)],
+                       cent$id[!is.na(cent$id)]))
+      rlang::abort(sprintf(
+        "No `%s`/`%s` value matches any feature name or id on the map (map keys look like: %s). Wrong columns, or wrong map?",
+        from, to, paste(utils::head(keys, 3), collapse = ", ")))
+    }
+    if (length(unmatched)) {
+      shown <- utils::head(unmatched, 5)
+      extra <- length(unmatched) - length(shown)
+      rlang::abort(sprintf(
+        "%d endpoint(s) match no feature name or id on the map: %s%s. A flow with a missing end cannot be drawn - fix the names or pass explicit coordinates.",
+        length(unmatched), paste(shown, collapse = ", "),
+        if (extra > 0) sprintf(" and %d more", extra) else ""))
+    }
+    place_lon <- stats::setNames(cent$lon[idx], place)
+    place_lat <- stats::setNames(cent$lat[idx], place)
+  }
+
+  # The endpoint dots' data: one row per place, its coordinates, and its
+  # total throughput - everything flowing out plus everything flowing in.
+  place <- unique(c(df$from, df$to))
+  throughput <- vapply(place, function(p) {
+    sum(df$value[df$from == p]) + sum(df$value[df$to == p])
+  }, numeric(1))
+
+  # Which places get a name written next to their dot. NULL labels them
+  # all; a character vector picks - and naming a place that carries no
+  # flow is a misunderstanding worth stopping on.
+  if (is.null(labels)) {
+    labelled <- rep(TRUE, length(place))
+  } else {
+    if (!is.character(labels) || anyNA(labels)) {
+      rlang::abort(
+        "`labels` must be NULL or a character vector of place names.")
+    }
+    unknown <- setdiff(labels, place)
+    if (length(unknown)) {
+      rlang::abort(sprintf(
+        "`labels` names place(s) that carry no flow: %s.",
+        paste(utils::head(unknown, 5), collapse = ", ")))
+    }
+    labelled <- place %in% labels
+  }
+  places <- data.frame(place = place,
+                       lon = unname(place_lon[place]),
+                       lat = unname(place_lat[place]),
+                       total = unname(throughput),
+                       labelled = labelled)
+
+  pv_widget("flowmap", c(list(
+    data = df[, c("from", "to", "value")], places = places, map = geo,
+    lakes = lakes, vlab = value
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}

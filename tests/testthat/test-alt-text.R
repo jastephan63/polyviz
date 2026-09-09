@@ -344,6 +344,49 @@ test_that("every canonical chart carries clean, period-terminated alt text", {
   }
 })
 
+test_that("pv_alt_text rebuilds the decompose description; plain facets keep theirs", {
+  monthly <- aggregate(gwh ~ date, pv_electricity, sum)
+  w <- pv_decompose(monthly, x = "date", y = "gwh", title = "Taken apart")
+  expect_match(w$x$alt,
+               "^A seasonal decomposition titled \u201cTaken apart\u201d")
+  expect_match(w$x$alt, "(stl, frequency 12)", fixed = TRUE)
+  # the generator rebuilds the same facts from the panels the payload
+  # carries - it no longer falls back to "an interactive facet chart"
+  expect_identical(pv_alt_text(w), w$x$alt)
+  wc <- pv_decompose(monthly, x = "date", y = "gwh", method = "classical")
+  expect_identical(pv_alt_text(wc), wc$x$alt)
+  # after pv_alt() the generator still speaks for the data underneath
+  own <- pv_alt(w, "My own words.")
+  expect_match(pv_alt_text(own), "^A seasonal decomposition")
+  # a plain facet keeps the honest generic sentence it always had
+  pop <- subset(pv_city_population, city %in% c("Luzern", "Zug"))
+  f <- pv_facet(pv_line(pop, x = "year", y = "population", series = "city"),
+                pop$city)
+  expect_identical(pv_alt_text(f), "An interactive facet chart.")
+})
+
+test_that("every panel's own alt text survives into a saved board page", {
+  # A board is composed htmltools, not one widget, so it carries no alt
+  # text of its own - a screen reader gets the board's heading markup and
+  # then each panel as its own described image. What must survive the
+  # save is each panel's generated description, riding in the payload
+  # the renderer reads (role="img" plus aria-label at draw time).
+  dir <- withr::local_tempdir()
+  agg <- aggregate(revenue ~ region, pv_sales, sum)
+  monthly <- aggregate(revenue ~ month, pv_sales, sum)
+  bar <- pv_bar(agg, "region", "revenue", title = "Revenue by region")
+  line <- pv_line(monthly, "month", "revenue", title = "Revenue over time")
+  b <- pv_board(bar, line, title = "Sales at a glance")
+  f <- file.path(dir, "board.html")
+  pv_save(b, f, quiet = TRUE)
+  html <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"),
+                collapse = "\n")
+  # both panels' alt strings sit in the saved page, ready for the
+  # renderer to hand to assistive tech
+  expect_match(html, substr(bar$x$alt, 1, 60), fixed = TRUE)
+  expect_match(html, substr(line$x$alt, 1, 60), fixed = TRUE)
+})
+
 test_that("knitted markdown carries the alt text on the figure", {
   skip_on_cran()
   skip_if_not_installed("knitr")

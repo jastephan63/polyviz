@@ -667,8 +667,8 @@ alt_beeswarm <- function(x) {
 }
 
 # The dispatcher pv_widget() and pv_alt_text() call. Any type without a
-# dedicated describer (a facet payload, say) still gets an honest
-# generic sentence rather than nothing.
+# dedicated describer still gets an honest generic sentence rather than
+# nothing.
 # The data table: structural facts only - the exact numbers live in the
 # cells themselves, so the description says what the table holds, not
 # what it says.
@@ -890,10 +890,51 @@ alt_flowmap <- function(x) {
   out
 }
 
+# The facet payload. A plain facet keeps the honest generic sentence the
+# fallback always gave it - the panel machinery adds its own note at
+# build time (R/facets.R), and a fresh description could not know what
+# the panels' subtype deserves. But a decomposition (pv_decompose marks
+# its payload under $decompose) is a known statistical object, so
+# pv_alt_text() rebuilds the same factual description the constructor
+# attached: the parts, the method and frequency, and where the computed
+# trend and seasonal components actually sit - read straight from the
+# Trend and Seasonal panels' rows.
+alt_facet <- function(x) {
+  d <- x$decompose
+  if (is.null(d)) {
+    return(alt_lead(x, "An interactive facet chart"))
+  }
+  panel_rows <- function(nm) {
+    for (p in x$panels) {
+      if (identical(p$name, nm)) {
+        return(p$data)
+      }
+    }
+    NULL
+  }
+  trend <- panel_rows("Trend")$y
+  seasonal <- panel_rows("Seasonal")$y
+  clause <- sprintf(
+    "splitting %s into trend, seasonal, and remainder parts (%s, frequency %d)",
+    alt_lab(x$ylab), d$method, as.integer(d$frequency))
+  paste(
+    alt_lead(x, "A seasonal decomposition", clause),
+    sprintf(paste(
+      "Four aligned line panels share the %s axis, each on its own",
+      "value scale: observed, trend, seasonal, remainder."),
+      alt_lab(x$xlab, if (identical(x$xtype, "date")) "date" else "x")),
+    sprintf(paste(
+      "The trend runs from %s to %s; the seasonal part swings between",
+      "%s and %s around zero."),
+      alt_num(trend[1]), alt_num(trend[length(trend)]),
+      alt_num(min(seasonal)), alt_num(max(seasonal))))
+}
+
 alt_describe <- function(x) {
   type <- if (alt_str(x$type)) x$type else "data"
   switch(type,
     table = alt_table(x),
+    facet = alt_facet(x),
     pairs = alt_pairs(x),
     bar = alt_bar(x),
     line = alt_line(x),

@@ -78,6 +78,18 @@ reference:
   - pv_facet
   - pv_link
 
+- title: Composition & time series
+  desc: >
+    Several finished charts composed into one page, and the three
+    time-series tools - seasonal decomposition, forecast fans, and
+    changepoint marks - computed entirely in base R's stats and drawn
+    by the chart machinery that already exists.
+  contents:
+  - pv_board
+  - pv_decompose
+  - pv_forecast
+  - pv_changepoints
+
 - title: Papers & export
   desc: >
     Getting charts out of the browser and onto a page - print-quality

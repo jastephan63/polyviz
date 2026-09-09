@@ -275,7 +275,8 @@ pv_downloads <- function(w, enabled = TRUE) {
 #'
 #' Textures apply to the charts whose marks are filled areas: bar (side
 #' by side, stacked, and percent, vertical or horizontal), area (stacked,
-#' percent, and stream), donut, and treemap. Every other chart ignores
+#' percent, and stream), donut, treemap, waffle, icicle, and the
+#' waterfall's contribution bars. Every other chart ignores
 #' the flag silently - line strokes, scatter/beeswarm/bubble dots,
 #' lollipop heads, and the value ramps of heatmap, calendar, and
 #' choropleth have no series fill for a texture to identify.

@@ -34,9 +34,15 @@ reference:
   - pv_scatter
   - pv_pairs
   - pv_lollipop
+  - pv_slope
+  - pv_dumbbell
+  - pv_waterfall
+  - pv_bullet
   - pv_donut
+  - pv_waffle
   - pv_treemap
   - pv_sunburst
+  - pv_icicle
   - pv_pack
   - pv_dendrogram
   - pv_histogram

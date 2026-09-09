@@ -8,7 +8,7 @@ polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wa
 
 **→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — a six-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, and an ageing no scenario escapes — every number computed from the data.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 28 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 34 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 **Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.
 
@@ -16,7 +16,7 @@ Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 28 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 34 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -45,6 +45,8 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_force()` | `pv_chord()` | `pv_arc()` — crossing-minimised order |
 | `pv_sankey()` | `pv_parallel()` — brushable | `pv_race()` — animated |
 | `pv_bump()` | `pv_dendrogram()` — from `hclust` | `pv_pairs()` — scatterplot matrix |
+| `pv_slope()` — two moments compared | `pv_dumbbell()` — the gap on every row | `pv_waterfall()` — running totals |
+| `pv_bullet()` — value, target, bands | `pv_waffle()` — countable squares | `pv_icicle()` — zoomable |
 | `pv_table()` — sortable, in-cell bars, shading & sparklines | | |
 
 ## Charts in papers and documents

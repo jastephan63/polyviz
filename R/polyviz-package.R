@@ -10,7 +10,7 @@
 #' * **Python** — numeric profiling and outlier detection delegated to a
 #'   bundled Python module when available, with an identical pure-R fallback
 #'   ([pv_profile()], [pv_outliers()]).
-#' * **JavaScript / D3** — 28 kinds of interactive, animated chart
+#' * **JavaScript / D3** — 34 kinds of interactive, animated chart
 #'   rendered by a bundled D3.js v7 and driven entirely from R data
 #'   frames: from [pv_bar()], [pv_line()], and [pv_scatter()] through
 #'   distributions ([pv_histogram()], [pv_violin()]), maps

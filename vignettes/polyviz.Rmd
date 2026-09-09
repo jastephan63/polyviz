@@ -64,7 +64,7 @@ pv_line(pv_weather, x = "date", y = "temp_mean",
 
 ## A second chart type
 
-All 28 chart types work the same way. Bars want one row per bar, so
+All 34 chart types work the same way. Bars want one row per bar, so
 aggregate first — and invalid data fails with a clear R-side message
 rather than a broken chart:
 
@@ -151,7 +151,7 @@ pv_demo()               # every chart family, live, with controls
 ```
 
 * The **[live gallery](https://jastephan63.github.io/polyviz/)** — all
-  28 chart types, interactive, each explained and running on real Swiss
+  34 chart types, interactive, each explained and running on real Swiss
   open data, with the R code that made it.
 * `pv_demo()` opens the same idea as a Shiny app on your machine, with
   live controls for each chart's main options.

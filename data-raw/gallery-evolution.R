@@ -1,5 +1,5 @@
 # Gallery examples for the evolution & matrix family (pv_area, pv_heatmap,
-# pv_calendar).
+# pv_calendar, pv_horizon).
 # One block per chart; each block is a single self-contained expression that
 # builds a widget from a bundled dataset.
 
@@ -100,4 +100,31 @@
               title = "Three summers, getting hotter",
               subtitle = "Daily maximum temperature in Lucerne, °C",
               source = "Source: MeteoSwiss")
+}
+
+## horizon
+# explain: The horizon chart is the answer to too many series: each line is
+#   folded into a compact ribbon and the ribbons stack in rows, so 26 cantons
+#   over 21 years fit in the height a line chart would spend on five. The fold
+#   cuts every value into bands of equal width — the header legend shows the
+#   actual inks, here one band = 2.31 million nights — and layers the slices
+#   over each other, so deeper ink means a higher value and the shape on top
+#   still says exactly where a series peaks. The scale is shared, so a given
+#   shade means the same amount in every row; order = "max" ranks the rows by
+#   their peak, and hovering anywhere drops a crosshair down all the rows at
+#   once and reads every canton's true value at that year from one tooltip
+#   (negative values, when a series has them, fold upward in the opposite
+#   colour — mirror = TRUE is the default). Read down the 2020 column for the
+#   pandemic in one glance: the city cantons go pale — Geneva and Zurich each
+#   lost two-thirds of their hotel nights — while Graubünden's resorts, kept
+#   afloat by domestic guests, gave up just 9% and Appenzell Innerrhoden
+#   actually gained. By 2025 the recovery has outrun the record books: 43.9
+#   million nights nationwide, Zurich alone at a deepest-ink 6.9 million.
+{
+  nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+  pv_horizon(nights, x = "year", y = "nights", series = "canton",
+             order = "max", xlab = NA,
+             title = "Twenty-one years of tourism, all 26 cantons at once",
+             subtitle = "Hotel nights per canton and year, 2005–2025",
+             source = "Source: Bundesamt für Statistik – HESTA")
 }

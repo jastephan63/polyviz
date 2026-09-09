@@ -1,5 +1,5 @@
 # Builds the printable cheatsheet: one A4 landscape page that groups all
-# 34 chart constructors by intent, states the shared grammar, and lists
+# 36 chart constructors by intent, states the shared grammar, and lists
 # the ways in (data) and out (paper). The page is laid out as HTML in the
 # package's own light-mode design tokens (pv_colors), set in the bundled
 # Inter, and printed to a true vector PDF by headless Chrome - the same
@@ -42,6 +42,7 @@ chooser <- list(
     entries = list(
       c("pv_line()", "a measure over time, a few series"),
       c("pv_area()", "totals over time: stacked, percent or stream"),
+      c("pv_horizon()", "dozens of series, folded into compact ribbons"),
       c("pv_bump()", "ranks trading places, period by period"),
       c("pv_race()", "the animated ranking, one frame per period"),
       c("pv_calendar()", "a daily value, laid out year by year"))),
@@ -65,7 +66,7 @@ chooser <- list(
   list(
     label = "Relationships",
     entries = list(
-      c("pv_scatter()", "two numerics; density contours when crowded"),
+      c("pv_scatter()", "two numerics; contours or hex bins when crowded"),
       c("pv_pairs()", "every numeric pair at once, as a matrix"),
       c("pv_parallel()", "many numeric columns, brushable"),
       c("pv_sankey()", "flows between stages, width carrying volume"),
@@ -76,7 +77,8 @@ chooser <- list(
     label = "Maps",
     entries = list(
       c("pv_choropleth()", "a value per region, shaded on its map"),
-      c("pv_bubble_map()", "sized points at real coordinates"))),
+      c("pv_bubble_map()", "sized points at real coordinates"),
+      c("pv_flow_map()", "movement between places, as tapered bands"))),
   list(
     label = "Special",
     entries = list(
@@ -85,7 +87,7 @@ chooser <- list(
       c("pv_dendrogram()", "an hclust tree, cut into k groups"))))
 
 n_charts <- sum(vapply(chooser, function(g) length(g$entries), integer(1)))
-stopifnot(n_charts == 34L)
+stopifnot(n_charts == 36L)
 
 # ---------------------------------------------------------------------
 # Small builders, so the markup below reads like the sheet.
@@ -339,8 +341,8 @@ header h1 { font-size: 19pt; font-weight: 760; letter-spacing: -0.022em;
 
 .entry { display: grid; grid-template-columns: 22.5mm 1fr; gap: 0 2mm;
   padding: 0.5mm 0; }
-.pick .entry { padding: 0.45mm 0; }
-.pick .group { margin-bottom: 2.2mm; }
+.pick .entry { padding: 0.3mm 0; }
+.pick .group { margin-bottom: 2mm; }
 .fn { font-size: 7pt; color: ', ink$primary, '; white-space: nowrap; }
 .when { color: ', ink$secondary, '; }
 
@@ -400,7 +402,7 @@ if (length(missing)) {
 constructors <- unlist(lapply(chooser, function(g) {
   vapply(g$entries, function(e) sub("\\(\\)$", "", e[[1]]), character(1))
 }))
-stopifnot(length(constructors) == 34L,
+stopifnot(length(constructors) == 36L,
           !anyDuplicated(constructors),
           all(vapply(constructors, function(f) {
             is.function(get0(f, envir = asNamespace("polyviz")))

@@ -185,6 +185,31 @@ pv_scatter(pv_weather, x = "temp_min", y = "temp_max", density = TRUE,
            subtitle = "Every day of 2020–2025 by its minimum and maximum temperature",
            source = "Source: MeteoSwiss")
 
+## scatter-hex
+# explain: density = "hex" is the contour treatment's counting sibling.
+#   Instead of smoothing the cloud into an estimate, it tiles the plot with
+#   hexagons and fills each by how many points actually landed in it, on the
+#   same sequential ramp - the aggregate view for when exact counts matter
+#   more than a smooth surface, and the only honest one when the data piles
+#   onto repeated values that smoothing would blur away. The hexagon size
+#   adapts to the point count and the panel, and hovering any cell reads its
+#   precise count. That counting honesty is the story here: sunshine against
+#   the day's high stacks 2,192 Lucerne days into a dark column on the left
+#   edge, because 405 days - nearly one in five - recorded no sunshine at
+#   all, at afternoon highs anywhere from -4 to 23 °C, and over a quarter
+#   managed less than half an hour. The opposite corner makes the reverse
+#   promise: none of the 211 days with more than twelve hours of sun stayed
+#   below an 11-degree afternoon.
+local({
+  w <- pv_weather
+  w$sunshine_h <- w$sunshine_min / 60
+  pv_scatter(w, x = "sunshine_h", y = "temp_max", density = "hex",
+             xlab = "Sunshine (hours)", ylab = "Afternoon high (°C)",
+             title = "The most common Lucerne day has no sunshine at all",
+             subtitle = "Every day of 2020–2025 by sunshine and afternoon high, counted into hexes",
+             source = "Source: MeteoSwiss")
+})
+
 ## force
 # explain: The force-directed network is d3's signature physics
 #   simulation: nodes repel, links pull, and you can grab any node and

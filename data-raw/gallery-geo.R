@@ -83,3 +83,34 @@ local({
                 subtitle = "Permanent residents of the statistical cities, 2024",
                 source = "Source: Bundesamt für Statistik; boundaries © BFS, ThemaKart")
 })
+
+## flow-map
+# explain: The flow map puts movement between places where it belongs - on
+#   the map. Each origin-destination pair becomes a curved band that starts
+#   wide and narrows toward its destination, so the thin end points the way
+#   without an arrowhead, and band width follows the square root of the flow,
+#   the same honest encoding circle areas use. Opposite flows bow to opposite
+#   sides of their shared chord, which is why every exchange here reads as
+#   two separate bands, and all of them deliberately wear the one accent
+#   colour - crossing translucent ribbons in several hues turn to mud.
+#   Endpoint dots are sized by each place's total throughput, and hovering a
+#   band lights that one flow and reads its exact count. Place names join
+#   the map's own features (cantons here; any polygon layer works), or
+#   explicit coordinate columns put the endpoints anywhere. The 2022-2024
+#   exchange makes Zug's pull visible: 39,881 commuters stream in each day
+#   against 18,660 out - more than two in for every one out. Zürich is the
+#   one nearly balanced partner (14,910 in, 10,189 back), Luzern sends
+#   12,376 and takes back 5,136, and Aargau's exchange is the most lopsided
+#   of all at nearly five to one.
+local({
+  latest <- subset(pv_commuters,
+                   period == "2022-2024" & region != "Restliche Schweiz")
+  flows <- data.frame(
+    from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+    to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+    commuters = latest$commuters)
+  pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+              title = "Zug pulls in two commuters for every one it sends",
+              subtitle = "Average daily commuters exchanged with the neighbour cantons, 2022–2024",
+              source = "Source: Fachstelle Statistik Kanton Zug; boundaries © BFS, ThemaKart")
+})

@@ -1,6 +1,28 @@
-# Hierarchy charts: zoomable circle packing, dendrogram. Like every chart
-# file, this one only shapes the payload - the drawing lives in
-# inst/htmlwidgets/lib/pv-renderers/hierarchy.js.
+# Hierarchy charts: zoomable circle packing, dendrogram, icicle. Like
+# every chart file, this one only shapes the payload - the drawing lives
+# in inst/htmlwidgets/lib/pv-renderers/hierarchy.js.
+
+# Turns a flat long-form table into the nested {name, children/value}
+# tree that d3.hierarchy expects: split the data by the first level
+# column, then recurse into each piece with the remaining levels. At the
+# last level, sum up the value column instead of recursing further. Every
+# hierarchy chart (and the sunburst over in widgets.R) speaks exactly
+# this shape.
+build_hierarchy <- function(data, levels, value) {
+  build <- function(df, lvls) {
+    key <- as.character(df[[lvls[[1]]]])
+    parts <- split(df, key)
+    lapply(names(parts), function(nm) {
+      part <- parts[[nm]]
+      if (length(lvls) == 1) {
+        list(name = nm, value = sum(as.numeric(part[[value]]), na.rm = TRUE))
+      } else {
+        list(name = nm, children = build(part, lvls[-1]))
+      }
+    })
+  }
+  list(name = "root", children = build(data, levels))
+}
 
 #' Zoomable D3 circle packing
 #'
@@ -56,23 +78,7 @@ pv_pack <- function(data, levels, value, labels = "auto",
       "Fold the smallest groups into an \"Other\" group first."),
       levels[[1]], n_top))
   }
-  # Turn the flat table into the nested {name, children/value} tree that
-  # d3.hierarchy expects: split the data by the first level column, then
-  # recurse into each piece with the remaining levels. At the last level,
-  # sum up the value column instead of recursing further.
-  build <- function(df, lvls) {
-    key <- as.character(df[[lvls[[1]]]])
-    parts <- split(df, key)
-    lapply(names(parts), function(nm) {
-      part <- parts[[nm]]
-      if (length(lvls) == 1) {
-        list(name = nm, value = sum(as.numeric(part[[value]]), na.rm = TRUE))
-      } else {
-        list(name = nm, children = build(part, lvls[-1]))
-      }
-    })
-  }
-  root <- list(name = "root", children = build(data, levels))
+  root <- build_hierarchy(data, levels, value)
   pv_widget("pack", c(list(
     root = root, labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
@@ -159,6 +165,70 @@ pv_dendrogram <- function(hc, labels = NULL, k = NULL,
   pv_widget("dendrogram", c(list(
     tree = build(nrow(hc$merge)),
     k = if (is.null(k)) NULL else as.integer(k)
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Zoomable D3 icicle chart
+#'
+#' The rectangular sunburst: the same hierarchy [pv_sunburst()] draws as
+#' concentric rings, laid out as stacked rectangles instead — the root
+#' band at the left edge, each level one column further right, and every
+#' segment's height its share of its parent. Click a segment to zoom
+#' into it; click the band at the left edge to zoom back out one level.
+#'
+#' Because its segments are upright rectangles, an icicle writes its
+#' labels horizontally wherever a segment is tall enough — where a
+#' sunburst has to bend names around an arc and give most of them up,
+#' the icicle keeps them readable. That is the whole reason to pick it
+#' over the sunburst. Labels are dropped only where a segment is too
+#' short to hold a line of text; hovering any segment always shows its
+#' full path, exact value, and share of the total.
+#'
+#' @param data A data frame in long form: one row per leaf.
+#' @param levels Character vector of column names, outermost grouping
+#'   first, defining the hierarchy — the same contract as
+#'   [pv_sunburst()]. The first level takes the palette colours, so it
+#'   allows at most as many distinct groups as the active theme's
+#'   palette carries (8 in the packaged theme).
+#' @param value Name of the numeric column summed within each segment.
+#'   Values must be non-negative — a segment's size is a length.
+#' @param labels Write names on the segments? `"auto"` (the default)
+#'   labels exactly the segments tall enough to hold a line of text,
+#'   truncating names to the column's width; `TRUE` squeezes labels onto
+#'   segments about 20% shorter than that (they must still hold a line
+#'   at all — slivers stay blank); `FALSE` draws no segment text,
+#'   leaving the names to the tooltip alone.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+#' pv_icicle(luzern, levels = c("group", "category"), value = "hectares",
+#'           title = "Land use in the city of Lucerne")
+#' @export
+pv_icicle <- function(data, levels, value, labels = "auto",
+                      title = NULL, subtitle = NULL, mode = "auto",
+                      duration = 650, source = NULL, width = NULL,
+                      height = NULL, elementId = NULL) {
+  check_columns(data, list(levels, value))
+  check_nonempty(data)
+  check_value_column(data, value)
+  check_flag(labels, "labels")
+  if (length(levels) < 1) {
+    rlang::abort("`levels` needs at least one column name.")
+  }
+  # A negative value has no length to fill; the layout would silently
+  # come out wrong, so refuse it here.
+  if (any(data[[value]] < 0, na.rm = TRUE)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; icicle segment sizes must be non-negative.",
+      value))
+  }
+  check_theme_palette_fit(unique(as.character(data[[levels[[1]]]])),
+                          levels[[1]])
+  root <- build_hierarchy(data, levels, value)
+  pv_widget("icicle", c(list(
+    root = root, labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

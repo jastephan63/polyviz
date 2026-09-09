@@ -1,5 +1,5 @@
 /*
- * Hierarchy renderers: zoomable circle packing, dendrogram.
+ * Hierarchy renderers: zoomable circle packing, dendrogram, icicle.
  * See basic.js for the ctx contract.
  */
 (function () {
@@ -195,6 +195,285 @@
        value, and share - the labels only ever carry the short name. */
     var total = root.value || 1;
     circle
+      .on("pointerenter pointermove", function (event, d) {
+        d3.select(this).attr("stroke", ctx.theme.ink.primary)
+          .attr("stroke-width", 1.5);
+        var trail = d.ancestors().reverse().slice(1)
+          .map(function (a) { return pv.esc(a.data.name); }).join(" / ");
+        pv.showTip(ctx, event, "<b>" + trail + "</b><br>" +
+          pv.swatchRow(color(topOf(d).data.name), ctx.x.vlab || "value",
+                       ctx.fmt(d.value)) +
+          " &middot; " + d3.format(".1%")(d.value / total) + " of total");
+      })
+      .on("pointerleave", function () {
+        d3.select(this).attr("stroke", "none");
+        pv.hideTip(ctx);
+      });
+  };
+
+  /* ---------- zoomable icicle ---------- */
+
+  pvRenderers.icicle = function (ctx) {
+    /* The rectangular sunburst: same nested {name, children/value} tree,
+       same d3.partition, but the rings become columns - the root band at
+       the left edge, depth growing rightward, each segment's height its
+       share. The zoom below mirrors the sunburst's move for move, with
+       the angular coordinate traded for a vertical one. */
+    var root = d3.hierarchy(ctx.x.root)
+      .sum(function (d) { return d.value || 0; })
+      .sort(function (a, b) { return b.value - a.value; });
+
+    var top = root.children || [];
+    var color = d3.scaleOrdinal()
+      .domain(top.map(function (d) { return d.data.name; }))
+      .range(ctx.theme.palette);
+
+    var m = { top: 4, right: 16, bottom: 10, left: 16 };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    /* Partition in abstract units: x runs 0..ih down the chart (the
+       sunburst's angle), y counts depth bands 0..height+1 (its rings).
+       Band 0 is the root's own - drawn, unlike the sunburst's hole,
+       because it doubles as the zoom-out control, but squeezed to a
+       narrow spine at the left edge so the data columns keep the room. */
+    d3.partition().size([ih, root.height + 1])(root);
+    root.each(function (d) { d.current = d; });
+    var navW = 26;
+    var bandW = (iw - navW) / Math.max(1, root.height);
+
+    /* Same colouring idea as the sunburst: every segment wears its
+       top-level branch's colour, faded a step toward the background per
+       column, so a whole branch reads as one family. */
+    var fadeStep = ctx.theme.mode === "light" ? 0.15 : 0.22;
+    function topOf(d) {
+      var anc = d;
+      while (anc.depth > 1) anc = anc.parent;
+      return anc;
+    }
+    function fillOf(d) {
+      var base = color(topOf(d).data.name);
+      return d3.interpolate(base, ctx.theme.ink.surface)(
+        fadeStep * (d.depth - 1));
+    }
+
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    /* Texture fills (pv_textures): every segment of a branch wears that
+       branch's hatch slot in its own depth-faded colour. Unlike the
+       treemap, segments of one branch sit at several depths, and
+       pv.texturePattern registers one colour per slot per <defs> - so
+       each depth gets its own defs, and the slot/colour pairing stays
+       honest at every level. */
+    var texDefs = ctx.x.textures === true ? {} : null;
+    var texSlot = {};
+    top.forEach(function (d, i) {
+      texSlot[d.data.name] = i % ctx.theme.palette.length;
+    });
+    function cellFill(d) {
+      if (!texDefs) return fillOf(d);
+      if (!texDefs[d.depth]) texDefs[d.depth] = svg.append("defs");
+      return pv.texturePattern(texDefs[d.depth],
+        texSlot[topOf(d).data.name], fillOf(d), ctx.theme);
+    }
+    /* Label ink is judged against what the eye actually sees: a
+       textured segment is mostly its lightened ground, so that is what
+       gets judged - the same rule the treemap applies. */
+    function labelInk(d) {
+      return inkOn(texDefs ?
+        pv.textureGround(fillOf(d), ctx.theme) : fillOf(d));
+    }
+
+    /* A segment is on screen when its band lies right of the root
+       column and it still has height. Every rect keeps a 2px surface
+       gap from its neighbours on both axes. */
+    function visible(pos) {
+      return pos.y1 <= root.height + 1 && pos.y0 >= 1 && pos.x1 > pos.x0;
+    }
+    function rectX(pos) { return navW + (pos.y0 - 1) * bandW + 1; }
+    function rectY(pos) { return pos.x0 + 1; }
+    function rectH(pos) { return Math.max(0, pos.x1 - pos.x0 - 2); }
+    var rectW = Math.max(0, bandW - 2);
+
+    /* The icicle's whole advantage over the sunburst: labels lie flat.
+       One is written on every segment tall enough for a line of text
+       (and wide enough for at least a few characters), truncated to the
+       column's width - the tooltip always carries the full trail. The
+       `labels` flag steers eagerness the way the pack's does: "auto"
+       wants a comfortable line, TRUE accepts segments about 20%
+       shorter, FALSE writes nothing at all. */
+    var showLabels = opt(ctx.x.labels, true);
+    var relax = ctx.x.labels === true ? 0.8 : 1;
+    /* The nudge keeps float rounding from eating the last character of
+       a name that exactly fits. */
+    var maxChars = Math.max(3,
+      Math.floor((rectW - 12) / pv.textWidth("x", 11) + 0.01));
+    function labelFits(pos) {
+      return showLabels && visible(pos) &&
+        rectH(pos) >= 14 * relax && rectW >= 30;
+    }
+    function labelTransform(pos) {
+      return "translate(" + (rectX(pos) + 6) + "," +
+        (rectY(pos) + rectH(pos) / 2) + ")";
+    }
+
+    var descendants = root.descendants().slice(1);
+    var cell = g.append("g").selectAll("rect").data(descendants).enter()
+      .append("rect")
+      .attr("x", function (d) { return rectX(d.current); })
+      .attr("y", function (d) { return rectY(d.current); })
+      .attr("width", rectW)
+      .attr("height", function (d) { return rectH(d.current); })
+      .attr("rx", 2)
+      .attr("fill", cellFill)
+      .attr("fill-opacity", function (d) {
+        return visible(d.current) ? (d.children ? 0.9 : 0.65) : 0;
+      })
+      .attr("pointer-events", function (d) {
+        return visible(d.current) ? "auto" : "none";
+      })
+      .style("cursor", function (d) {
+        return d.children ? "pointer" : "default";
+      });
+
+    var label = g.append("g")
+      .attr("pointer-events", "none")
+      .selectAll("text").data(descendants).enter().append("text")
+      .attr("dy", "0.35em")
+      .attr("fill", labelInk)
+      .attr("fill-opacity", function (d) { return +labelFits(d.current); })
+      .attr("transform", function (d) { return labelTransform(d.current); })
+      .style("font-size", "11px")
+      .text(function (d) { return pv.truncate(d.data.name, maxChars); });
+
+    /* The root band: a neutral spine down the left edge. Zoomed in, it
+       names the branch in focus - written upward, like a book spine -
+       and one click steps back out: the sunburst's centre circle,
+       squared off. */
+    var parentRect = g.append("rect")
+      .datum(root)
+      .attr("x", 1).attr("y", 1)
+      .attr("width", Math.max(0, navW - 3))
+      .attr("height", Math.max(0, ih - 2))
+      .attr("rx", 2)
+      .attr("fill", ctx.theme.ink.grid)
+      .attr("fill-opacity", 0.6)
+      .style("cursor", "pointer");
+    var parentLabel = g.append("text")
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "middle")
+      .attr("transform",
+        "translate(" + (navW / 2 - 1) + "," + ih / 2 + ") rotate(-90)")
+      .attr("fill", ctx.theme.ink.secondary)
+      .style("font-size", "11px")
+      .style("pointer-events", "none")
+      .text("");
+
+    /* The zoom. Clicking a branch makes it the new left edge: every node
+       gets a "target" position rescaled so the branch spans the full
+       height, then all rects glide from where they are to where they
+       belong. Clicking the root band zooms back out one level. */
+    function clicked(event, p) {
+      var target = p.children ? p : p.parent;
+      if (!target) return;
+      /* A click can land mid-entrance; scheduling the zoom would cancel
+         that transition and freeze cells half-faded, so the entrance is
+         finished instantly first. */
+      cell.interrupt().attr("opacity", 1);
+      parentRect.datum(target.parent || root);
+      /* The spine runs the chart's full height, so the name can afford
+         to be long - truncated only against that height. */
+      parentLabel.text(target === root ? "" :
+        pv.truncate(target.data.name,
+          Math.max(4, Math.floor((ih - 16) / pv.textWidth("x", 11)))));
+
+      root.each(function (d) {
+        d.target = {
+          x0: Math.max(0, Math.min(1,
+            (d.x0 - target.x0) / (target.x1 - target.x0))) * ih,
+          x1: Math.max(0, Math.min(1,
+            (d.x1 - target.x0) / (target.x1 - target.x0))) * ih,
+          y0: Math.max(0, d.y0 - target.depth),
+          y1: Math.max(0, d.y1 - target.depth)
+        };
+      });
+
+      var t = g.transition().duration(ctx.duration || 750);
+      cell.transition(t)
+        .tween("data", function (d) {
+          var i = d3.interpolate(d.current, d.target);
+          return function (tt) { d.current = i(tt); };
+        })
+        .filter(function (d) {
+          return +this.getAttribute("fill-opacity") || visible(d.target);
+        })
+        .attr("fill-opacity", function (d) {
+          return visible(d.target) ? (d.children ? 0.9 : 0.65) : 0;
+        })
+        .attr("pointer-events", function (d) {
+          return visible(d.target) ? "auto" : "none";
+        })
+        .attrTween("x", function (d) {
+          return function () { return rectX(d.current); };
+        })
+        .attrTween("y", function (d) {
+          return function () { return rectY(d.current); };
+        })
+        .attrTween("height", function (d) {
+          return function () { return rectH(d.current); };
+        });
+      label.filter(function (d) {
+        return +this.getAttribute("fill-opacity") || labelFits(d.target);
+      }).transition(t)
+        .attr("fill-opacity", function (d) { return +labelFits(d.target); })
+        .attrTween("transform", function (d) {
+          return function () { return labelTransform(d.current); };
+        });
+    }
+
+    /* In Shiny, clicking any segment reports its path down the tree -
+       e.g. name "Forest", path ["Natural", "Forest"] - as
+       input$<id>_click. Branch segments also zoom; the root band only
+       zooms back out. */
+    function emitNode(d) {
+      ctx.emit("click", {
+        name: d.data.name,
+        path: d.ancestors().reverse().slice(1)
+          .map(function (a) { return a.data.name; }),
+        value: d.value
+      });
+    }
+    cell.filter(function (d) { return !!d.children; })
+      .on("click", function (event, d) {
+        emitNode(d);
+        clicked(event, d);
+      });
+    cell.filter(function (d) { return !d.children; })
+      .on("click", function (event, d) { emitNode(d); });
+    parentRect.on("click", clicked);
+
+    /* Entrance: columns surface left to right, each fading in as it
+       arrives, then the labels. Skipped entirely in instant mode -
+       everything above is already drawn in its final state. */
+    if (ctx.duration > 0) {
+      cell.attr("opacity", 0)
+        .transition().duration(Math.max(200, ctx.duration * 0.6))
+        .delay(function (d) { return (d.depth - 1) * 150; })
+        .ease(d3.easeCubicOut)
+        .attr("opacity", 1);
+      label.each(function (d) {
+        d.finalOp = +this.getAttribute("fill-opacity");
+      })
+        .attr("fill-opacity", 0)
+        .transition().delay(ctx.duration * 0.7).duration(250)
+        .attr("fill-opacity", function (d) { return d.finalOp; });
+    }
+
+    /* Hovering any segment shows its full path, exact value, and share
+       - the flat labels only ever carry the (possibly truncated) name. */
+    var total = root.value || 1;
+    cell
       .on("pointerenter pointermove", function (event, d) {
         d3.select(this).attr("stroke", ctx.theme.ink.primary)
           .attr("stroke-width", 1.5);

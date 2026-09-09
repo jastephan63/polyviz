@@ -126,6 +126,77 @@ test_that("dendrogram validates hc, k, and labels", {
   expect_error(pv_dendrogram(many, k = 9), "at most 8")
 })
 
+test_that("icicle builds the nested tree with summed leaf values", {
+  luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  w <- expect_pvchart(
+    pv_icicle(luzern, levels = c("group", "category"), value = "hectares"),
+    "icicle")
+  expect_hierarchy_dep(w)
+  expect_equal(w$x$root$name, "root")
+  # split() orders the branches alphabetically by group name.
+  expect_equal(
+    vapply(w$x$root$children, function(n) n$name, character(1)),
+    sort(unique(luzern$group)))
+  # Every hectare ends up in exactly one leaf.
+  leaves <- collect_leaves(w$x$root)
+  expect_equal(sum(vapply(leaves, function(l) l$value, numeric(1))),
+               sum(luzern$hectares))
+  expect_equal(w$x$vlab, "hectares")
+  expect_equal(w$x$labels, "auto")
+})
+
+test_that("icicle shares the sunburst's data contract exactly", {
+  # Same levels/value arguments, same hierarchy building: the payload
+  # tree must be identical to what pv_sunburst ships for the same data.
+  luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  ici <- pv_icicle(luzern, levels = c("group", "category"),
+                   value = "hectares")
+  sun <- pv_sunburst(luzern, levels = c("group", "category"),
+                     value = "hectares")
+  expect_identical(ici$x$root, sun$x$root)
+})
+
+test_that("icicle validates columns, levels, values, groups, and labels", {
+  luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  expect_error(pv_icicle(luzern, levels = "nope", value = "hectares"),
+               "not in `data`")
+  expect_error(pv_icicle(luzern, levels = character(0), value = "hectares"),
+               "at least one")
+  neg <- data.frame(g = c("a", "b"), v = c(5, -1))
+  expect_error(pv_icicle(neg, levels = "g", value = "v"), "non-negative")
+  # 181 cities as the top level blows the 8-colour palette.
+  expect_error(pv_icicle(pv_city_landuse, levels = c("city", "category"),
+                         value = "hectares"), "8")
+  expect_error(pv_icicle(luzern, levels = "group", value = "hectares",
+                         labels = "sometimes"), 'TRUE, FALSE, or "auto"')
+  wt <- pv_icicle(luzern, levels = "group", value = "hectares",
+                  labels = TRUE)
+  expect_true(wt$x$labels)
+  wf <- pv_icicle(luzern, levels = "group", value = "hectares",
+                  labels = FALSE)
+  expect_false(wf$x$labels)
+})
+
+test_that("icicle generates alt text without a dedicated describer", {
+  luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  alt <- pv_alt_text(pv_icicle(luzern, levels = c("group", "category"),
+                               value = "hectares", title = "Land use"))
+  expect_true(is.character(alt) && length(alt) == 1 && nzchar(alt))
+})
+
+test_that("icicle renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  luzern <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  w <- pv_icicle(luzern, levels = c("group", "category"),
+                 value = "hectares",
+                 title = "Land use in the city of Lucerne")
+  path <- tempfile("icicle-", fileext = ".png")
+  on.exit(unlink(path), add = TRUE)
+  expect_no_warning(pv_save(w, path, quiet = TRUE))
+  expect_true(file.exists(path))
+  expect_gt(file.size(path), 20000)
+})
+
 test_that("gallery dendrogram data holds up: 25 cities, ward.D2, k = 4", {
   latest <- pv_city_population[
     pv_city_population$year == max(pv_city_population$year), ]

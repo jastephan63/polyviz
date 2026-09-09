@@ -23,7 +23,7 @@ an R warning quoting the error."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -95,7 +95,8 @@ an R warning quoting the error.</p>
 
 
 <dl><dt id="arg-widget">widget<a class="anchor" aria-label="anchor" href="#arg-widget"></a></dt>
-<dd><p>A polyviz chart, as returned by <code><a href="pv_bar.html">pv_bar()</a></code> and friends.</p></dd>
+<dd><p>A polyviz chart, as returned by <code><a href="pv_bar.html">pv_bar()</a></code> and friends,
+or a chart board from <code><a href="pv_board.html">pv_board()</a></code>.</p></dd>
 
 
 <dt id="arg-file">file<a class="anchor" aria-label="anchor" href="#arg-file"></a></dt>
@@ -174,7 +175,13 @@ a paper or a deck — asking for one is an error pointing at <code>.png</code>.<
 <li><p><code>.html</code> — the interactive widget as one self-contained file (every
 script, stylesheet, and font inlined). This format needs neither
 Chrome nor pandoc, and it keeps the entrance animation.</p></li>
-</ul></div>
+</ul><p>A chart board built with <code><a href="pv_board.html">pv_board()</a></code> saves the same way, as <code>.html</code>
+(one self-contained file, linking and all), <code>.png</code>, or <code>.pdf</code> — there
+the size arguments apply to the whole page, and <code>height = NULL</code>
+captures the page at the natural height the board renders to at that
+width. A board has no single vector drawing to serialise and no
+animation timeline, so <code>.svg</code> and <code>.gif</code> are refused with a message.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

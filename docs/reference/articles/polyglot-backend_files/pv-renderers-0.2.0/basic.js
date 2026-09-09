@@ -721,6 +721,26 @@
         xkey: d.x, y: d.y, series: d.series
       };
     });
+    /* The forecast layer (pv_forecast). R fitted the model and shipped
+       only computed points - future x positions, the point estimate,
+       and lo/hi bounds per confidence level. The x values are parsed
+       exactly like the data's own, so the scales treat both alike.
+       The R side only attaches a forecast to single-series charts on a
+       continuous axis; the guards here just keep a hand-built payload
+       from breaking the render. */
+    var fc = ctx.x.forecast || null;
+    var fpts = [];
+    if (fc && fc.points && fc.points.length && xtype !== "category") {
+      fpts = fc.points.map(function (d) {
+        var o = { x: xtype === "date" ? parse(d.x) : d.x, xkey: d.x,
+                  y: d.y };
+        fc.levels.forEach(function (lev) {
+          o["lo" + lev] = d["lo" + lev];
+          o["hi" + lev] = d["hi" + lev];
+        });
+        return o;
+      });
+    }
     /* Linked selection is skipped on lines: a path has no per-row
        identity, so there is nothing for a row-keyed selection to dim. */
     var seriesNames = pv.uniq(data.map(function (d) { return d.series; }));
@@ -769,6 +789,10 @@
     var g = svg.append("g").attr("transform",
       "translate(" + m.left + "," + m.top + ")");
 
+    /* The x domain covers the forecast too (xAll is just the data when
+       no forecast rides along), so the axis ticks recompute naturally
+       over the extended range. */
+    var xAll = fpts.length ? data.concat(fpts) : data;
     var xScale;
     if (xtype === "category") {
       xScale = d3.scalePoint()
@@ -776,15 +800,25 @@
         .range([0, iw]).padding(0.5);
     } else if (xtype === "date") {
       xScale = d3.scaleTime()
-        .domain(d3.extent(data, function (d) { return d.x; })).range([0, iw]);
+        .domain(d3.extent(xAll, function (d) { return d.x; })).range([0, iw]);
     } else {
       xScale = d3.scaleLinear()
-        .domain(d3.extent(data, function (d) { return d.x; })).nice()
+        .domain(d3.extent(xAll, function (d) { return d.x; })).nice()
         .range([0, iw]);
     }
+    /* The y domain widens to hold the fan's widest band - a forecast
+       whose uncertainty spilled past the axes would understate itself. */
+    var yLo = d3.min(data, function (d) { return d.y; });
+    var yHi = d3.max(data, function (d) { return d.y; });
+    if (fpts.length) {
+      var wideLev = fc.levels[fc.levels.length - 1];
+      yLo = Math.min(yLo, d3.min(fpts, function (d) {
+        return d["lo" + wideLev]; }));
+      yHi = Math.max(yHi, d3.max(fpts, function (d) {
+        return d["hi" + wideLev]; }));
+    }
     var y = d3.scaleLinear()
-      .domain([Math.min(0, d3.min(data, function (d) { return d.y; })),
-               d3.max(data, function (d) { return d.y; })])
+      .domain([Math.min(0, yLo), yHi])
       .nice().range([ih, 0]);
     /* Explicit limits (the facet renderer shares scales this way)
        replace the computed domains exactly as given - no nice(). Dates
@@ -916,6 +950,28 @@
       }
     }
 
+    /* The forecast fan (pv_forecast), just under the annotation and
+       trend layer, in its own clip: a brushed window or an explicit
+       xlim must cut the fan at the axes, never let it spill past them.
+       The last observed point is handed over so the dashed
+       continuation and the bands grow out of the series' own line
+       end. Forecast charts are single-series (R enforces it), so the
+       one series' colour carries the dashes. */
+    if (fpts.length) {
+      var fcSeries = bySeries[0].points;
+      var fcClip = "pv-fc-clip-" + Math.floor(Math.random() * 1e9);
+      svg.append("clipPath").attr("id", fcClip)
+        .append("rect").attr("width", iw).attr("height", ih);
+      pv.drawForecast(ctx,
+        g.append("g").attr("pointer-events", "none")
+          .attr("clip-path", "url(#" + fcClip + ")"),
+        xScale, y, {
+          points: fpts, levels: fc.levels,
+          last: fcSeries.length ? fcSeries[fcSeries.length - 1] : null,
+          color: spaghetti ? accent : color(seriesNames[0])
+        });
+    }
+
     /* The one spaghetti line the pointer currently singles out. Moving to
        another settles the old line back into the grey bundle and brings
        the new one forward in the accent colour. */
@@ -1009,6 +1065,13 @@
       .filter(function (v) { return v >= -0.5 && v <= iw + 0.5; })
       .sort(function (a, b) { return a - b; });
 
+    /* Forecast positions are crosshair targets too, each keeping its
+       full row so the tooltip can read the point estimate and every
+       interval straight off it. */
+    var fHover = fpts.map(function (d) {
+      return { px: +xScale(d.x), d: d };
+    }).filter(function (e) { return e.px >= -0.5 && e.px <= iw + 0.5; });
+
     /* The spaghetti hover singles one line out of the bundle, and that
        pick is true 2D nearest-neighbour (d3.Delaunay) over every
        visible point: the pointer lifts the line whose observation is
@@ -1068,6 +1131,40 @@
           return;
         }
         var hits = hitsAt(p[0]);
+        /* Over the projected region the nearest x position belongs to
+           a forecast point, and the tooltip switches to reading the
+           point estimate plus the interval at each level. */
+        var fBest = null;
+        fHover.forEach(function (e) {
+          if (!fBest || Math.abs(e.px - p[0]) < Math.abs(fBest.px - p[0])) {
+            fBest = e;
+          }
+        });
+        if (fBest && (!hits.length ||
+            Math.abs(fBest.px - p[0]) <
+              Math.abs(xScale(hits[0].x) - p[0]))) {
+          var fd = fBest.d;
+          var fColor = spaghetti ? accent : color(seriesNames[0]);
+          cross.attr("x1", fBest.px).attr("x2", fBest.px)
+            .attr("opacity", 1);
+          var fSel = dots.selectAll("circle").data([fd]);
+          fSel.enter().append("circle").attr("r", 4)
+            .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2)
+            .merge(fSel)
+            .attr("cx", fBest.px).attr("cy", y(fd.y))
+            .attr("fill", fColor);
+          fSel.exit().remove();
+          var fLabel = xtype === "date" ?
+            d3.timeFormat("%b %e, %Y")(fd.x) : fd.x;
+          var fRows = [pv.swatchRow(fColor, "forecast", ctx.fmt(fd.y))];
+          fc.levels.forEach(function (lev) {
+            fRows.push(lev + "%: " + ctx.fmt(fd["lo" + lev]) +
+              " \u2013 " + ctx.fmt(fd["hi" + lev]));
+          });
+          pv.showTip(ctx, event, "<b>" + pv.esc(fLabel) + "</b><br>" +
+            fRows.join("<br>"));
+          return;
+        }
         if (!hits.length) return;
         var nearest = xScale(hits[0].x);
         cross.attr("x1", nearest).attr("x2", nearest).attr("opacity", 1);
@@ -1129,6 +1226,18 @@
               .attr("stroke-opacity", 0.55)
               .attr("d", mini);
           });
+          /* The forecast continues into the strip as a dashed sliver of
+             the same muted ink, so the brushable range visibly covers
+             the projection (the strip's extent already does). */
+          if (fpts.length) {
+            sg.append("path").datum(fpts)
+              .attr("fill", "none")
+              .attr("stroke", ctx.theme.ink.muted)
+              .attr("stroke-width", 1)
+              .attr("stroke-opacity", 0.55)
+              .attr("stroke-dasharray", "3,3")
+              .attr("d", mini);
+          }
         }
       });
     }

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,6 +45,19 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.3.0" id="polyviz-130">polyviz 1.3.0<a class="anchor" aria-label="anchor" href="#polyviz-130"></a></h2>
+<p>The composition release: the charts learn to work together, and the package learns time series.</p>
+<ul><li>
+<code><a href="../reference/pv_board.html">pv_board()</a></code> — several charts composed into one page from plain R: a responsive grid on the theme’s tokens, one title block, panel captions from names, light/dark like everything else. Works in the viewer, R Markdown, and Quarto; crosstalk-linked panels keep their linking; <code><a href="../reference/pv_save.html">pv_save()</a></code> writes boards as self-contained HTML, PNG, or vector PDF.</li>
+<li>
+<code><a href="../reference/pv_decompose.html">pv_decompose()</a></code> — one regular time series split into observed, trend, seasonal, and remainder as four aligned panels (STL or classical, frequency inferred from dates), riding the existing facet machinery.</li>
+<li>
+<code><a href="../reference/pv_forecast.html">pv_forecast()</a></code> — a forecast layer for single-series lines in the <code><a href="../reference/pv_trend.html">pv_trend()</a></code> mould: Holt-Winters, a small ARIMA search, or the honest naive baseline, drawn as nested interval fans with a dashed continuation — dashes finally meaning “projection”, as reserved.</li>
+<li>
+<code><a href="../reference/pv_changepoints.html">pv_changepoints()</a></code> — sustained level shifts found by binary segmentation with a BIC stopping rule (implemented from first principles, limits documented), marked through the annotation system; optional per-stretch mean lines.</li>
+</ul><p>All statistics compute in base R — no new dependencies. Every method states what it is and what it is not, on the chart and in the docs.</p>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.2.0" id="polyviz-120">polyviz 1.2.0<a class="anchor" aria-label="anchor" href="#polyviz-120"></a></h2>
 <p>Time and density: two new chart types (36 in all), a third way to see a big scatter, and hover that always knows which mark you mean.</p>

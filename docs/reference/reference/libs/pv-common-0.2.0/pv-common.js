@@ -1260,3 +1260,91 @@ window.pv = (function () {
   };
 
 })();
+
+/*
+ * The forecast fan (pv_forecast on the R side). R fits the model and
+ * ships only computed points - future x positions, the point estimate,
+ * and a lo/hi pair per requested confidence level - and this drawer
+ * turns them into the classic fan chart: nested bands painted
+ * widest-level-first, so each narrower band layers over the wider ones
+ * and the ink deepens toward the point estimate; the estimate itself as
+ * a DASHED continuation of the series' own line (dashes carry their
+ * reserved projection meaning throughout polyviz - see pv_slope's
+ * roxygen); and a subtle vertical rule where the observed data ends.
+ * The line renderer hands over its scales, a pointer-transparent group
+ * clipped to the plot (a brushed window must cut the fan, not let it
+ * spill past the axes), the parsed points, the ascending level list,
+ * the last observed point - fan and dashes grow out of the line's own
+ * end - and the series' colour for the dashed continuation.
+ */
+(function () {
+
+  pv.drawForecast = function (ctx, g, xs, ys, o) {
+    if (!o || !o.points || !o.points.length) return;
+    var ih = ys.range()[0];
+    var last = o.last || null;
+    var ramp = ctx.theme.sequential;
+
+    /* Bands widest-first (descending level). Each band's colour steps
+       along the theme's sequential ramp - the widest level wears the
+       lighter ink, deepening inward - and every band stays at low
+       opacity, so the overlap itself adds a second layer of deepening
+       and gridlines keep showing through. The band starts at the last
+       observed point with zero width: at that moment the value is
+       known exactly, which is what a fan growing out of the line end
+       says. */
+    var levels = o.levels.slice().sort(function (a, b) { return b - a; });
+    levels.forEach(function (lev, i) {
+      var t = levels.length > 1 ? i / (levels.length - 1) : 1;
+      var color = ramp[Math.round((0.3 + 0.45 * t) * (ramp.length - 1))];
+      var band = (last ? [{ x: last.x, lo: last.y, hi: last.y }] : [])
+        .concat(o.points.map(function (d) {
+          return { x: d.x, lo: d["lo" + lev], hi: d["hi" + lev] };
+        }));
+      g.append("path").datum(band)
+        .attr("class", "pv-fan")
+        .attr("fill", color).attr("fill-opacity", 0.18)
+        .attr("d", d3.area()
+          .x(function (d) { return xs(d.x); })
+          .y0(function (d) { return ys(d.lo); })
+          .y1(function (d) { return ys(d.hi); })
+          .curve(d3.curveMonotoneX));
+    });
+
+    /* The end-of-history rule: a quiet full-height vertical in the
+       axis ink, so the eye knows exactly where observation stops and
+       projection starts even before it reads the dashes. */
+    if (last) {
+      g.append("line")
+        .attr("class", "pv-fan-rule")
+        .attr("x1", xs(last.x)).attr("x2", xs(last.x))
+        .attr("y1", 0).attr("y2", ih)
+        .attr("stroke", ctx.theme.ink.baseline)
+        .attr("stroke-width", 1);
+    }
+
+    /* The point forecast continues the series' own line - same colour,
+       same weight - but dashed: the one meaning dashes are reserved
+       for. */
+    g.append("path").datum((last ? [last] : []).concat(o.points))
+      .attr("class", "pv-fan-line")
+      .attr("fill", "none")
+      .attr("stroke", o.color).attr("stroke-width", 2)
+      .attr("stroke-dasharray", "5,4")
+      .attr("stroke-linejoin", "round")
+      .attr("d", d3.line()
+        .x(function (d) { return xs(d.x); })
+        .y(function (d) { return ys(d.y); })
+        .curve(d3.curveMonotoneX));
+
+    /* The fan fades in once the line's draw-in has reached the end of
+       history - the projection appears to grow out of the arriving
+       line. Headless captures (duration 0) get it immediately. */
+    if (ctx.duration > 0) {
+      g.attr("opacity", 0)
+        .transition().delay(ctx.duration).duration(250)
+        .attr("opacity", 1);
+    }
+  };
+
+})();

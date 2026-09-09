@@ -499,6 +499,236 @@ suggest_line <- function(p, nm) {
        score = 85)
 }
 
+# Exactly two moments per group: the slope chart's home ground. The
+# profile's time axis wants three points or more, so this builder hunts
+# on its own for a Date or year column holding exactly two distinct
+# values - too few for a line, exactly right for a slope. The signal is
+# strong and distinctive, so it scores above pv_line.
+suggest_slope <- function(p, nm) {
+  nms <- names(p$data)
+  low <- tolower(nms)
+  x <- NULL
+  axis_word <- NULL
+  for (i in seq_along(nms)) {
+    v <- p$data[[nms[[i]]]]
+    if (p$kind[[i]] == "date") {
+      ok <- v[!is.na(v)]
+      if (length(ok) && length(unique(ok)) == 2) {
+        x <- nms[[i]]
+        axis_word <- "date"
+        break
+      }
+    } else if (p$kind[[i]] == "numeric" &&
+               grepl("^(year|yr|jahr|annee)s?$", low[[i]])) {
+      ok <- v[!is.na(v)]
+      if (length(ok) && length(unique(ok)) == 2 && all(ok == trunc(ok)) &&
+          min(ok) >= 1500 && max(ok) <= 2200) {
+        x <- nms[[i]]
+        axis_word <- "year"
+        break
+      }
+    }
+  }
+  if (is.null(x)) {
+    return(NULL)
+  }
+  m <- NULL
+  for (cand in p$measures) {
+    if (cand$kind == "numeric") {
+      m <- cand
+      break
+    }
+  }
+  if (is.null(m)) {
+    return(NULL)
+  }
+  # The grouping: one row per position per level, with at least two
+  # groups present at both ends - a slope wants clean pairs, so no
+  # aggregate() escape hatch here; messier frames fall through to the
+  # other builders.
+  g <- NULL
+  for (cc in p$cats) {
+    keep <- suggest_complete(p$data, c(x, m$name, cc$name))
+    if (!any(keep)) next
+    key <- paste(p$data[[x]][keep], p$data[[cc$name]][keep], sep = "\r")
+    if (anyDuplicated(key) > 0) next
+    per <- table(as.character(p$data[[cc$name]][keep]))
+    if (sum(per == 2) < 2) next
+    if (is.null(g) || cc$distinct < g$distinct) {
+      g <- cc
+    }
+  }
+  if (is.null(g)) {
+    return(NULL)
+  }
+  xv <- p$data[[x]]
+  pos <- sort(unique(xv[!is.na(xv)]))
+  pos <- if (inherits(xv, "Date")) {
+    format(pos, "%Y-%m-%d")
+  } else {
+    format(pos, trim = TRUE)
+  }
+  list(chart = "pv_slope",
+       code = sprintf("pv_slope(%s, x = %s, y = %s, group = %s)",
+                      nm, suggest_q(x), suggest_q(m$name), suggest_q(g$name)),
+       reason = sprintf(
+         "`%s` holds exactly two %ss (%s and %s), so each `%s` draws one line whose slope is its change",
+         x, axis_word, pos[[1]], pos[[2]], g$name),
+       score = 88)
+}
+
+# Exactly two numeric columns on one shared scale, one row per category:
+# the wide before/after shape. It rides alongside the scatter - the
+# scatter shows how the pair co-varies, the dumbbell shows each row's
+# gap - and edges just ahead of it, being the more specific read.
+suggest_dumbbell <- function(p, nm) {
+  nums <- Filter(function(m) m$kind == "numeric" && m$distinct >= 2,
+                 p$measures)
+  if (length(nums) != 2) {
+    return(NULL)
+  }
+  a <- nums[[1]]
+  b <- nums[[2]]
+  # Same-ish scale means the two value ranges overlap. Columns in
+  # different units (counts against francs, say) share no axis, so they
+  # stay a scatter.
+  if (max(a$min, b$min) > min(a$max, b$max)) {
+    return(NULL)
+  }
+  g <- NULL
+  for (cc in p$cats) {
+    keep <- suggest_complete(p$data, c(cc$name, a$name, b$name))
+    k <- sum(keep)
+    if (k < 2 || k > 40) next
+    if (anyDuplicated(p$data[[cc$name]][keep]) > 0) next
+    if (is.null(g) || cc$distinct > g$distinct) {
+      g <- cc
+    }
+  }
+  if (is.null(g)) {
+    return(NULL)
+  }
+  list(chart = "pv_dumbbell",
+       code = sprintf("pv_dumbbell(%s, y = %s, x1 = %s, x2 = %s)",
+                      nm, suggest_q(g$name), suggest_q(a$name),
+                      suggest_q(b$name)),
+       reason = sprintf(
+         "`%s` and `%s` sit on one scale with one row per `%s`, so each row reads as a pair with its gap in view",
+         a$name, b$name, g$name),
+       score = 73)
+}
+
+# A summable measure that mixes gains and losses over a handful of
+# categories reads like contributions building toward a total. That is a
+# guess - only the author knows whether the rows are steps of one story
+# - so the reason says so out loud.
+suggest_waterfall <- function(p, nm) {
+  m <- NULL
+  for (cand in p$measures) {
+    if (cand$kind != "numeric" || !identical(cand$fun, "sum")) next
+    v <- p$data[[cand$name]]
+    ok <- v[!is.na(v)]
+    if (!length(ok) || any(!is.finite(ok))) next
+    neg <- mean(ok < 0)
+    # Negatives must be a real minority: none means plain bars, half or
+    # more means the "total" the bars build toward is not the story.
+    if (neg >= 0.1 && neg < 0.5 && any(ok > 0)) {
+      m <- cand
+      break
+    }
+  }
+  if (is.null(m)) {
+    return(NULL)
+  }
+  fitting <- Filter(function(cc) cc$distinct >= 2 && cc$distinct <= 15,
+                    p$cats)
+  if (!length(fitting)) {
+    return(NULL)
+  }
+  counts <- vapply(fitting, function(cc) cc$distinct, numeric(1))
+  cat_col <- fitting[[which.max(counts)]]
+  keep <- suggest_complete(p$data, c(cat_col$name, m$name))
+  if (!any(keep)) {
+    return(NULL)
+  }
+  dup <- anyDuplicated(p$data[[cat_col$name]][keep]) > 0
+  note <- ""
+  if (dup) {
+    if (!suggest_syntactic(c(m$name, cat_col$name))) {
+      return(NULL)
+    }
+    agg <- suggest_agg(m$name, cat_col$name, nm, "sum")
+    frame <- agg$var
+    lines <- agg$line
+    note <- agg$note
+  } else {
+    frame <- nm
+    lines <- character(0)
+  }
+  call_line <- sprintf("pv_waterfall(%s, x = %s, y = %s)",
+                       frame, suggest_q(cat_col$name), suggest_q(m$name))
+  list(chart = "pv_waterfall",
+       code = paste(c(lines, call_line), collapse = "\n"),
+       reason = sprintf(
+         "`%s` mixes gains and losses - if the `%s` rows are steps of one story, a waterfall shows them building to the total (a guess: only you know whether they are)%s",
+         m$name, cat_col$name, note),
+       score = 58)
+}
+
+# Two category columns where one nests strictly inside the other - every
+# child level belongs to exactly one parent level, and there are more
+# children than parents - plus a summable non-negative measure: a
+# genuine hierarchy.
+suggest_sunburst <- function(p, nm) {
+  m <- NULL
+  for (cand in p$measures) {
+    if (cand$kind == "numeric" && identical(cand$fun, "sum") &&
+        cand$min >= 0) {
+      m <- cand
+      break
+    }
+  }
+  if (is.null(m)) {
+    return(NULL)
+  }
+  best <- NULL
+  for (parent in p$cats) {
+    if (parent$distinct < 2 || parent$distinct > theme_palette_slots()) {
+      next
+    }
+    for (child in p$cats) {
+      if (identical(child$name, parent$name)) next
+      # Strictly more children than parents rules out 1:1 relabelings
+      # (a code column and its name column); the cap keeps the rings
+      # countable.
+      if (child$distinct <= parent$distinct || child$distinct > 40) next
+      keep <- suggest_complete(p$data, c(parent$name, child$name, m$name))
+      if (!any(keep)) next
+      pv <- as.character(p$data[[parent$name]][keep])
+      cv <- as.character(p$data[[child$name]][keep])
+      # Nested means each child level appears under exactly one parent:
+      # as many distinct (child, parent) pairs as distinct children.
+      if (length(unique(paste(cv, pv, sep = "\r"))) != length(unique(cv))) {
+        next
+      }
+      if (is.null(best) || child$distinct > best$child$distinct) {
+        best <- list(parent = parent, child = child)
+      }
+    }
+  }
+  if (is.null(best)) {
+    return(NULL)
+  }
+  list(chart = "pv_sunburst",
+       code = sprintf("pv_sunburst(%s, levels = c(%s, %s), value = %s)",
+                      nm, suggest_q(best$parent$name),
+                      suggest_q(best$child$name), suggest_q(m$name)),
+       reason = sprintf(
+         "every `%s` belongs to exactly one `%s`, so `%s` nests as rings - pv_icicle draws the same tree with readable labels",
+         best$child$name, best$parent$name, m$name),
+       score = 66)
+}
+
 suggest_area <- function(p, nm) {
   if (is.null(p$time)) {
     return(NULL)
@@ -778,6 +1008,62 @@ suggest_donut <- function(p, nm) {
        score = 40)
 }
 
+# The waffle rides the donut's coat-tails: the same parts-of-a-whole
+# test, deliberately mirrored condition for condition, offered as the
+# alternative whose squares can actually be counted. It scores one below
+# the donut so the pair always sits together in the list.
+suggest_waffle <- function(p, nm) {
+  if (!length(p$measures)) {
+    return(NULL)
+  }
+  m <- p$measures[[1]]
+  if (!identical(m$fun, "sum") || m$min < 0) {
+    return(NULL)
+  }
+  fitting <- Filter(function(cc) cc$distinct >= 2 && cc$distinct <= 6,
+                    p$cats)
+  if (!length(fitting)) {
+    return(NULL)
+  }
+  counts <- vapply(fitting, function(cc) cc$distinct, numeric(1))
+  cat_col <- fitting[[which.max(counts)]]
+  keep <- suggest_complete(p$data, c(cat_col$name, m$name))
+  if (!any(keep)) {
+    return(NULL)
+  }
+  # A waffle divides a total into squares, so the total must be there
+  # to divide.
+  if (sum(as.numeric(p$data[[m$name]][keep])) <= 0) {
+    return(NULL)
+  }
+  # pv_waffle sums duplicate categories itself, but the donut beside
+  # this suggestion prints the aggregate() step - showing the same code
+  # here keeps the pair interchangeable.
+  dup <- anyDuplicated(p$data[[cat_col$name]][keep]) > 0
+  nas <- anyNA(p$data[[m$name]])
+  note <- ""
+  if (dup || nas) {
+    if (!suggest_syntactic(c(m$name, cat_col$name))) {
+      return(NULL)
+    }
+    agg <- suggest_agg(m$name, cat_col$name, nm, "sum")
+    frame <- agg$var
+    lines <- agg$line
+    note <- agg$note
+  } else {
+    frame <- nm
+    lines <- character(0)
+  }
+  call_line <- sprintf("pv_waffle(%s, category = %s, value = %s)",
+                       frame, suggest_q(cat_col$name), suggest_q(m$name))
+  list(chart = "pv_waffle",
+       code = paste(c(lines, call_line), collapse = "\n"),
+       reason = sprintf(
+         "the same %d shares of `%s` as countable unit squares - a waffle reads more precisely than a donut%s",
+         cat_col$distinct, m$name, note),
+       score = 39)
+}
+
 # One distribution chart, picked by group cardinality: violins for two or
 # three well-filled groups, ridgelines for four to eight, boxes when the
 # groups are too thin for honest densities.
@@ -919,14 +1205,20 @@ suggest_runs <- function(code, nm, data) {
 #' The suggestions come from what is actually in the data: column types
 #' and cardinalities, whether keys repeat (which decides between a direct
 #' call and an `aggregate()` step, printed as part of the code), a `Date`
-#' or year column (lines; a calendar for daily dates), pairs of numeric
-#' columns (scatter, with `density = TRUE` past a few thousand rows),
-#' many numeric columns (a pairs matrix), longitude/latitude pairs (a
-#' bubble map), id columns matching the bundled Swiss map layers (a
-#' choropleth), and grouped numeric columns (boxplot, violin, or
-#' ridgeline, by group count). Every candidate is built once behind the
-#' scenes before it is offered, so a printed suggestion never errors on
-#' the data it was suggested for.
+#' or year column (lines; a calendar for daily dates; a slope chart when
+#' it holds exactly two moments per group), pairs of numeric columns
+#' (scatter, with `density = TRUE` past a few thousand rows; a dumbbell
+#' when exactly two share a scale with one row per category), many
+#' numeric columns (a pairs matrix), longitude/latitude pairs (a bubble
+#' map), id columns matching the bundled Swiss map layers (a
+#' choropleth), grouped numeric columns (boxplot, violin, or ridgeline,
+#' by group count), a signed measure whose losses are a real minority (a
+#' waterfall, offered as a guess), nested category columns (a sunburst,
+#' with the icicle named as its readable-label twin), and parts of a
+#' whole (a donut, with a waffle beside it as the precise-reading
+#' alternative). Every candidate is built once behind the scenes before
+#' it is offered, so a printed suggestion never errors on the data it
+#' was suggested for.
 #'
 #' @param data A data frame to inspect.
 #' @param n Maximum number of suggestions to keep, best fit first
@@ -948,6 +1240,10 @@ suggest_runs <- function(code, nm, data) {
 #' # Municipality ids that match the bundled Lucerne map layer.
 #' fiscal25 <- subset(pv_fiscal, year == 2025)
 #' pv_suggest(fiscal25)
+#'
+#' # Exactly two census years per city: the slope chart's home ground.
+#' census <- subset(pv_city_population, year %in% c(1930, 2024))
+#' pv_suggest(census)
 #' @export
 pv_suggest <- function(data, n = 4) {
   check_columns(data, list())
@@ -971,10 +1267,11 @@ pv_suggest <- function(data, n = 4) {
   p <- suggest_profile(data)
   builders <- list(
     suggest_choropleth, suggest_bubble_map, suggest_calendar,
-    suggest_line, suggest_pairs, suggest_heatmap, suggest_scatter,
-    suggest_area, suggest_category, suggest_distribution,
+    suggest_slope, suggest_line, suggest_pairs, suggest_heatmap,
+    suggest_dumbbell, suggest_scatter, suggest_area, suggest_sunburst,
+    suggest_category, suggest_distribution, suggest_waterfall,
     suggest_parallel, suggest_spark_table, suggest_histogram,
-    suggest_donut, suggest_fallback_table)
+    suggest_donut, suggest_waffle, suggest_fallback_table)
   cands <- Filter(Negate(is.null), lapply(builders, function(b) b(p, nm)))
   if (length(cands)) {
     cands <- cands[order(-vapply(cands, function(s) s$score, numeric(1)))]

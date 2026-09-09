@@ -111,8 +111,11 @@ test_that("daily dates read as a calendar and a line", {
   # Nothing here is a category, a share, or a map.
   expect_false("pv_bar" %in% charts)
   expect_false("pv_donut" %in% charts)
+  expect_false("pv_waffle" %in% charts)
   expect_false("pv_choropleth" %in% charts)
   expect_false("pv_bubble_map" %in% charts)
+  # Five numeric columns are a pairs matrix, not a before/after pair.
+  expect_false("pv_dumbbell" %in% charts)
 })
 
 test_that("a lon/lat pair reads as a bubble map on the Swiss base map", {
@@ -221,6 +224,142 @@ test_that("grouped distributions pick their form by group cardinality", {
   expect_false(any(c("pv_violin", "pv_ridgeline") %in% suggest_charts(s)))
 })
 
+test_that("exactly two time points per group read as a slope chart", {
+  pop <- pv_city_population[pv_city_population$year %in% c(1930, 2024), ]
+  s <- pv_suggest(pop, n = 10)
+  charts <- suggest_charts(s)
+  # No map, calendar, or daily-date shape competes here, so the slope's
+  # strong signal puts it first.
+  expect_identical(charts[[1]], "pv_slope")
+  code <- suggest_code(s, "pv_slope")
+  expect_match(code, 'x = "year"', fixed = TRUE)
+  expect_match(code, 'y = "population"', fixed = TRUE)
+  expect_match(code, 'group = "city"', fixed = TRUE)
+  reason <- suggest_reason(s, "pv_slope")
+  expect_match(reason, "1930", fixed = TRUE)
+  expect_match(reason, "2024", fixed = TRUE)
+  w <- suggest_eval(code, list(pop = pop))
+  expect_s3_class(w, "pvchart")
+  # Three or more moments stay a line; a slope never fires there.
+  full <- pv_suggest(pv_city_population, n = 10)
+  expect_false("pv_slope" %in% suggest_charts(full))
+  expect_true("pv_line" %in% suggest_charts(full))
+})
+
+test_that("the slope outranks the line when both shapes are present", {
+  # One frame with both signals: a daily date axis feeds the line, and a
+  # separate two-value year column feeds the slope.
+  mixed <- data.frame(
+    city = rep(c("A", "B", "C", "D"), each = 2),
+    year = rep(c(2010L, 2024L), 4),
+    when = as.Date("2024-01-01") + 0:7,
+    value = c(1, 3, 2, 2, 5, 4, 3, 6))
+  s <- pv_suggest(mixed, n = 10)
+  charts <- suggest_charts(s)
+  expect_true(all(c("pv_slope", "pv_line") %in% charts))
+  expect_lt(match("pv_slope", charts), match("pv_line", charts))
+})
+
+test_that("two same-scale numerics per category earn a dumbbell beside the scatter", {
+  f20 <- pv_fiscal[pv_fiscal$year == 2020,
+                   c("municipality", "resource_index")]
+  f27 <- pv_fiscal[pv_fiscal$year == 2027,
+                   c("municipality", "resource_index")]
+  both <- merge(f20, f27, by = "municipality",
+                suffixes = c("_2020", "_2027"))
+  both <- head(both[order(-both$resource_index_2027), ], 12)
+  s <- pv_suggest(both, n = 10)
+  charts <- suggest_charts(s)
+  expect_true(all(c("pv_dumbbell", "pv_scatter") %in% charts))
+  # The dumbbell is the more specific read, so it edges ahead.
+  expect_lt(match("pv_dumbbell", charts), match("pv_scatter", charts))
+  code <- suggest_code(s, "pv_dumbbell")
+  expect_match(code, 'y = "municipality"', fixed = TRUE)
+  expect_match(code, 'x1 = "resource_index_2020"', fixed = TRUE)
+  expect_match(code, 'x2 = "resource_index_2027"', fixed = TRUE)
+  w <- suggest_eval(code, list(both = both))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("the dumbbell stays away from mismatched scales and wider frames", {
+  # Two numerics whose ranges never overlap share no axis.
+  apart <- data.frame(name = letters[1:8], small = (1:8) / 10,
+                      big = 1000 + 1:8)
+  expect_false("pv_dumbbell" %in% suggest_charts(pv_suggest(apart, n = 10)))
+  # Three numerics are a frame of measures, not a before/after pair.
+  three <- data.frame(name = letters[1:8], a = 1:8, b = 8:1,
+                      c = 2 * (1:8))
+  expect_false("pv_dumbbell" %in% suggest_charts(pv_suggest(three, n = 10)))
+  # Repeated categories have no one-row-per-category pairing to draw.
+  rep_cat <- data.frame(name = rep(letters[1:4], 2), a = 1:8, b = 8:1)
+  expect_false("pv_dumbbell" %in%
+                 suggest_charts(pv_suggest(rep_cat, n = 10)))
+})
+
+test_that("a signed measure with a minority of losses earns a waterfall guess", {
+  budget <- data.frame(
+    item = c("Wages", "Goods", "Fees", "Transfers", "Interest", "Rents"),
+    change_chf = c(420, -180, 260, -90, 35, 150))
+  s <- pv_suggest(budget, n = 10)
+  expect_true("pv_waterfall" %in% suggest_charts(s))
+  code <- suggest_code(s, "pv_waterfall")
+  expect_match(code, 'x = "item"', fixed = TRUE)
+  expect_match(code, 'y = "change_chf"', fixed = TRUE)
+  reason <- suggest_reason(s, "pv_waterfall")
+  # The reason owns up to the guess instead of asserting a story.
+  expect_match(reason, "guess")
+  expect_match(reason, "gains and losses")
+  w <- suggest_eval(code, list(budget = budget))
+  expect_s3_class(w, "pvchart")
+  # Repeated categories get the aggregate() step, like every builder.
+  doubled <- rbind(budget, budget)
+  s2 <- pv_suggest(doubled, n = 10)
+  expect_match(suggest_code(s2, "pv_waterfall"), "aggregate(", fixed = TRUE)
+})
+
+test_that("the waterfall needs losses to be a real minority", {
+  # All gains are plain bars, not contributions toward a total.
+  gains <- data.frame(item = letters[1:6], v = c(4, 2, 6, 1, 3, 5))
+  expect_false("pv_waterfall" %in% suggest_charts(pv_suggest(gains, n = 10)))
+  # Half negatives are diverging data; the "total" is not the story.
+  half <- data.frame(item = letters[1:6], v = c(5, -5, 4, -4, 3, -3))
+  expect_false("pv_waterfall" %in% suggest_charts(pv_suggest(half, n = 10)))
+})
+
+test_that("wherever a donut is suggested a waffle follows right behind", {
+  seats <- data.frame(party = c("A", "B", "C"), n = c(6, 3, 1))
+  s <- pv_suggest(seats, n = 10)
+  charts <- suggest_charts(s)
+  expect_true(all(c("pv_donut", "pv_waffle") %in% charts))
+  expect_identical(match("pv_waffle", charts), match("pv_donut", charts) + 1L)
+  code <- suggest_code(s, "pv_waffle")
+  expect_match(code, 'category = "party"', fixed = TRUE)
+  expect_match(code, 'value = "n"', fixed = TRUE)
+  expect_match(suggest_reason(s, "pv_waffle"), "donut")
+  w <- suggest_eval(code, list(seats = seats))
+  expect_s3_class(w, "pvchart")
+  # With repeated keys the pair prints the same aggregate() step.
+  s2 <- pv_suggest(pv_sales, n = 10)
+  expect_true(all(c("pv_donut", "pv_waffle") %in% suggest_charts(s2)))
+  expect_match(suggest_code(s2, "pv_donut"), "aggregate(", fixed = TRUE)
+  expect_match(suggest_code(s2, "pv_waffle"), "aggregate(", fixed = TRUE)
+})
+
+test_that("nested categories earn a sunburst whose reason offers the icicle", {
+  s <- pv_suggest(pv_city_landuse, n = 10)
+  expect_true("pv_sunburst" %in% suggest_charts(s))
+  code <- suggest_code(s, "pv_sunburst")
+  # Outermost grouping first: the parent leads the levels vector.
+  expect_match(code, 'levels = c("group", "category")', fixed = TRUE)
+  expect_match(code, 'value = "hectares"', fixed = TRUE)
+  expect_match(suggest_reason(s, "pv_sunburst"), "pv_icicle", fixed = TRUE)
+  w <- suggest_eval(code, list(pv_city_landuse = pv_city_landuse))
+  expect_s3_class(w, "pvchart")
+  # A code column and its 1:1 name column is a relabeling, not a tree.
+  s2 <- pv_suggest(pv_city_sectors, n = 10)
+  expect_false("pv_sunburst" %in% suggest_charts(s2))
+})
+
 test_that("a numeric list-column earns a sparkline table", {
   sp <- data.frame(name = c("a", "b", "c"))
   sp$trend <- list(c(1, 2, 3), c(3, 2, 1), c(2, 2, 5))
@@ -237,6 +376,50 @@ test_that("a frame with no chartable shape still offers the table", {
   expect_identical(suggest_charts(s), "pv_table")
   expect_match(suggest_code(s, "pv_table"), "pv_table(pv_city_coords)",
                fixed = TRUE)
+})
+
+# The same promise for the shapes the bundled frames don't reach on
+# their own: frames built to trigger each of the new suggestion paths,
+# every printed call evaluated like the bundled loop below does.
+test_that("every printed suggestion for the new-shape frames builds a widget", {
+  frames <- list(
+    two_moments = pv_city_population[
+      pv_city_population$year %in% c(1930, 2024), ],
+    paired_wide = head(merge(
+      pv_fiscal[pv_fiscal$year == 2020, c("municipality", "resource_index")],
+      pv_fiscal[pv_fiscal$year == 2027, c("municipality", "resource_index")],
+      by = "municipality", suffixes = c("_2020", "_2027")), 30),
+    contributions = data.frame(
+      item = c("Wages", "Goods", "Fees", "Transfers", "Interest", "Rents"),
+      change_chf = c(420, -180, 260, -90, 35, 150)),
+    shares = data.frame(party = c("A", "B", "C", "D"), n = c(6, 3, 2, 1)),
+    nested = pv_city_landuse[pv_city_landuse$city %in%
+                               c("Luzern", "Zug", "Emmen"), ])
+  triggers <- list(two_moments = "pv_slope", paired_wide = "pv_dumbbell",
+                   contributions = "pv_waterfall", shares = "pv_waffle",
+                   nested = "pv_sunburst")
+  for (nm in names(frames)) {
+    assign(nm, frames[[nm]])
+    s <- eval(call("pv_suggest", as.name(nm), n = 10L))
+    expect_true(triggers[[nm]] %in% suggest_charts(s), label = nm)
+    expect_false(anyDuplicated(suggest_charts(s)) > 0)
+    for (r in s$suggestions) {
+      err <- NULL
+      w <- tryCatch(
+        suggest_eval(r$code, stats::setNames(list(frames[[nm]]), nm)),
+        error = function(e) {
+          err <<- conditionMessage(e)
+          NULL
+        })
+      expect_true(
+        is.null(err),
+        info = sprintf("%s / %s errored: %s", nm, r$chart,
+                       if (is.null(err)) "" else err))
+      expect_true(
+        inherits(w, "pvchart"),
+        info = sprintf("%s / %s did not return a chart", nm, r$chart))
+    }
+  }
 })
 
 test_that("every printed suggestion for every bundled frame builds a widget", {

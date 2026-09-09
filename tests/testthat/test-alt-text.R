@@ -87,6 +87,168 @@ test_that("pv_alt overrides the generated text, and validates its input", {
   expect_error(pv_alt_text("nope"), "polyviz chart")
 })
 
+test_that("a slope chart's alt text names the periods, the riser, and the faller", {
+  two <- data.frame(year = rep(c(2000L, 2024L), each = 3),
+                    g = rep(c("Up", "Down", "Flat"), 2),
+                    v = c(10, 30, 20, 25, 12, 20))
+  w <- pv_slope(two, x = "year", y = "v", group = "g", title = "Three paths")
+  a <- w$x$alt
+  expect_match(a, "^A slope chart titled \u201cThree paths\u201d")
+  expect_match(a, "3 groups (Up, Down, and Flat) from 2000 to 2024",
+               fixed = TRUE)
+  expect_match(a, "Up rises the most, from 10 to 25", fixed = TRUE)
+  expect_match(a, "Down falls the most, from 30 to 12", fixed = TRUE)
+  # All-flat lines get the honest sentence, not an invented mover.
+  flat <- data.frame(year = rep(c(2000L, 2024L), each = 2),
+                     g = rep(c("A", "B"), 2), v = c(5, 7, 5, 7))
+  expect_match(pv_slope(flat, x = "year", y = "v", group = "g")$x$alt,
+               "No group changes between the two positions.", fixed = TRUE)
+})
+
+test_that("a dumbbell's alt text names the widest gap with both ends", {
+  d <- data.frame(name = c("A", "B", "C"), before = c(10, 40, 25),
+                  after = c(20, 90, 30))
+  w <- pv_dumbbell(d, y = "name", x1 = "before", x2 = "after",
+                   labels = c("Then", "Now"))
+  a <- w$x$alt
+  expect_match(a, "^A dumbbell chart comparing Then and Now across 3 categories")
+  expect_match(a, "The widest gap is B, from 40 (Then) to 90 (Now).",
+               fixed = TRUE)
+})
+
+test_that("a waterfall's alt text carries the largest contribution and the total", {
+  steps <- data.frame(item = c("Wages", "Goods", "Fees"),
+                      change = c(400, -150, 50))
+  w <- pv_waterfall(steps, x = "item", y = "change")
+  a <- w$x$alt
+  expect_match(a, "^A waterfall chart building 3 signed contributions of change")
+  expect_match(a, "The largest contribution is Wages, adding 400.",
+               fixed = TRUE)
+  expect_match(a, "The running total ends at 300.", fixed = TRUE)
+  # The largest step can be a loss, and the verb says so.
+  down <- data.frame(item = c("Wages", "Goods", "Fees"),
+                     change = c(100, -400, 50))
+  a2 <- pv_waterfall(down, x = "item", y = "change")$x$alt
+  expect_match(a2, "The largest contribution is Goods, subtracting 400.",
+               fixed = TRUE)
+  expect_match(a2, "The running total ends at -250.", fixed = TRUE)
+})
+
+test_that("a bullet chart's alt text counts measures above, at, and below target", {
+  b <- data.frame(m = c("A", "B", "C", "D"), v = c(120, 80, 100, 90),
+                  t = c(100, 100, 100, 100))
+  w <- pv_bullet(b, label = "m", value = "v", target = "t")
+  a <- w$x$alt
+  expect_match(a, "^A bullet chart comparing 4 measures")
+  expect_match(a, "4 measures (A, B, C, and D) of v, each against its target",
+               fixed = TRUE)
+  expect_match(a, "1 sits above target, 1 hits the target exactly, and 2 fall short.",
+               fixed = TRUE)
+  # A single measure gets singular verbs.
+  one <- data.frame(m = "A", v = 100, t = 100)
+  expect_match(pv_bullet(one, label = "m", value = "v", target = "t")$x$alt,
+               "1 hits the target exactly.", fixed = TRUE)
+})
+
+test_that("a waffle's alt text gives the leading share in squares and percent", {
+  seats <- data.frame(party = c("A", "B", "C"), n = c(6, 3, 1))
+  w <- pv_waffle(seats, category = "party", value = "n", title = "Seats")
+  a <- w$x$alt
+  expect_match(a, "^A waffle chart titled \u201cSeats\u201d")
+  expect_match(a, "3 categories (A, B, and C) as a 10-by-10 grid of unit squares",
+               fixed = TRUE)
+  expect_match(a, "The largest category, A, fills 60 squares (60% of the total).",
+               fixed = TRUE)
+  # A coarser grid changes the square count but not the exact percent.
+  w2 <- pv_waffle(seats, category = "party", value = "n", rows = 5)
+  expect_match(w2$x$alt, "5-by-5 grid", fixed = TRUE)
+  expect_match(w2$x$alt, "fills 15 squares (60% of the total)", fixed = TRUE)
+})
+
+test_that("an icicle's alt text mirrors the sunburst's structure", {
+  luz <- pv_city_landuse[pv_city_landuse$city == "Luzern", ]
+  ici <- pv_icicle(luz, levels = c("group", "category"),
+                   value = "hectares")$x$alt
+  sun <- pv_sunburst(luz, levels = c("group", "category"),
+                     value = "hectares")$x$alt
+  expect_match(ici, "^An icicle chart")
+  n_leaf <- length(unique(luz$category))
+  n_top <- length(unique(luz$group))
+  expect_match(ici, sprintf(
+    "showing a hierarchy of %d leaf segments in %d top-level groups as stacked rectangles",
+    n_leaf, n_top), fixed = TRUE)
+  agg <- aggregate(hectares ~ group, luz, sum)
+  expect_match(ici, sprintf("The largest group, %s,",
+                            agg$group[which.max(agg$hectares)]),
+               fixed = TRUE)
+  # Same payload, same closing fact: only the geometry words differ.
+  expect_identical(sub("^.*? (The largest group,.*)$", "\\1", ici),
+                   sub("^.*? (The largest group,.*)$", "\\1", sun))
+})
+
+# The canonical-loop hygiene checks, run over the six new chart types
+# directly so their describers stay covered whatever the render helpers
+# currently enumerate.
+test_that("the new chart types carry clean, period-terminated alt text", {
+  builders <- list(
+    slope = function() {
+      pop <- pv_city_population[
+        pv_city_population$city %in% c("Luzern", "Emmen", "Zug") &
+          pv_city_population$year %in% c(1930, 2024), ]
+      pv_slope(pop, x = "year", y = "population", group = "city")
+    },
+    dumbbell = function() {
+      both <- merge(
+        pv_fiscal[pv_fiscal$year == 2020,
+                  c("municipality", "resource_index")],
+        pv_fiscal[pv_fiscal$year == 2027,
+                  c("municipality", "resource_index")],
+        by = "municipality", suffixes = c("_2020", "_2027"))
+      pv_dumbbell(head(both, 12), y = "municipality",
+                  x1 = "resource_index_2020", x2 = "resource_index_2027")
+    },
+    waterfall = function() {
+      lu <- pv_city_population[pv_city_population$city == "Luzern", ]
+      lu <- lu[order(lu$year), ]
+      steps <- data.frame(
+        period = paste(head(lu$year, -1), lu$year[-1], sep = "\u2013"),
+        change = diff(lu$population))
+      pv_waterfall(steps, x = "period", y = "change",
+                   start = lu$population[1])
+    },
+    bullet = function() {
+      rev <- aggregate(revenue ~ region, pv_sales, sum)
+      rev$target <- round(1.08 * mean(rev$revenue), -4)
+      pv_bullet(rev, label = "region", value = "revenue", target = "target")
+    },
+    waffle = function() {
+      seats <- aggregate(elected ~ party,
+                         pv_elections[pv_elections$year == 2024, ], sum)
+      seats <- seats[order(-seats$elected), ]
+      seats$party[-(1:7)] <- "Other"
+      seats <- aggregate(elected ~ party, seats, sum)
+      pv_waffle(seats, category = "party", value = "elected")
+    },
+    icicle = function() {
+      pv_icicle(pv_city_landuse[pv_city_landuse$city == "Luzern", ],
+                levels = c("group", "category"), value = "hectares")
+    })
+  for (id in names(builders)) {
+    w <- builders[[id]]()
+    a <- w$x$alt
+    expect_true(is.character(a) && length(a) == 1 && !is.na(a) && nzchar(a),
+                label = sprintf("%s alt text is a usable string", id))
+    expect_true(grepl("\\.$", a),
+                label = sprintf("%s alt text ends with a period", id))
+    expect_false(grepl("\\bNA\\b|\\bNULL\\b|\\bNaN\\b|\\(no value\\)", a),
+                 label = sprintf("%s alt text leaks a missing value", id))
+    expect_false(grepl("  ", a, fixed = TRUE),
+                 label = sprintf("%s alt text has doubled spaces", id))
+    expect_identical(pv_alt_text(w), a,
+                     label = sprintf("%s generator agrees", id))
+  }
+})
+
 test_that("every canonical chart carries clean, period-terminated alt text", {
   for (id in names(c(render_charts, render_variants))) {
     w <- c(render_charts, render_variants)[[id]]()

@@ -701,6 +701,142 @@ alt_pairs <- function(x) {
   out
 }
 
+# The slope chart: the two moments it joins, then the biggest riser and
+# the biggest faller - the two lines a reader would trace first. A chart
+# of pure gains (or pure losses) only gets the sentence its data earns.
+alt_slope <- function(x) {
+  df <- x$data
+  pos <- x$xlevels
+  out <- alt_lead(x, "A slope chart",
+                  sprintf("joining %s%s from %s to %s",
+                          alt_count(nrow(df), "group", "groups"),
+                          alt_names(df$group),
+                          alt_pos(pos[[1]]), alt_pos(pos[[2]])))
+  d <- df$y2 - df$y1
+  bits <- character(0)
+  if (any(d > 0)) {
+    hi <- which.max(d)
+    bits <- c(bits, sprintf("%s rises the most, from %s to %s",
+                            df$group[hi], alt_num(df$y1[hi]),
+                            alt_num(df$y2[hi])))
+  }
+  if (any(d < 0)) {
+    lo <- which.min(d)
+    bits <- c(bits, sprintf("%s falls the most, from %s to %s",
+                            df$group[lo], alt_num(df$y1[lo]),
+                            alt_num(df$y2[lo])))
+  }
+  if (!length(bits)) {
+    return(paste(out, "No group changes between the two positions."))
+  }
+  paste(out, paste0(paste(bits, collapse = ", and "), "."))
+}
+
+# The dumbbell: what the two dot sets are, and the row with the widest
+# gap - the row the form exists to surface.
+alt_dumbbell <- function(x) {
+  df <- x$data
+  labs <- x$labels
+  gap <- abs(df$x2 - df$x1)
+  hi <- which.max(gap)
+  paste(
+    alt_lead(x, "A dumbbell chart",
+             sprintf("comparing %s and %s across %s", labs[[1]], labs[[2]],
+                     alt_count(nrow(df), "category", "categories"))),
+    sprintf("The widest gap is %s, from %s (%s) to %s (%s).",
+            df$y[hi], alt_num(df$x1[hi]), labs[[1]],
+            alt_num(df$x2[hi]), labs[[2]]))
+}
+
+# The waterfall: how many contributions build the total, the largest
+# single one (signed by its verb), and where the running total ends.
+alt_waterfall <- function(x) {
+  df <- x$data
+  deltas <- df[df$kind == "delta", , drop = FALSE]
+  out <- alt_lead(x, "A waterfall chart",
+                  sprintf("building %s of %s into a running total",
+                          alt_count(nrow(deltas), "signed contribution",
+                                    "signed contributions"),
+                          alt_lab(x$ylab)))
+  if (nrow(deltas)) {
+    hi <- which.max(abs(deltas$y))
+    out <- paste(out, sprintf("The largest contribution is %s, %s %s.",
+                              deltas$x[hi],
+                              if (deltas$y[hi] >= 0) "adding"
+                              else "subtracting",
+                              alt_num(abs(deltas$y[hi]))))
+  }
+  # The rows arrive in build order, so the last one's reached level is
+  # the final total whether or not a total bar closes the chart.
+  paste(out, sprintf("The running total ends at %s.",
+                     alt_num(df$y1[[nrow(df)]])))
+}
+
+# The bullet list: how many measures, then the target scoreboard - how
+# many sit above, hit it exactly, and fall short.
+alt_bullet <- function(x) {
+  df <- x$data
+  above <- sum(df$value > df$target)
+  at <- sum(df$value == df$target)
+  below <- sum(df$value < df$target)
+  parts <- character(0)
+  if (above > 0) {
+    parts <- c(parts, sprintf("%d %s above target", above,
+                              if (above == 1) "sits" else "sit"))
+  }
+  if (at > 0) {
+    parts <- c(parts, sprintf("%d %s the target exactly", at,
+                              if (at == 1) "hits" else "hit"))
+  }
+  if (below > 0) {
+    parts <- c(parts, sprintf("%d %s short", below,
+                              if (below == 1) "falls" else "fall"))
+  }
+  paste(
+    alt_lead(x, "A bullet chart",
+             sprintf("comparing %s%s of %s, each against its target",
+                     alt_count(nrow(df), "measure", "measures"),
+                     alt_names(df$label), alt_lab(x$vlab))),
+    sprintf("%s.", alt_join(parts)))
+}
+
+# The waffle: the grid, then the leading category's share said both ways
+# - in squares (the rounded count actually drawn) and in percent (from
+# the exact values, never the rounding).
+alt_waffle <- function(x) {
+  df <- x$data
+  total <- sum(df$value)
+  rows <- as.integer(x$rows)
+  hi <- which.max(df$value)
+  paste(
+    alt_lead(x, "A waffle chart",
+             sprintf("dividing %s across %s%s as a %d-by-%d grid of unit squares",
+                     alt_lab(x$vlab),
+                     alt_count(nrow(df), "category", "categories"),
+                     alt_names(df$category), rows, rows)),
+    sprintf("The largest category, %s, fills %s (%s of the total).",
+            df$category[hi],
+            alt_count(df$units[hi], "square", "squares"),
+            alt_pct(df$value[hi] / total)))
+}
+
+# The icicle shares the sunburst's payload, so its description mirrors
+# alt_sunburst structure for structure - only the geometry words change.
+alt_icicle <- function(x) {
+  g <- alt_tree_groups(x$root)
+  leaves <- alt_tree_leaves(x$root)
+  clause <- if (leaves > length(g$name)) {
+    sprintf("showing a hierarchy of %s in %s as stacked rectangles",
+            alt_count(leaves, "leaf segment", "leaf segments"),
+            alt_count(length(g$name), "top-level group", "top-level groups"))
+  } else {
+    sprintf("showing %s as a column of rectangles",
+            alt_count(length(g$name), "segment", "segments"))
+  }
+  paste(c(alt_lead(x, "An icicle chart", clause), alt_top_group(g)),
+        collapse = " ")
+}
+
 alt_describe <- function(x) {
   type <- if (alt_str(x$type)) x$type else "data"
   switch(type,
@@ -731,6 +867,12 @@ alt_describe <- function(x) {
     race = alt_race(x),
     bump = alt_bump(x),
     beeswarm = alt_beeswarm(x),
+    slope = alt_slope(x),
+    dumbbell = alt_dumbbell(x),
+    waterfall = alt_waterfall(x),
+    bullet = alt_bullet(x),
+    waffle = alt_waffle(x),
+    icicle = alt_icicle(x),
     alt_lead(x, sprintf("An interactive %s chart", type))
   )
 }

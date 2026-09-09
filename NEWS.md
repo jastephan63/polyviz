@@ -1,3 +1,24 @@
+# polyviz 1.2.0
+
+Time and density: two new chart types (36 in all), a third way to see
+a big scatter, and hover that always knows which mark you mean.
+
+* `pv_horizon()` — dozens of time series as tight layered ribbons,
+  one thin row per series, values folded into bands of deepening ink
+  (mirrored for negatives). The form for the data a line chart drowns
+  in; a crosshair reads every row at once.
+* `pv_flow_map()` — origin-destination flows as tapered arcs on the
+  Swiss map layers (or your own `sf`), endpoints resolved to feature
+  centroids, bidirectional pairs bowed apart, endpoint dots sized by
+  throughput.
+* `pv_scatter(density = "hex")` — hexagonal binning joins the density
+  contours: counts on the sequential ramp, the middle ground between
+  raw points and smoothed bands. (`TRUE` still means contours.)
+* Voronoi hover: scatter marks and spaghetti-line crosshairs now find
+  the *nearest* mark wherever the pointer is, via the bundled
+  d3-delaunay — nothing changes visually; sparse charts just feel
+  precise. Bundled: d3-hexbin (BSD-3).
+
 # polyviz 1.1.0
 
 The comparison release: six new chart types bring the family to 34,

@@ -1009,6 +1009,24 @@
       .filter(function (v) { return v >= -0.5 && v <= iw + 0.5; })
       .sort(function (a, b) { return a - b; });
 
+    /* The spaghetti hover singles one line out of the bundle, and that
+       pick is true 2D nearest-neighbour (d3.Delaunay) over every
+       visible point: the pointer lifts the line whose observation is
+       genuinely closest, instead of first snapping to an x column and
+       only then comparing heights - which is what makes a dense
+       crosshair feel precise. The index is built once per render,
+       never per pointer move. */
+    var hoverPts = null, hoverDelaunay = null;
+    if (spaghetti) {
+      hoverPts = data.filter(function (d) {
+        var px = xScale(d.x);
+        return px >= -0.5 && px <= iw + 0.5;
+      });
+      hoverDelaunay = hoverPts.length ? d3.Delaunay.from(hoverPts,
+        function (d) { return xScale(d.x); },
+        function (d) { return y(d.y); }) : null;
+    }
+
     /* Every point whose x position is nearest the pointer - the same
        lookup feeds the crosshair tooltip and the click payload. */
     function hitsAt(px) {
@@ -1026,20 +1044,15 @@
       .attr("fill", "transparent")
       .on("pointermove", function (event) {
         var p = d3.pointer(event, this);
-        var hits = hitsAt(p[0]);
-        if (!hits.length) return;
-        var nearest = xScale(hits[0].x);
-        cross.attr("x1", nearest).attr("x2", nearest).attr("opacity", 1);
         if (spaghetti) {
-          /* Dozens of tooltip rows would be noise. Pick the one line
-             nearest the pointer vertically, lift it, and report it
-             alone - name, dot, and value. */
-          var best = hits[0];
-          hits.forEach(function (d) {
-            if (Math.abs(y(d.y) - p[1]) < Math.abs(y(best.y) - p[1])) {
-              best = d;
-            }
-          });
+          /* Dozens of tooltip rows would be noise. The Delaunay index
+             hands over the one nearest observation; lift its line and
+             report it alone - name, dot, and value - with the
+             crosshair snapped to that observation's x. */
+          if (!hoverDelaunay) return;
+          var best = hoverPts[hoverDelaunay.find(p[0], p[1])];
+          var bx = xScale(best.x);
+          cross.attr("x1", bx).attr("x2", bx).attr("opacity", 1);
           setHot(best.series);
           var dotSel = dots.selectAll("circle").data([best]);
           dotSel.enter().append("circle").attr("r", 4)
@@ -1054,6 +1067,10 @@
             pv.swatchRow(accent, best.series, ctx.fmt(best.y)));
           return;
         }
+        var hits = hitsAt(p[0]);
+        if (!hits.length) return;
+        var nearest = xScale(hits[0].x);
+        cross.attr("x1", nearest).attr("x2", nearest).attr("opacity", 1);
         var sel = dots.selectAll("circle").data(hits);
         sel.enter().append("circle").attr("r", 4)
           .attr("stroke", ctx.theme.ink.surface).attr("stroke-width", 2)
@@ -1120,10 +1137,15 @@
   /* ---------- scatter ---------- */
 
   pvRenderers.scatter = function (ctx) {
-    /* Density contours (density = TRUE from R) replace the point marks
-       entirely, and they are already the aggregate view - so they also
-       win over any canvas request. Everything below draws points. */
-    if (ctx.x.density === true) { return renderScatterDensity(ctx); }
+    /* The density treatments (density = TRUE / "contours" / "hex" from
+       R) replace the point marks entirely, and they are already the
+       aggregate view - so they also win over any canvas request. R
+       normalises "contours" to TRUE, but accept the spelling here too.
+       Everything below draws points. */
+    if (ctx.x.density === true || ctx.x.density === "contours") {
+      return renderScatterDensity(ctx);
+    }
+    if (ctx.x.density === "hex") { return renderScatterHex(ctx); }
     var data = ctx.x.data;
     var hasSeries = data.length && data[0].series !== undefined;
     var hasSize = data.length && data[0].size !== undefined;
@@ -1288,29 +1310,85 @@
       .delay(function (d, i) { return Math.min(i * 6, 400); })
       .attr("r", function (d) { return hasSize ? r(d.size) : r(); });
 
-    pts
-      .on("pointerenter pointermove", function (event, d) {
-        /* Lift the hovered point to full opacity so it reads clearly
-           even inside a dense, faded cloud. */
-        d3.select(this)
+    /* Hover targeting is nearest-neighbour (d3.Delaunay): wherever the
+       pointer sits in the plot, the nearest mark owns it - no more
+       pixel-perfect aim on sparse clouds. The index is built once per
+       render, never per pointer move; the marks themselves carry no
+       listeners, and nothing visible changes - the hover lift and the
+       tooltip are exactly the ones the per-mark listeners used to run. */
+    var delaunay = d3.Delaunay.from(data,
+      function (d) { return xScale(d.x); },
+      function (d) { return y(d.y); });
+    var ptNodes = pts.nodes();
+    var hoveredIdx = -1;
+
+    /* The nearest mark's index, or -1 when the pointer is outside the
+       plot panel (bubbled events can arrive from the axes below it). */
+    function nearestIdx(p) {
+      if (p[0] < 0 || p[0] > iw || p[1] < 0 || p[1] > ih) { return -1; }
+      var i = delaunay.find(p[0], p[1]);
+      return i == null || i < 0 ? -1 : i;
+    }
+
+    /* Settles the old mark back into the cloud and lifts the new one to
+       full opacity so it reads clearly even inside a dense, faded
+       cloud - the same lift as ever, just driven from one place. */
+    function setHover(i) {
+      if (i === hoveredIdx) { return; }
+      if (hoveredIdx >= 0) {
+        var od = data[hoveredIdx];
+        d3.select(ptNodes[hoveredIdx])
+          .attr("fill-opacity", ptOp(od))
+          .attr("stroke-width", ptStroke)
+          .attr("r", hasSize ? r(od.size) : r());
+      }
+      hoveredIdx = i;
+      if (i >= 0) {
+        var d = data[i];
+        d3.select(ptNodes[i])
           .attr("fill-opacity", 1)
           .attr("stroke-width", 2)
           .attr("r", (hasSize ? r(d.size) : r()) * 1.35);
-        if (event.type === "pointerenter") {
-          ctx.emit("hover", ptDatum(d));
-        }
-        pv.showTip(ctx, event, tipHtml(d));
-      })
-      .on("pointerleave", function (event, d) {
-        d3.select(this)
-          .attr("fill-opacity", ptOp(d))
-          .attr("stroke-width", ptStroke)
-          .attr("r", hasSize ? r(d.size) : r());
-        pv.hideTip(ctx);
-      })
-      .on("click", function (event, d) {
-        ctx.emit("click", ptDatum(d));
-      });
+        ctx.emit("hover", ptDatum(d));
+      }
+    }
+
+    function onMove(event) {
+      var i = nearestIdx(d3.pointer(event, g.node()));
+      setHover(i);
+      if (i >= 0) { pv.showTip(ctx, event, tipHtml(data[i])); }
+      else { pv.hideTip(ctx); }
+    }
+    function onLeave() {
+      setHover(-1);
+      pv.hideTip(ctx);
+    }
+    function onClick(event) {
+      var i = nearestIdx(d3.pointer(event, g.node()));
+      if (i >= 0) { ctx.emit("click", ptDatum(data[i])); }
+    }
+
+    if (keys) {
+      /* The brush overlay (drawn before the marks) already blankets the
+         plot and must keep owning drags, so the hover handlers listen
+         on the plot group and catch the bubbled events instead of
+         putting a surface of their own above the brush. The brush
+         suppresses the click a finished drag would leave behind, so a
+         plain click still both clears the selection and reports the
+         nearest mark. */
+      g.on("pointermove", onMove)
+        .on("pointerleave", onLeave)
+        .on("click", onClick);
+    } else {
+      /* No brush to keep clear of: a transparent surface over the plot
+         does the listening, exactly like the line's crosshair rect. */
+      g.append("rect")
+        .attr("width", iw).attr("height", ih)
+        .attr("fill", "transparent")
+        .on("pointermove", onMove)
+        .on("pointerleave", onLeave)
+        .on("click", onClick);
+    }
 
     /* Reference lines and annotation labels above the points, and trend
        fits (pv_trend) into the same pointer-transparent group so the
@@ -1642,6 +1720,146 @@
 
     /* Reference lines, annotation labels, and trend fits over the
        contours, clipped like every scatter trend layer. */
+    var gOver = g.append("g").attr("pointer-events", "none");
+    pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
+    var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);
+    svg.append("clipPath").attr("id", clipId)
+      .append("rect").attr("width", iw).attr("height", ih);
+    pv.drawTrends(ctx,
+      gOver.append("g").attr("clip-path", "url(#" + clipId + ")"),
+      xScale, y);
+  }
+
+  /* ---------- scatter hexagonal binning ---------- */
+
+  /* The hex treatment (density = "hex" from R): the cloud binned into
+     hexagons (d3.hexbin), each filled on the theme's sequential ramp by
+     how many points it holds, with the same thin surface-coloured
+     separators the contour bands use. Where the contours smooth the
+     cloud into an estimate, the hexes stay honest counts - the tooltip
+     gives each cell's exact tally and centre. Like the contours, the
+     hexes are the aggregate view: no per-point aesthetics, nothing for
+     the brush or a crosstalk selection to pick out, and annotation and
+     trend layers draw over the cells exactly as they draw over points. */
+  function renderScatterHex(ctx) {
+    var data = ctx.x.data;
+    var m = { top: 12, right: 24, bottom: 52, left: pv.leftMargin(ctx) };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var xScale = d3.scaleLinear()
+      .domain(d3.extent(data, function (d) { return d.x; })).nice()
+      .range([0, iw]);
+    var y = d3.scaleLinear()
+      .domain(d3.extent(data, function (d) { return d.y; })).nice()
+      .range([ih, 0]);
+    /* Explicit limits (the facet renderer shares scales this way)
+       replace the computed domains exactly as given - no nice(). */
+    if (ctx.x.xlim) { xScale.domain(ctx.x.xlim); }
+    if (ctx.x.ylim) { y.domain(ctx.x.ylim); }
+
+    pv.yGrid(g, y, iw, ctx.theme);
+    g.append("g").attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(xScale).ticks(Math.min(8, Math.floor(iw / 80)))
+        .tickFormat(pv.fmtTick).tickSizeOuter(0))
+      .call(function (sel) { pv.styleAxis(sel, ctx.theme, true); });
+    g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(pv.fmtTick))
+      .call(function (sel) { pv.styleAxis(sel, ctx.theme, false); });
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, ctx.x.ylab);
+
+    /* Annotation bands still go under the data layer. */
+    var gUnder = g.append("g").attr("pointer-events", "none");
+
+    /* The one knob, picked from the data and the plot rather than
+       hard-coded (the same spirit as the contour bandwidth): the radius
+       targets about 2 * cbrt(n) hexes across the plot's short side -
+       more points earn finer bins - clamped to [8, 32]px so a small
+       sample never coarsens into a handful of blobs and a huge cloud
+       never dissolves into speckle. A thousand points on a 360px panel
+       get an 18px radius; twenty thousand reach the 8px floor. */
+    var n = data.length;
+    var side = Math.max(1, Math.min(iw, ih));
+    var radius = Math.max(8, Math.min(32,
+      side / (2 * Math.cbrt(Math.max(1, n)))));
+
+    var hexbin = d3.hexbin()
+      .x(function (d) { return xScale(d.x); })
+      .y(function (d) { return y(d.y); })
+      .extent([[0, 0], [iw, ih]])
+      .radius(radius);
+    var bins = hexbin(data);
+
+    /* Fills ride the sequential ramp on the square root of the count:
+       most clouds pile heavily into a few peak cells, and a linear
+       mapping would wash everything else out to the lightest end. The
+       root keeps the peak darkest while mid-density structure stays
+       tellable apart; the tooltip always has the exact count. */
+    var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
+    var maxCount = d3.max(bins, function (b) { return b.length; }) || 1;
+    function fillOf(b) { return ramp(Math.sqrt(b.length / maxCount)); }
+
+    /* Cells whose centres sit near the plot's edge overhang it by up to
+       one radius, so the layer is clipped to the panel - edge hexes end
+       flush with the axes instead of spilling into the margins. */
+    var hexClip = "pv-hex-clip-" + Math.floor(Math.random() * 1e9);
+    svg.append("clipPath").attr("id", hexClip)
+      .append("rect").attr("width", iw).attr("height", ih);
+    var gHex = g.append("g").attr("clip-path", "url(#" + hexClip + ")");
+    var hexes = gHex.selectAll("path").data(bins).enter().append("path")
+      .attr("transform", function (b) {
+        return "translate(" + b.x + "," + b.y + ")";
+      })
+      .attr("d", hexbin.hexagon())
+      .attr("fill", fillOf)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 0.7);
+
+    /* The whole mosaic fades in as one layer, like the contour bands -
+       hundreds of cells have no per-mark entrance worth staggering. */
+    if (ctx.duration > 0) {
+      gHex.attr("opacity", 0)
+        .transition().duration(ctx.duration)
+        .attr("opacity", 1);
+    }
+
+    /* A cell's tooltip and click payload: the exact count and the cell
+       centre read back through the scales into data units. */
+    function binDatum(b) {
+      return { x: xScale.invert(b.x), y: y.invert(b.y), count: b.length };
+    }
+    function tipHtml(b) {
+      return "<b>" + ctx.fmt(b.length) +
+        (b.length === 1 ? " point" : " points") + "</b><br>" +
+        pv.esc(ctx.x.xlab || "x") + " &#8776; <b>" +
+        ctx.fmt(xScale.invert(b.x)) + "</b><br>" +
+        pv.esc(ctx.x.ylab || "y") + " &#8776; <b>" +
+        ctx.fmt(y.invert(b.y)) + "</b>";
+    }
+
+    hexes
+      .on("pointerenter pointermove", function (event, b) {
+        /* The hovered cell lifts its hairline border to a full ring so
+           the eye can hold it while reading the tooltip. */
+        d3.select(this).raise()
+          .attr("stroke-width", 1.6);
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", binDatum(b));
+        }
+        pv.showTip(ctx, event, tipHtml(b));
+      })
+      .on("pointerleave", function () {
+        d3.select(this).attr("stroke-width", 0.7);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, b) {
+        ctx.emit("click", binDatum(b));
+      });
+
+    /* Reference lines, annotation labels, and trend fits over the
+       hexes, clipped like every scatter trend layer. */
     var gOver = g.append("g").attr("pointer-events", "none");
     pv.drawAnnotations(ctx, gUnder, gOver, xScale, y, iw, ih);
     var clipId = "pv-trend-clip-" + Math.floor(Math.random() * 1e9);

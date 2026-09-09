@@ -13,7 +13,7 @@ and go from there."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,19 +92,23 @@ numbered list; the object itself is returned for programmatic use.</p>
 and cardinalities, whether keys repeat (which decides between a direct
 call and an <code><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate()</a></code> step, printed as part of the code), a <code>Date</code>
 or year column (lines; a calendar for daily dates; a slope chart when
-it holds exactly two moments per group), pairs of numeric columns
-(scatter, with <code>density = TRUE</code> past a few thousand rows; a dumbbell
-when exactly two share a scale with one row per category), many
-numeric columns (a pairs matrix), longitude/latitude pairs (a bubble
-map), id columns matching the bundled Swiss map layers (a
-choropleth), grouped numeric columns (boxplot, violin, or ridgeline,
-by group count), a signed measure whose losses are a real minority (a
-waterfall, offered as a guess), nested category columns (a sunburst,
-with the icicle named as its readable-label twin), and parts of a
-whole (a donut, with a waffle beside it as the precise-reading
-alternative). Every candidate is built once behind the scenes before
-it is offered, so a printed suggestion never errors on the data it
-was suggested for.</p>
+it holds exactly two moments per group; a horizon chart when a
+grouping holds more series than the palette has colours, the point
+where a line chart turns to spaghetti), pairs of numeric columns
+(scatter, with <code>density = TRUE</code> past a few thousand rows and the
+reason naming <code>density = "hex"</code> as the countable alternative; a
+dumbbell when exactly two share a scale with one row per category),
+many numeric columns (a pairs matrix), longitude/latitude pairs (a
+bubble map), id columns matching the bundled Swiss map layers (a
+choropleth), two place-name columns whose values are feature names on
+one bundled layer plus a non-negative measure (a flow map), grouped
+numeric columns (boxplot, violin, or ridgeline, by group count), a
+signed measure whose losses are a real minority (a waterfall, offered
+as a guess), nested category columns (a sunburst, with the icicle
+named as its readable-label twin), and parts of a whole (a donut,
+with a waffle beside it as the precise-reading alternative). Every
+candidate is built once behind the scenes before it is offered, so a
+printed suggestion never errors on the data it was suggested for.</p>
     </div>
 
     <div class="section level2">
@@ -131,20 +135,20 @@ was suggested for.</p>
 <span class="r-in"><span><span class="fu">pv_suggest</span><span class="op">(</span><span class="va">pv_sales</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;pv_suggestions&gt; pv_sales: 480 rows, 6 columns</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1) pv_line - a date and a numeric per region read naturally as lines (summed to one row per `date`/`region` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1) pv_horizon - 24 `month` series would tangle as spaghetti lines; the horizon folds each into its own compact shaded ribbon (summed to one row per `date`/`month` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_date_month &lt;- aggregate(units ~ date + month, pv_sales, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_horizon(by_date_month, x = "date", y = "units", series = "month")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2) pv_line - a date and a numeric per region read naturally as lines (summed to one row per `date`/`region` first)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    by_date_region &lt;- aggregate(units ~ date + region, pv_sales, sum)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    pv_line(by_date_region, x = "date", y = "units", series = "region")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2) pv_heatmap - one value per `product`/`region` pair reads as a colour grid - patterns across the whole matrix at once (summed to one row per `product`/`region` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3) pv_heatmap - one value per `product`/`region` pair reads as a colour grid - patterns across the whole matrix at once (summed to one row per `product`/`region` first)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    by_product_region &lt;- aggregate(units ~ product + region, pv_sales, sum)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    pv_heatmap(by_product_region, x = "product", y = "region", value = "units")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3) pv_scatter - two numeric columns invite a look at how `revenue` moves with `units`</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_scatter - two numeric columns invite a look at how `revenue` moves with `units`</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    pv_scatter(pv_sales, x = "units", y = "revenue")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_area - the `region` bands are non-negative, so stacking them also shows the total (summed to one row per `date`/`region` first)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    by_date_region &lt;- aggregate(units ~ date + region, pv_sales, sum)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_area(by_date_region, x = "date", y = "units", series = "region")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Municipality ids that match the bundled Lucerne map layer.</span></span></span>
@@ -182,6 +186,49 @@ was suggested for.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_histogram - the spread of `population` is worth a first look on its own</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    pv_histogram(census, x = "population")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># 26 cantons over 21 years - past the spaghetti threshold, so a</span></span></span>
+<span class="r-in"><span><span class="co"># horizon chart is offered where a line chart would drown.</span></span></span>
+<span class="r-in"><span><span class="fu">pv_suggest</span><span class="op">(</span><span class="va">pv_tourism</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;pv_suggestions&gt; pv_tourism: 6,006 rows, 6 columns</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1) pv_choropleth - the ids in `canton_id` are canton numbers, so `arrivals` can be painted by region (summed to one row per `canton_id` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_canton_id &lt;- aggregate(arrivals ~ canton_id, pv_tourism, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_choropleth(by_canton_id, map = "cantons", id = "canton_id", value = "arrivals")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2) pv_horizon - 26 `canton` series would tangle as spaghetti lines; the horizon folds each into its own compact shaded ribbon (summed to one row per `year`/`canton` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_year_canton &lt;- aggregate(arrivals ~ year + canton, pv_tourism, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_horizon(by_year_canton, x = "year", y = "arrivals", series = "canton")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3) pv_line - a year and a numeric per origin read naturally as lines (summed to one row per `year`/`origin` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_year_origin &lt;- aggregate(arrivals ~ year + origin, pv_tourism, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_line(by_year_origin, x = "year", y = "arrivals", series = "origin")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_heatmap - one value per `canton`/`origin` pair reads as a colour grid - patterns across the whole matrix at once (summed to one row per `canton`/`origin` first)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    by_canton_origin &lt;- aggregate(arrivals ~ canton + origin, pv_tourism, sum)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_heatmap(by_canton_origin, x = "canton", y = "origin", value = "arrivals")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Two columns of canton names and a count: origin-destination flows.</span></span></span>
+<span class="r-in"><span><span class="va">pendler</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  from <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Aargau"</span>, <span class="st">"Luzern"</span>, <span class="st">"Schwyz"</span>, <span class="st">"Zug"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  to <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Zug"</span>, <span class="st">"Zug"</span>, <span class="st">"Zug"</span>, <span class="st">"Luzern"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  commuters <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4905</span>, <span class="fl">11251</span>, <span class="fl">4576</span>, <span class="fl">4925</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">pv_suggest</span><span class="op">(</span><span class="va">pendler</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;pv_suggestions&gt; pendler: 4 rows, 3 columns</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1) pv_flow_map - `from` and `to` hold canton names, so each row draws as a curved band from origin to destination</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_flow_map(pendler, from = "from", to = "to", value = "commuters")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2) pv_heatmap - one value per `from`/`to` pair reads as a colour grid - patterns across the whole matrix at once</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_heatmap(pendler, x = "from", y = "to", value = "commuters")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3) pv_sunburst - every `from` belongs to exactly one `to`, so `commuters` nests as rings - pv_icicle draws the same tree with readable labels</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_sunburst(pendler, levels = c("to", "from"), value = "commuters")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4) pv_bar - one number per `from` compares cleanly as bars</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    pv_bar(pendler, x = "from", y = "commuters")</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 </code></pre></div>
     </div>

@@ -43,21 +43,30 @@ values keeps every pair distinguishable; more will error).}
 shows it (when a \code{color} mapping exists), \code{FALSE} hides it; \code{"auto"}
 (default) shows it exactly when a \code{color} mapping exists.}
 
-\item{density}{Draw the joint distribution as filled density contours
-instead of point marks? \code{FALSE} (default) or \code{TRUE}. When on, a 2D
-kernel density estimate over the points (d3.contourDensity) replaces
-the cloud with filled bands on the theme's sequential ramp, light
-where points are sparse to dark at the peak, with thin
-surface-coloured separators between bands — the readable treatment
-for clouds too dense to show structure point by point. The
-bandwidth and the number of bands are picked adaptively from the
-point count and the plot size, and the tooltip reports the band
-under the cursor as a share of the peak density. Contours have no
+\item{density}{Draw the joint distribution as an aggregate surface
+instead of point marks? \code{FALSE} (default) keeps the points.
+\code{"contours"} — or \code{TRUE}, its original spelling, which still works
+everywhere — replaces the cloud with a 2D kernel density estimate
+(d3.contourDensity): filled bands on the theme's sequential ramp,
+light where points are sparse to dark at the peak, with thin
+surface-coloured separators between bands. The bandwidth and the
+number of bands are picked adaptively from the point count and the
+plot size, and the tooltip reports the band under the cursor as a
+share of the peak density. \code{"hex"} bins the points into hexagons
+(d3.hexbin) filled on the same sequential ramp by how many points
+each holds, with thin surface-coloured borders between cells; its
+tooltip gives the exact count and the cell's centre. The hexagon
+radius adapts to the data and the panel: it targets about
+\eqn{2\sqrt[3]{n}}{2 * n^(1/3)} hexes across the plot's shorter
+side — more points earn finer bins — clamped between 8 and 32
+pixels so a small sample never coarsens into a handful of blobs
+and a huge cloud never dissolves into speckle. Both aggregate
+views have no
 per-point aesthetics, so \code{color}, \code{size}, and \code{label} are refused;
 the drag-to-select brush and \code{\link[=pv_link]{pv_link()}} dimming have no marks to
 act on either, so both quietly stay off. \code{\link[=pv_trend]{pv_trend()}} and
-\code{\link[=pv_annotate]{pv_annotate()}} layers still draw, over the contours. When \code{canvas}
-is also requested, density wins — the contours are already the
+\code{\link[=pv_annotate]{pv_annotate()}} layers still draw, over the surface. When \code{canvas}
+is also requested, density wins — the surface is already the
 aggregate view, so \code{canvas} is ignored.}
 
 \item{canvas}{Draw the point marks on a \verb{<canvas>} layer instead of as
@@ -70,8 +79,8 @@ point within a small radius), the drag-to-select brush and
 \code{\link[=pv_link]{pv_link()}} dimming behave as before, and the layer is
 device-pixel-ratio aware so it stays crisp on high-density screens.
 SVG exports embed the canvas layer as a raster image at the same
-position and size; PNG and PDF saves are unaffected. Ignored when
-\code{density = TRUE}.}
+position and size; PNG and PDF saves are unaffected. Ignored
+whenever \code{density} asks for an aggregate view.}
 
 \item{xlab, ylab}{Axis titles. \code{NULL} (default) uses the column names;
 \code{NA} or \code{""} suppresses the title entirely; any other string
@@ -95,9 +104,9 @@ An htmlwidget.
 \description{
 Scatter plot with per-point tooltips; optional colour (categorical) and
 size (numeric) encodings. For clouds too dense to read point by point,
-\code{density = TRUE} redraws the joint distribution as filled contours,
-and \code{canvas} moves the marks to a canvas layer so very large clouds
-stay responsive.
+\code{density} redraws the joint distribution as filled contours or as
+count-filled hexagonal bins, and \code{canvas} moves the marks to a canvas
+layer so very large clouds stay responsive.
 }
 \examples{
 pv_scatter(mtcars, x = "wt", y = "mpg", size = "hp")

@@ -1,7 +1,7 @@
 /*
  * Evolution and matrix renderers: the area chart family (stacked, percent,
- * stream), the categorical heatmap, and the calendar heatmap. See basic.js
- * for the ctx contract.
+ * stream), the categorical heatmap, the calendar heatmap, and the horizon
+ * chart. See basic.js for the ctx contract.
  */
 (function () {
 
@@ -780,6 +780,330 @@
           pv.hideTip(ctx);
         });
     });
+  };
+
+  /* ---------- horizon ---------- */
+
+  pvRenderers.horizon = function (ctx) {
+    /* Annotations and trends are skipped on horizons: every ribbon folds
+       its values into its own few pixels, so there is no shared y
+       position for a line or a fit to sit at. Textures are skipped too -
+       the fold is a value ramp, and a hatch has no series fill to
+       identify. */
+    var xtype = ctx.x.xtype;
+    var parse = xtype === "date" ? d3.timeParse("%Y-%m-%d") : null;
+    /* A single series arrives from R as a bare string, not an array. */
+    var seriesNames = [].concat(ctx.x.series);
+    var bands = ctx.x.bands;
+    var bw = ctx.x.bandWidth;
+    var mirror = ctx.x.mirror === true;
+    var n = seriesNames.length;
+
+    /* Pivot the long rows into one object per x position holding a value
+       for every series, exactly as the area chart does. A series with no
+       row at some x counts as zero - the family's rule. */
+    var xKeys = pv.uniq(ctx.x.data.map(function (d) { return d.x; }));
+    if (xtype !== "category") {
+      xKeys.sort(function (a, b) { return d3.ascending(a, b); });
+    }
+    var byKey = {};
+    var pivot = xKeys.map(function (k) {
+      var row = { key: k, x: xtype === "date" ? parse(k) : k };
+      seriesNames.forEach(function (nm) { row[nm] = 0; });
+      byKey[String(k)] = row;
+      return row;
+    });
+    var hasNeg = false;
+    ctx.x.data.forEach(function (d) {
+      if (d.y != null) {
+        byKey[String(d.x)][d.series] = +d.y;
+        if (+d.y < 0) hasNeg = true;
+      }
+    });
+    /* R refuses negatives when mirror is off, so negOn is simply
+       "negative ink will be drawn". */
+    var negOn = mirror && hasNeg;
+
+    /* The band inks. Positive slices climb the theme's sequential ramp,
+       the deepest band landing on the ramp's end so the tallest peaks
+       carry the most ink. Mirrored negatives wear the diverging scale's
+       other pole - the packaged sequential shares the diverging low
+       pole's blue, so the high pole is the one a reader can tell apart -
+       deepening from the surface toward it, the way the sequential's own
+       low end recedes toward the surface. */
+    var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
+    var posInk = d3.range(bands).map(function (i) {
+      return ramp((i + 1) / bands);
+    });
+    var negRamp = d3.interpolateRgb(ctx.theme.ink.surface,
+      ctx.theme.diverging.high);
+    var negInk = d3.range(bands).map(function (i) {
+      return negRamp((i + 1) / bands);
+    });
+
+    /* The horizon's legend is its band scale: chips of the actual band
+       inks, and a sentence saying what one shade is worth - without it
+       the fold is a mystery. Mirrored charts show both polarities. */
+    var legFmt = function (v) {
+      return Math.abs(v) >= 10000 ?
+        d3.format(".3~s")(v) : d3.format(",.2~f")(v);
+    };
+    function chipRow(colors) {
+      var span = document.createElement("span");
+      span.style.cssText = "display:inline-flex;gap:2px;";
+      colors.forEach(function (c) {
+        var chip = document.createElement("span");
+        chip.style.cssText =
+          "width:9px;height:9px;border-radius:2px;background:" + c + ";";
+        span.appendChild(chip);
+      });
+      return span;
+    }
+    function legendText(t) {
+      var s = document.createElement("span");
+      s.textContent = t;
+      return s;
+    }
+    var scaleRow = document.createElement("div");
+    scaleRow.style.cssText =
+      "display:flex;align-items:center;flex-wrap:wrap;gap:4px 7px;" +
+      "margin-top:7px;font-size:11px;font-variant-numeric:tabular-nums;" +
+      "color:" + ctx.theme.ink.muted + ";";
+    if (negOn) {
+      /* Deepest negative on the left through deepest positive on the
+         right, so the chips read like the diverging scale they are. */
+      scaleRow.appendChild(chipRow(negInk.slice().reverse()));
+      scaleRow.appendChild(legendText("below 0"));
+      scaleRow.appendChild(chipRow(posInk));
+      scaleRow.appendChild(legendText("above 0"));
+      scaleRow.appendChild(legendText("·"));
+    } else {
+      scaleRow.appendChild(chipRow(posInk));
+    }
+    scaleRow.appendChild(legendText("each shade = one band of " +
+      legFmt(bw) + (ctx.x.vlab ? " " + ctx.x.vlab : "")));
+    ctx.header.appendChild(scaleRow);
+    ctx.height = Math.max(120, ctx.height - scaleRow.offsetHeight - 7);
+
+    /* Series labels sit in a left margin like the ridgeline's: at most
+       30% of the width, truncated to what really fits; a truncated name
+       shows in full when the label itself is hovered. */
+    var longest = d3.max(seriesNames, function (nm) {
+      return pv.textWidth(nm, 11); }) || 30;
+    var labelW = Math.max(24, Math.min(longest, 146,
+      Math.floor(ctx.width * 0.30) - 12));
+    var maxChars = Math.max(2, Math.floor(labelW / pv.textWidth("M", 11)));
+    var m = { top: 4, right: 16, bottom: ctx.x.xlab ? 48 : 32,
+              left: 12 + labelW };
+    var iw = Math.max(40, ctx.width - m.left - m.right),
+        ih = Math.max(40, ctx.height - m.top - m.bottom);
+
+    /* Ribbons adapt to count and container between an 8px emergency
+       floor (R already refused anything under ~12px at build time, but
+       a viewer pane can shrink after that) and a 40px cap - fatter rows
+       stop reading as a horizon. A short stack centres in the leftover
+       height, like the calendar; the axis and its title travel with
+       the block. */
+    var rowH = Math.max(8, Math.min(40, ih / n));
+    var gridH = rowH * n;
+    var offY = m.top + Math.max(0, (ih - gridH) / 2);
+
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + offY + ")");
+
+    /* No nice() on the x domain: the ribbons should fill the plot edge
+       to edge, like the area chart. */
+    var xScale;
+    if (xtype === "category") {
+      xScale = d3.scalePoint().domain(xKeys).range([0, iw]);
+    } else if (xtype === "date") {
+      xScale = d3.scaleTime()
+        .domain(d3.extent(pivot, function (d) { return d.x; }))
+        .range([0, iw]);
+    } else {
+      xScale = d3.scaleLinear()
+        .domain(d3.extent(pivot, function (d) { return d.x; }))
+        .range([0, iw]);
+    }
+
+    /* The one shared x axis, at the bottom only - the same tick rules
+       as the area chart. */
+    var xAxis = d3.axisBottom(xScale).tickSizeOuter(0);
+    if (xtype === "category") {
+      var maxTicks = Math.max(2, Math.floor(iw / 80));
+      var tstep = Math.ceil(xKeys.length / maxTicks);
+      xAxis.tickValues(xKeys.filter(function (d, i) {
+        return i % tstep === 0;
+      }));
+    } else {
+      xAxis.ticks(Math.min(8, Math.floor(iw / 80)));
+      if (xtype === "number") {
+        xAxis.tickFormat(function (v) {
+          return Math.abs(v) >= 10000 ?
+            d3.format("~s")(v) : d3.format("~f")(v);
+        });
+      }
+    }
+    g.append("g").attr("transform", "translate(0," + gridH + ")")
+      .call(xAxis).call(function (s) { pv.styleAxis(s, ctx.theme, true); });
+    /* The axis title sits right under its axis, not at the widget's
+       bottom edge - a centred short stack takes the title with it. */
+    if (ctx.x.xlab) {
+      svg.append("text")
+        .attr("x", m.left + iw / 2)
+        .attr("y", Math.min(ctx.height - 6, offY + gridH + 38))
+        .attr("text-anchor", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", "12px")
+        .text(ctx.x.xlab);
+    }
+
+    /* One clip per ribbon keeps every folded layer inside its own row.
+       Ids carry a random base so two horizons on one page can never
+       capture each other's clips. */
+    var clipBase = "pv-horizon-" + Math.floor(Math.random() * 1e9);
+    var defs = svg.append("defs");
+
+    /* The fold itself: band i of a polarity is the slice of the value
+       between i and i+1 band widths, stretched to the full ribbon
+       height. Layers are drawn in band order, so the deepest ink lands
+       on top. */
+    function bandArea(nm, sign, i) {
+      return d3.area()
+        .x(function (p) { return xScale(p.x); })
+        .y0(rowH)
+        .y1(function (p) {
+          var slice = Math.max(0, Math.min(bw, sign * p[nm] - i * bw));
+          return rowH - (slice / bw) * rowH;
+        })
+        .curve(d3.curveMonotoneX);
+    }
+
+    var labelPx = rowH < 14 ? 9.5 : 11;
+    seriesNames.forEach(function (nm, r) {
+      defs.append("clipPath").attr("id", clipBase + "-" + r)
+        .append("rect").attr("width", iw).attr("height", rowH);
+      var rowG = g.append("g")
+        .attr("transform", "translate(0," + (r * rowH) + ")");
+      var layerG = rowG.append("g")
+        .attr("clip-path", "url(#" + clipBase + "-" + r + ")");
+
+      /* Layers a series never reaches would be empty paths; skip them. */
+      var posMax = d3.max(pivot, function (p) { return p[nm]; });
+      var negMax = -d3.min(pivot, function (p) { return p[nm]; });
+      for (var i = 0; i < bands; i++) {
+        if (posMax > i * bw) {
+          layerG.append("path").datum(pivot)
+            .attr("fill", posInk[i])
+            .attr("d", bandArea(nm, 1, i));
+        }
+        if (negOn && negMax > i * bw) {
+          layerG.append("path").datum(pivot)
+            .attr("fill", negInk[i])
+            .attr("d", bandArea(nm, -1, i));
+        }
+      }
+
+      /* A hairline separator above every row but the first - drawn
+         after the layers, so a full band never swallows it. */
+      if (r > 0) {
+        rowG.append("line")
+          .attr("x1", 0).attr("x2", iw)
+          .attr("stroke", ctx.theme.ink.grid);
+      }
+
+      /* The series name, left of its ribbon. Truncated names show in
+         full when hovered - same contract as every truncating label. */
+      var shown = pv.truncate(nm, maxChars);
+      var lab = rowG.append("text")
+        .attr("x", -10).attr("y", rowH / 2)
+        .attr("text-anchor", "end")
+        .attr("dominant-baseline", "middle")
+        .attr("fill", ctx.theme.ink.secondary)
+        .style("font-size", labelPx + "px")
+        .text(shown);
+      if (shown !== nm) {
+        lab.on("pointerenter pointermove", function (event) {
+            pv.showTip(ctx, event, "<b>" + pv.esc(nm) + "</b>");
+          })
+          .on("pointerleave", function () { pv.hideTip(ctx); });
+      }
+
+      /* Ribbons fade in top to bottom. With duration 0 they are simply
+         drawn - no transition is even scheduled, so the final state
+         exists synchronously. */
+      if (ctx.duration > 0) {
+        rowG.attr("opacity", 0)
+          .transition().duration(ctx.duration)
+          .delay(Math.min(r * 40, 400))
+          .ease(d3.easeCubicOut)
+          .attr("opacity", 1);
+      }
+    });
+
+    /* The crosshair: an invisible rectangle covers all the ribbons,
+       finds the nearest x position under the pointer, drops a vertical
+       line through every row, and reads all series' true values out of
+       one tooltip - the payoff of the form. The row under the pointer
+       gets its name emphasised. */
+    var cross = g.append("line")
+      .attr("y1", 0).attr("y2", gridH)
+      .attr("stroke", ctx.theme.ink.baseline)
+      .attr("stroke-dasharray", "3,3").attr("opacity", 0);
+    var xPos = pivot.map(function (row) { return xScale(row.x); });
+    function nearestIdx(px) {
+      var idx = -1, best = Infinity;
+      xPos.forEach(function (xp, i) {
+        var dd = Math.abs(xp - px);
+        if (dd < best) { best = dd; idx = i; }
+      });
+      return idx;
+    }
+    function rowUnder(py) {
+      return Math.max(0, Math.min(n - 1, Math.floor(py / rowH)));
+    }
+
+    g.append("rect")
+      .attr("class", "pv-hover")
+      .attr("width", iw).attr("height", gridH)
+      .attr("fill", "transparent")
+      .on("pointermove", function (event) {
+        var p = d3.pointer(event, this);
+        var idx = nearestIdx(p[0]);
+        if (idx < 0) return;
+        cross.attr("x1", xPos[idx]).attr("x2", xPos[idx]).attr("opacity", 1);
+        var hovered = rowUnder(p[1]);
+        var row = pivot[idx];
+        var xLabel = xtype === "date" ?
+          d3.timeFormat("%b %e, %Y")(row.x) : row.key;
+        var tipRows = seriesNames.map(function (s, ri) {
+          var name = ri === hovered ?
+            "<b>" + pv.esc(s) + "</b>" : pv.esc(s);
+          return name + ": <b>" + ctx.fmt(row[s]) + "</b>";
+        });
+        /* Many rows read better as two tight columns than as one long
+           drop past the chart's bottom edge. */
+        var body = '<div style="line-height:1.4;' +
+          (n > 12 ? "column-count:2;column-gap:14px;" : "") + '">' +
+          tipRows.join("<br>") + "</div>";
+        pv.showTip(ctx, event,
+          "<b>" + pv.esc(xLabel) + "</b>" + body);
+      })
+      .on("pointerleave", function () {
+        cross.attr("opacity", 0);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event) {
+        /* A click reports the x position under the pointer, the row the
+           pointer is in, and that series' true value there. */
+        var p = d3.pointer(event, this);
+        var idx = nearestIdx(p[0]);
+        if (idx < 0) return;
+        var s = seriesNames[rowUnder(p[1])];
+        ctx.emit("click",
+          { x: pivot[idx].key, series: s, y: pivot[idx][s] });
+      });
   };
 
 })();

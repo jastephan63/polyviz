@@ -509,4 +509,235 @@
     }
   };
 
+  /* ---------- flow map ---------- */
+
+  /* A point and the tangent of the quadratic bezier p1 -> c -> p2 at t,
+     for sampling the flow bands below. */
+  function qPoint(p1, c, p2, t) {
+    var u = 1 - t;
+    return [
+      u * u * p1[0] + 2 * u * t * c[0] + t * t * p2[0],
+      u * u * p1[1] + 2 * u * t * c[1] + t * t * p2[1]
+    ];
+  }
+  function qTangent(p1, c, p2, t) {
+    return [
+      2 * (1 - t) * (c[0] - p1[0]) + 2 * t * (p2[0] - c[0]),
+      2 * (1 - t) * (c[1] - p1[1]) + 2 * t * (p2[1] - c[1])
+    ];
+  }
+
+  /* The control point bowing a flow's arc: the chord midpoint pushed to
+     the right of the travel direction. Every arc bows to the same side
+     of its own direction (clockwise on screen), so a pair of opposite
+     flows parts to the two sides of their shared chord instead of
+     overprinting - the offset is the direction itself. */
+  function flowControl(p1, p2) {
+    var dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var bow = 0.16 * len;
+    return [(p1[0] + p2[0]) / 2 - dy / len * bow,
+            (p1[1] + p2[1]) / 2 + dx / len * bow];
+  }
+
+  /* The filled band around a flow's centerline: the curve sampled into
+     short segments, each pushed apart by half the local width. The width
+     tapers from full at the origin to a narrow nose at the destination -
+     the thin end points the way, quieter than an arrowhead. */
+  function flowBand(p1, c, p2, w) {
+    var S = 28, left = [], right = [];
+    for (var i = 0; i <= S; i++) {
+      var t = i / S;
+      var pt = qPoint(p1, c, p2, t);
+      var tg = qTangent(p1, c, p2, t);
+      var len = Math.sqrt(tg[0] * tg[0] + tg[1] * tg[1]) || 1;
+      var nx = -tg[1] / len, ny = tg[0] / len;
+      var h = (w / 2) * (1 - 0.8 * t);
+      left.push((pt[0] + nx * h) + "," + (pt[1] + ny * h));
+      right.push((pt[0] - nx * h) + "," + (pt[1] - ny * h));
+    }
+    return "M" + left.join("L") + "L" + right.reverse().join("L") + "Z";
+  }
+
+  pvRenderers.flowmap = function (ctx) {
+    var geo = rewind(ctx.x.map);
+    var flows = ctx.x.data;
+    var places = ctx.x.places || [];
+
+    /* No axes - the margins are breathing room, as on the map siblings. */
+    var m = { top: 8, right: 16, bottom: 10, left: 16 };
+    var iw = Math.max(50, ctx.width - m.left - m.right),
+        ih = Math.max(80, ctx.height - m.top - m.bottom);
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var projection = d3.geoMercator().fitSize([iw, ih], geo);
+    var path = d3.geoPath(projection);
+
+    /* The base map is context, not data - the bubble map's quiet
+       treatment: neutral fills, hairline borders, lakes over them, no
+       pointer events anywhere. */
+    g.append("g").attr("pointer-events", "none")
+      .selectAll("path.region").data(geo.features).enter()
+      .append("path")
+      .attr("class", "region")
+      .attr("d", path)
+      .attr("fill", ctx.theme.ink.grid)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 1)
+      .attr("stroke-linejoin", "round");
+    drawLakes(ctx, svg, g, path, iw, ih);
+
+    /* Each place's pixel position, keyed by name, shared by the bands,
+       the dots, and the labels. */
+    var pos = {};
+    places.forEach(function (p) {
+      var xy = projection([p.lon, p.lat]);
+      pos[p.place] = { x: xy[0], y: xy[1] };
+    });
+
+    /* Band width follows sqrt(value) - the same honesty as circle
+       areas - clamped so the fattest flow stays a band rather than a
+       wedge, and the thinnest stays visible. */
+    var vmax = d3.max(flows, function (d) { return d.value; }) || 1;
+    var wMax = Math.max(6, Math.min(14, 0.03 * Math.min(iw, ih)));
+    var wSc = d3.scaleSqrt().domain([0, vmax]).range([0, wMax]);
+    function widthOf(v) { return Math.max(1.5, wSc(v)); }
+
+    /* Crowded maps stack translucent bands - lighten every fill as the
+       count grows so crossings keep reading, never below 0.3. */
+    var n = flows.length;
+    var flowOp = n <= 12 ? 0.62 : Math.max(0.3, 0.62 * Math.sqrt(12 / n));
+    var accent = ctx.theme.palette[0];
+
+    /* Big flows first, so smaller ones paint on top and their hover
+       twins are reachable. */
+    var fl = flows.slice().sort(function (a, b) {
+      return b.value - a.value;
+    });
+
+    var flowSel = g.append("g")
+      .selectAll("g.flow").data(fl).enter()
+      .append("g").attr("class", "flow");
+
+    var bands = flowSel.append("path")
+      .attr("class", "band")
+      .attr("pointer-events", "none")
+      .attr("d", function (d) {
+        var a = pos[d.from], b = pos[d.to];
+        var p1 = [a.x, a.y], p2 = [b.x, b.y];
+        return flowBand(p1, flowControl(p1, p2), p2, widthOf(d.value));
+      })
+      .attr("fill", accent)
+      .attr("fill-opacity", flowOp)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 0.75)
+      .attr("stroke-linejoin", "round");
+
+    /* A thin band is a mean hover target, so each flow also carries an
+       invisible fat twin along its centerline - the comparison charts'
+       trick. Hovering lights that one flow and dims the rest. */
+    flowSel.append("path")
+      .attr("class", "hover")
+      .attr("d", function (d) {
+        var a = pos[d.from], b = pos[d.to];
+        var c = flowControl([a.x, a.y], [b.x, b.y]);
+        return "M" + a.x + "," + a.y + "Q" + c[0] + "," + c[1] +
+          " " + b.x + "," + b.y;
+      })
+      .attr("fill", "none")
+      .attr("stroke", "transparent")
+      .attr("stroke-width", function (d) {
+        return Math.max(14, widthOf(d.value) + 8);
+      })
+      .style("cursor", "pointer")
+      .on("pointerenter pointermove", function (event, d) {
+        d3.select(this.parentNode).raise();
+        bands.attr("fill-opacity", function (e) {
+          return e === d ? Math.min(1, flowOp + 0.35) : 0.08;
+        });
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", { from: d.from, to: d.to, value: d.value });
+        }
+        pv.showTip(ctx, event,
+          "<b>" + pv.esc(d.from) + " → " + pv.esc(d.to) + "</b><br>" +
+          pv.esc(ctx.x.vlab || "value") + ": <b>" + ctx.fmt(d.value) +
+          "</b>");
+      })
+      .on("pointerleave", function () {
+        bands.attr("fill-opacity", flowOp);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", { from: d.from, to: d.to, value: d.value });
+      });
+
+    /* Endpoint dots, sized by total throughput (in plus out), wearing
+       the usual 2px surface ring. They sit above the bands but take no
+       pointer events - the hovers belong to the flows converging on
+       them. */
+    var tmax = d3.max(places, function (p) { return p.total; }) || 1;
+    var rMax = Math.max(4, Math.min(9, 0.02 * Math.min(iw, ih)));
+    var rSc = d3.scaleSqrt().domain([0, tmax]).range([0, rMax]);
+    function rOf(p) { return Math.max(2.5, rSc(p.total)); }
+
+    var dots = g.append("g").attr("pointer-events", "none")
+      .selectAll("circle.place").data(places).enter()
+      .append("circle")
+      .attr("class", "place")
+      .attr("cx", function (p) { return pos[p.place].x; })
+      .attr("cy", function (p) { return pos[p.place].y; })
+      .attr("r", rOf)
+      .attr("fill", accent)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 2);
+
+    /* Direct labels beside the dots for the places the R side flagged.
+       A surface-coloured halo keeps them readable over bands and
+       borders, and labels near the right edge flip to the other side of
+       their dot. */
+    var labels = g.append("g").attr("pointer-events", "none")
+      .selectAll("text.place").data(places.filter(function (p) {
+        return p.labelled;
+      })).enter()
+      .append("text")
+      .attr("class", "place")
+      .attr("x", function (p) {
+        var flip = pos[p.place].x > iw - 80;
+        return pos[p.place].x + (flip ? -1 : 1) * (rOf(p) + 5);
+      })
+      .attr("y", function (p) { return pos[p.place].y; })
+      .attr("text-anchor", function (p) {
+        return pos[p.place].x > iw - 80 ? "end" : "start";
+      })
+      .attr("dominant-baseline", "middle")
+      .attr("fill", ctx.theme.ink.secondary)
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 3)
+      .attr("paint-order", "stroke")
+      .attr("stroke-linejoin", "round")
+      .style("font-size", "11px")
+      .text(function (p) { return p.place; });
+
+    /* Entrance: bands fade in biggest first, dots grow, labels follow -
+       skipped entirely at duration 0, where the final state must exist
+       synchronously. */
+    if (ctx.duration > 0) {
+      var fade = Math.min(300, ctx.duration);
+      bands.attr("opacity", 0)
+        .transition().duration(fade)
+        .delay(function (d, i) { return Math.min(i * 25, 250); })
+        .ease(d3.easeCubicOut)
+        .attr("opacity", 1);
+      dots.attr("r", 0)
+        .transition().duration(Math.min(300, ctx.duration))
+        .ease(d3.easeCubicOut)
+        .attr("r", rOf);
+      labels.attr("opacity", 0)
+        .transition().delay(fade / 2).duration(fade)
+        .attr("opacity", 1);
+    }
+  };
+
 })();

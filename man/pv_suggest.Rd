@@ -31,19 +31,23 @@ The suggestions come from what is actually in the data: column types
 and cardinalities, whether keys repeat (which decides between a direct
 call and an \code{aggregate()} step, printed as part of the code), a \code{Date}
 or year column (lines; a calendar for daily dates; a slope chart when
-it holds exactly two moments per group), pairs of numeric columns
-(scatter, with \code{density = TRUE} past a few thousand rows; a dumbbell
-when exactly two share a scale with one row per category), many
-numeric columns (a pairs matrix), longitude/latitude pairs (a bubble
-map), id columns matching the bundled Swiss map layers (a
-choropleth), grouped numeric columns (boxplot, violin, or ridgeline,
-by group count), a signed measure whose losses are a real minority (a
-waterfall, offered as a guess), nested category columns (a sunburst,
-with the icicle named as its readable-label twin), and parts of a
-whole (a donut, with a waffle beside it as the precise-reading
-alternative). Every candidate is built once behind the scenes before
-it is offered, so a printed suggestion never errors on the data it
-was suggested for.
+it holds exactly two moments per group; a horizon chart when a
+grouping holds more series than the palette has colours, the point
+where a line chart turns to spaghetti), pairs of numeric columns
+(scatter, with \code{density = TRUE} past a few thousand rows and the
+reason naming \code{density = "hex"} as the countable alternative; a
+dumbbell when exactly two share a scale with one row per category),
+many numeric columns (a pairs matrix), longitude/latitude pairs (a
+bubble map), id columns matching the bundled Swiss map layers (a
+choropleth), two place-name columns whose values are feature names on
+one bundled layer plus a non-negative measure (a flow map), grouped
+numeric columns (boxplot, violin, or ridgeline, by group count), a
+signed measure whose losses are a real minority (a waterfall, offered
+as a guess), nested category columns (a sunburst, with the icicle
+named as its readable-label twin), and parts of a whole (a donut,
+with a waffle beside it as the precise-reading alternative). Every
+candidate is built once behind the scenes before it is offered, so a
+printed suggestion never errors on the data it was suggested for.
 }
 \examples{
 # Daily weather readings: a calendar and a line top the list.
@@ -60,4 +64,15 @@ pv_suggest(fiscal25)
 # Exactly two census years per city: the slope chart's home ground.
 census <- subset(pv_city_population, year \%in\% c(1930, 2024))
 pv_suggest(census)
+
+# 26 cantons over 21 years - past the spaghetti threshold, so a
+# horizon chart is offered where a line chart would drown.
+pv_suggest(pv_tourism)
+
+# Two columns of canton names and a count: origin-destination flows.
+pendler <- data.frame(
+  from = c("Aargau", "Luzern", "Schwyz", "Zug"),
+  to = c("Zug", "Zug", "Zug", "Luzern"),
+  commuters = c(4905, 11251, 4576, 4925))
+pv_suggest(pendler)
 }

@@ -1,3 +1,30 @@
+# polyviz 1.3.0
+
+The composition release: the charts learn to work together, and the
+package learns time series.
+
+* `pv_board()` — several charts composed into one page from plain R:
+  a responsive grid on the theme's tokens, one title block, panel
+  captions from names, light/dark like everything else. Works in the
+  viewer, R Markdown, and Quarto; crosstalk-linked panels keep their
+  linking; `pv_save()` writes boards as self-contained HTML, PNG, or
+  vector PDF.
+* `pv_decompose()` — one regular time series split into observed,
+  trend, seasonal, and remainder as four aligned panels (STL or
+  classical, frequency inferred from dates), riding the existing
+  facet machinery.
+* `pv_forecast()` — a forecast layer for single-series lines in the
+  `pv_trend()` mould: Holt-Winters, a small ARIMA search, or the
+  honest naive baseline, drawn as nested interval fans with a dashed
+  continuation — dashes finally meaning "projection", as reserved.
+* `pv_changepoints()` — sustained level shifts found by binary
+  segmentation with a BIC stopping rule (implemented from first
+  principles, limits documented), marked through the annotation
+  system; optional per-stretch mean lines.
+
+All statistics compute in base R — no new dependencies. Every method
+states what it is and what it is not, on the chart and in the docs.
+
 # polyviz 1.2.0
 
 Time and density: two new chart types (36 in all), a third way to see

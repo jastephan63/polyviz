@@ -18,7 +18,8 @@ pv_save(
 )
 }
 \arguments{
-\item{widget}{A polyviz chart, as returned by \code{\link[=pv_bar]{pv_bar()}} and friends.}
+\item{widget}{A polyviz chart, as returned by \code{\link[=pv_bar]{pv_bar()}} and friends,
+or a chart board from \code{\link[=pv_board]{pv_board()}}.}
 
 \item{file}{Output path; the extension (\code{.png}, \code{.svg}, \code{.pdf}, \code{.gif},
 or \code{.html}) picks the format.}
@@ -90,6 +91,13 @@ a paper or a deck — asking for one is an error pointing at \code{.png}.
 script, stylesheet, and font inlined). This format needs neither
 Chrome nor pandoc, and it keeps the entrance animation.
 }
+
+A chart board built with \code{\link[=pv_board]{pv_board()}} saves the same way, as \code{.html}
+(one self-contained file, linking and all), \code{.png}, or \code{.pdf} — there
+the size arguments apply to the whole page, and \code{height = NULL}
+captures the page at the natural height the board renders to at that
+width. A board has no single vector drawing to serialise and no
+animation timeline, so \code{.svg} and \code{.gif} are refused with a message.
 }
 \examples{
 \dontshow{if (interactive()) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}

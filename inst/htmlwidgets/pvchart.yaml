@@ -36,3 +36,4 @@ dependencies:
       - facet.js
       - table.js
       - pairs.js
+      - comparison.js

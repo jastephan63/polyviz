@@ -16,10 +16,10 @@ test_that("every chart type has a render check", {
     "histogram", "boxplot", "violin", "ridgeline",
     "donut", "waffle", "treemap", "icicle", "lollipop",
     "slope", "dumbbell", "waterfall", "bullet",
-    "area", "heatmap", "calendar",
+    "area", "heatmap", "calendar", "horizon",
     "sankey", "parallel",
     "pack", "dendrogram",
-    "choropleth", "bubblemap", "race", "bump", "beeswarm",
+    "choropleth", "bubblemap", "flowmap", "race", "bump", "beeswarm",
     "pairs", "table"))
   for (id in names(render_charts)) {
     w <- render_charts[[id]]()
@@ -120,6 +120,10 @@ test_that("calendar renders without JavaScript errors", {
   expect_chart_renders("calendar")
 })
 
+test_that("horizon renders without JavaScript errors", {
+  expect_chart_renders("horizon")
+})
+
 test_that("sankey renders without JavaScript errors", {
   expect_chart_renders("sankey")
 })
@@ -142,6 +146,10 @@ test_that("choropleth renders without JavaScript errors", {
 
 test_that("bubblemap renders without JavaScript errors", {
   expect_chart_renders("bubblemap")
+})
+
+test_that("flowmap renders without JavaScript errors", {
+  expect_chart_renders("flowmap")
 })
 
 test_that("race renders without JavaScript errors", {
@@ -167,14 +175,15 @@ test_that("table renders without JavaScript errors", {
 # The opt-in chart options ship extra drawing code the canonical charts
 # above never reach - stacked layouts, marker dots, curve interpolation,
 # the zoom strip, violin overlays, texture patterns, locale formatting,
-# the scatter's density contours and its canvas mark layer. One variant
-# per option keeps those paths under the same render contract.
+# the scatter's density contours, its hexagon bins, and its canvas mark
+# layer. One variant per option keeps those paths under the same render
+# contract.
 
 test_that("every option variant builds its base chart type", {
   expect_setequal(names(render_variants), c(
     "bar_stacked", "bar_percent", "bar_textured", "bar_locale",
     "violin_overlays", "line_markers", "line_zoom",
-    "scatter_density", "scatter_canvas",
+    "scatter_density", "scatter_canvas", "scatter_hex",
     "choropleth_cantons"))
   for (id in names(render_variants)) {
     w <- render_variants[[id]]()
@@ -217,6 +226,10 @@ test_that("scatter density contours render without JavaScript errors", {
 
 test_that("scatter canvas marks render without JavaScript errors", {
   expect_chart_renders("scatter_canvas")
+})
+
+test_that("scatter hexagon bins render without JavaScript errors", {
+  expect_chart_renders("scatter_hex")
 })
 
 # The country-wide geo paths: the cantons layer with its lakes overlay

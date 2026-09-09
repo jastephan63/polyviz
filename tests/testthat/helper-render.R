@@ -168,6 +168,11 @@ render_charts <- list(
     pv_calendar(pv_weather, date = "date", value = "temp_max",
                 years = 2024:2025, title = "Two summers of daily maximums")
   },
+  horizon = function() {
+    nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+    pv_horizon(nights, x = "year", y = "nights", series = "canton",
+               title = "Where Switzerland's guests sleep")
+  },
   sankey = function() {
     e <- pv_elections[pv_elections$year == 2024, ]
     outcome <- ifelse(e$elected, "elected", "not elected")
@@ -215,6 +220,17 @@ render_charts <- list(
                     by = "city")
     pv_bubble_map(cities, lon = "lon", lat = "lat", size = "population",
                   label = "city", title = "Where urban Switzerland lives")
+  },
+  flowmap = function() {
+    latest <- pv_commuters[pv_commuters$period ==
+                             max(pv_commuters$period) &
+                             pv_commuters$region != "Restliche Schweiz", ]
+    flows <- data.frame(
+      from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+      to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+      commuters = latest$commuters)
+    pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                title = "Commuter exchange with Canton Zug")
   },
   race = function() {
     pv_race(pv_city_population, time = "year", id = "city",
@@ -314,10 +330,11 @@ render_variants <- list(
     pv_line(pv_weather, x = "date", y = "temp_mean", zoom = TRUE,
             title = "Six years of daily means")
   },
-  # The scatter's two big-cloud treatments. Contours replace the marks
+  # The scatter's three big-cloud treatments. Contours replace the marks
   # with the d3-contour density pipeline; canvas = TRUE forces the
   # canvas mark layer on, so that drawing path runs regardless of the
-  # 8,000-point threshold "auto" would apply.
+  # 8,000-point threshold "auto" would apply; density = "hex" runs the
+  # d3-hexbin counting path.
   scatter_density = function() {
     pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
                density = TRUE, title = "Six years of days, as contours")
@@ -325,6 +342,10 @@ render_variants <- list(
   scatter_canvas = function() {
     pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
                canvas = TRUE, title = "Six years of days, on canvas")
+  },
+  scatter_hex = function() {
+    pv_scatter(pv_weather, x = "temp_min", y = "temp_max",
+               density = "hex", title = "Six years of days, in hexagons")
   },
   # The two country-wide geo paths, on bundled layers only - the
   # municipality layer would need a network fetch, which tests never do.

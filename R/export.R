@@ -129,13 +129,11 @@ export_dep_files <- function(entry) {
   }, character(1))
 }
 
-# Builds the one-file HTML page: the widget's rendered tags plus every
-# dependency (d3, the renderers, the font css) inlined into the head, in
-# the same order a saveWidget() page would load them from disk.
-export_standalone_html <- function(widget, mode, embed_fonts) {
-  tags <- htmltools::as.tags(widget, standalone = TRUE)
-  rendered <- htmltools::renderTags(tags)
-  deps <- htmltools::resolveDependencies(rendered$dependencies)
+# Inlines a list of resolved htmltools dependencies as <style> and
+# <script> elements (plus any literal head lines), in the same order a
+# saveWidget() page would load them from disk. Shared by the widget and
+# board standalone-HTML paths.
+export_inline_dependencies <- function(deps, embed_fonts) {
   parts <- character()
   for (dep in deps) {
     root <- if (is.null(dep$package)) {
@@ -166,23 +164,26 @@ export_standalone_html <- function(widget, mode, embed_fonts) {
       parts <- c(parts, as.character(dep$head))
     }
   }
-  # The page background matches the chart surface, so nothing flashes and
-  # the margins around the widget blend in. "auto" keeps both surfaces
-  # live through a media query, the way the widget itself behaves.
-  ink <- widget$x$theme$ink
+  parts
+}
+
+# The page background matches the chart surface, so nothing flashes and
+# the margins around the content blend in. "auto" keeps both surfaces
+# live through a media query, the way the widgets themselves behave.
+export_body_css <- function(ink, mode) {
   light_bg <- ink$light$surface %||% "#ffffff"
   dark_bg <- ink$dark$surface %||% "#1b1a18"
-  body_css <- switch(mode,
+  switch(mode,
     light = paste0("body{margin:0;background-color:", light_bg, ";}"),
     dark = paste0("body{margin:0;background-color:", dark_bg, ";}"),
     paste0("body{margin:0;background-color:", light_bg, ";}",
            "@media (prefers-color-scheme: dark){body{background-color:",
            dark_bg, ";}}"))
-  title <- widget$x$title
-  if (!is.character(title) || length(title) != 1 || is.na(title) ||
-      !nzchar(title)) {
-    title <- "polyviz chart"
-  }
+}
+
+# The standalone document shell around rendered tags and inlined
+# dependencies - one shape for charts and boards alike.
+export_standalone_page <- function(rendered, parts, body_css, title) {
   paste0(
     "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n",
     "<meta charset=\"utf-8\"/>\n",
@@ -195,6 +196,23 @@ export_standalone_html <- function(widget, mode, embed_fonts) {
     "</head>\n<body>\n",
     paste(as.character(rendered$html), collapse = "\n"),
     "\n</body>\n</html>\n")
+}
+
+# Builds the one-file HTML page: the widget's rendered tags plus every
+# dependency (d3, the renderers, the font css) inlined into the head, in
+# the same order a saveWidget() page would load them from disk.
+export_standalone_html <- function(widget, mode, embed_fonts) {
+  tags <- htmltools::as.tags(widget, standalone = TRUE)
+  rendered <- htmltools::renderTags(tags)
+  deps <- htmltools::resolveDependencies(rendered$dependencies)
+  parts <- export_inline_dependencies(deps, embed_fonts)
+  body_css <- export_body_css(widget$x$theme$ink, mode)
+  title <- widget$x$title
+  if (!is.character(title) || length(title) != 1 || is.na(title) ||
+      !nzchar(title)) {
+    title <- "polyviz chart"
+  }
+  export_standalone_page(rendered, parts, body_css, title)
 }
 
 # Thin wrapper so tests can pretend chromote is not installed.
@@ -519,7 +537,15 @@ format_px <- function(v) {
 #'   script, stylesheet, and font inlined). This format needs neither
 #'   Chrome nor pandoc, and it keeps the entrance animation.
 #'
-#' @param widget A polyviz chart, as returned by [pv_bar()] and friends.
+#' A chart board built with [pv_board()] saves the same way, as `.html`
+#' (one self-contained file, linking and all), `.png`, or `.pdf` — there
+#' the size arguments apply to the whole page, and `height = NULL`
+#' captures the page at the natural height the board renders to at that
+#' width. A board has no single vector drawing to serialise and no
+#' animation timeline, so `.svg` and `.gif` are refused with a message.
+#'
+#' @param widget A polyviz chart, as returned by [pv_bar()] and friends,
+#'   or a chart board from [pv_board()].
 #' @param file Output path; the extension (`.png`, `.svg`, `.pdf`, `.gif`,
 #'   or `.html`) picks the format.
 #' @param width Chart width in CSS pixels.
@@ -560,6 +586,13 @@ format_px <- function(v) {
 pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
                     mode = "light", delay = 0.5, embed_fonts = TRUE,
                     quiet = FALSE, fps = 20) {
+  # A chart board takes its own save path (R/board.R); the single-chart
+  # path below is untouched.
+  if (inherits(widget, "pv_board")) {
+    return(board_save(widget, file, width = width, height = height,
+                      scale = scale, mode = mode, delay = delay,
+                      embed_fonts = embed_fonts, quiet = quiet))
+  }
   if (!inherits(widget, "pvchart")) {
     rlang::abort(paste(
       "`widget` must be a polyviz chart (the return value of pv_bar()",

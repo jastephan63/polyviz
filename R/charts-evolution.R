@@ -1,5 +1,5 @@
 # The evolution-and-matrix chart family: pv_area (stacked, percent, and
-# stream areas), pv_heatmap, and pv_calendar. Rendered by
+# stream areas), pv_heatmap, pv_calendar, and pv_horizon. Rendered by
 # inst/htmlwidgets/lib/pv-renderers/evolution.js.
 
 # Local copy of the axis logic in widgets.R so this family stands alone:
@@ -368,6 +368,181 @@ pv_calendar <- function(data, date, value, years = NULL,
   pv_widget("calendar", c(list(
     data = data.frame(date = format(df$date, "%Y-%m-%d"), value = df$value),
     years = show_years, vlab = value, domain = domain
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Interactive D3 horizon chart
+#'
+#' Dozens of time series in one readable column — the form for
+#' many-series-over-time data that lines cannot hold. Each series is one
+#' thin ribbon, and instead of asking for a taller y axis the value is
+#' folded: it is cut into `bands` slices, each slice is stretched to the
+#' full ribbon height, and the slices are layered over each other in
+#' deepening sequential ink with the deepest on top. A ribbon a couple
+#' of dozen pixels tall still shows exactly where a series peaks and how
+#' high, because height and shade carry the value together.
+#'
+#' The band scale is the classic uniform construction (Heer, Kong &
+#' Agrawala, "Sizing the Horizon", 2009) and it is shared: the largest
+#' absolute value anywhere in the data, divided into `bands` equal
+#' slices. Every row folds against the same slices, so a given shade
+#' means the same amount in every series and rows compare honestly. A
+#' compact legend in the header shows the actual band inks and spells
+#' the scale out ("each shade = one band of N"). With `mirror = TRUE`
+#' (the default) negative values fold upward from the same baseline the
+#' classic way, wearing the theme's diverging opposite pole, so a series
+#' of anomalies reads warm-against-cold at a glance.
+#'
+#' Series names sit left of their rows (truncated when the room runs
+#' out — a truncated name shows in full when hovered), hairline
+#' separators keep the ribbons apart, and one shared x axis runs along
+#' the bottom. Hovering the chart draws a crosshair down every row at
+#' once and reads all series' true values at that x out of one tooltip —
+#' the payoff of the form. Series/x combinations without a row count as
+#' zero, the family's rule. Textures ([pv_textures()]) do not apply:
+#' like the heatmap and calendar, the horizon is a value ramp with no
+#' series fill for a hatch to identify, so the flag is ignored.
+#'
+#' @param data A data frame in long form: one row per series per x.
+#'   More than one row per series/x combination is an error; aggregate
+#'   it first. Rows with a missing x, value, or series are dropped with
+#'   a warning.
+#' @param x Name of the x column — `Date`, numeric, or categorical.
+#' @param y Name of the numeric value column. Negative values need
+#'   `mirror = TRUE` (the default); with `mirror = FALSE` they are an
+#'   error, because an unmirrored horizon has nowhere to fold them.
+#' @param series Name of the series column — one ribbon per level.
+#' @param bands How many slices the shared scale folds a value into,
+#'   a whole number from 2 to 5 (default 3). More bands hold more range
+#'   in the same ribbon but ask the eye to tell more shades apart.
+#' @param mirror Fold negative values upward from the baseline in the
+#'   opposite colour pole? `TRUE` (default) or `FALSE`. A plain switch:
+#'   whether negatives exist is a fact of the data, so there is no
+#'   render-time decision for `"auto"` to defer.
+#' @param order Row order, top to bottom. `"appearance"` (default)
+#'   keeps the series in first-appearance order, `"alpha"` sorts the
+#'   names, `"max"` puts the series with the largest absolute value
+#'   first.
+#' @param xlab Title for the shared x axis. `NULL` (default) uses the
+#'   column name; `NA` or `""` suppresses it; any other string replaces
+#'   it. There is no y axis — the folded bands and the header legend are
+#'   the value scale.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @section Height:
+#'   Row height adapts to the series count and the container, between
+#'   roughly 12 and 40 pixels. Below the 12px floor the ribbons stop
+#'   being readable, so the function refuses to build — the widget's
+#'   chrome needs about 100px of the height, and each series 12px more.
+#'   The message says the height that would fit; pass it as `height`,
+#'   or plot fewer series.
+#' @examples
+#' # 26 cantons, 21 years, one chart: the case lines cannot hold.
+#' nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+#' pv_horizon(nights, x = "year", y = "nights", series = "canton",
+#'            title = "Where Switzerland's guests sleep",
+#'            source = "Source: Bundesamt für Statistik")
+#' # Mirrored: daily temperature anomalies against each calendar day's
+#' # six-year mean, one row per year - warm folds up in red, cold in blue.
+#' w <- pv_weather
+#' w$doy <- as.integer(format(w$date, "%j"))
+#' w$anomaly <- w$temp_mean - ave(w$temp_mean, format(w$date, "%m-%d"))
+#' w$year <- format(w$date, "%Y")
+#' pv_horizon(w, x = "doy", y = "anomaly", series = "year",
+#'            title = "Warm and cold spells, day by day",
+#'            xlab = "day of the year",
+#'            source = "Source: MeteoSwiss")
+#' @export
+pv_horizon <- function(data, x, y, series, bands = 3, mirror = TRUE,
+                       order = c("appearance", "alpha", "max"),
+                       xlab = NULL,
+                       title = NULL, subtitle = NULL, mode = "auto",
+                       duration = 600, source = NULL, width = NULL,
+                       height = NULL, elementId = NULL) {
+  check_columns(data, list(x, y, series))
+  check_nonempty(data)
+  check_value_column(data, y)
+  order <- match.arg(order)
+  if (!is.numeric(bands) || length(bands) != 1 || is.na(bands) ||
+      bands != trunc(bands) || bands < 2 || bands > 5) {
+    rlang::abort("`bands` must be a whole number between 2 and 5.")
+  }
+  bands <- as.integer(bands)
+  # Mirroring is a plain on/off switch: whether negatives exist is a
+  # fact of the data, not something the renderer could decide better at
+  # draw time, so "auto" has no meaning here.
+  if (!isTRUE(mirror) && !isFALSE(mirror)) {
+    rlang::abort("`mirror` must be TRUE or FALSE.")
+  }
+  ax <- evolution_axis_values(data[[x]])
+  df <- data.frame(x = ax$values, y = as.numeric(data[[y]]),
+                   series = as.character(data[[series]]))
+  df <- drop_missing(df, is.na(df$x), x)
+  df <- drop_missing(df, is.na(df$y), y)
+  df <- drop_missing(df, is.na(df$series), series)
+  # An unmirrored horizon folds everything up from zero; a negative
+  # value would have to fold down out of its own ribbon. Refuse it
+  # rather than draw it wrong.
+  if (!mirror && any(df$y < 0)) {
+    rlang::abort(sprintf(paste(
+      "`%s` has negative values and `mirror = FALSE` has nowhere to",
+      "fold them. Keep `mirror = TRUE`, or fix the data."), y))
+  }
+  # Two rows for the same series at the same x would silently overwrite
+  # each other in the pivot on the JavaScript side, so refuse them here
+  # where the message can say what to do about it.
+  if (anyDuplicated(paste(df$x, df$series, sep = "\r"))) {
+    rlang::abort(
+      "`data` has more than one row per series/x combination; aggregate it first.")
+  }
+  # The row order is a statistic, so it is settled here; the renderer
+  # draws the ribbons exactly as the series list arrives.
+  series_names <- switch(order,
+    appearance = unique(df$series),
+    alpha = sort(unique(df$series)),
+    max = {
+      peaks <- tapply(abs(df$y), df$series, max)
+      names(sort(peaks, decreasing = TRUE))
+    })
+  n <- length(series_names)
+  # Each ribbon keeps a floor of about 12px and the widget's chrome
+  # (header, band legend, x axis) needs roughly 100px of the height.
+  # R knows the requested height - the package default is 420 - so the
+  # refusal happens here, where the message can say what would fit.
+  h <- if (is.numeric(height) && length(height) == 1 && is.finite(height)) {
+    as.numeric(height)
+  } else {
+    420
+  }
+  need <- 100L + 12L * n
+  if (h < need) {
+    rlang::abort(sprintf(paste(
+      "Too many series for the height: %d rows at the 12px floor need",
+      "about %dpx and this chart has %spx. Give it `height = %d`, or",
+      "plot fewer series."), n, need, format(h, trim = TRUE), need))
+  }
+  # The shared band scale is the classic uniform construction: the
+  # largest absolute value anywhere in the data, split into `bands`
+  # equal slices. Sharing it is what makes rows comparable - a given
+  # shade means the same amount in every series. All-zero data would
+  # collapse the slices; give the scale a token width.
+  peak <- max(abs(df$y))
+  band_width <- if (peak > 0) peak / bands else 1
+  # Within a series the rows keep their arrival order on a category
+  # axis; dates and numbers sort naturally (same rule as pv_area).
+  ord <- if (ax$xtype == "category") {
+    order(match(df$series, series_names))
+  } else {
+    order(match(df$series, series_names), df$x)
+  }
+  df <- df[ord, ]
+  rownames(df) <- NULL
+  pv_widget("horizon", c(list(
+    data = df, xtype = ax$xtype, series = series_names,
+    bands = bands, bandWidth = band_width, mirror = mirror,
+    vlab = y,
+    xlab = evolution_axis_title(xlab, x, "xlab")
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

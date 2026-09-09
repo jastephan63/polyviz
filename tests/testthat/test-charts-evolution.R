@@ -282,3 +282,231 @@ test_that("calendar widens an all-equal colour domain", {
   flat <- data.frame(day = as.Date("2024-01-01") + 0:1, v = c(7, 7))
   expect_equal(pv_calendar(flat, "day", "v")$x$domain, c(6, 8))
 })
+
+test_that("horizon builds from real data with a shared band scale", {
+  nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+  w <- expect_pvchart(pv_horizon(nights, "year", "nights",
+                                 series = "canton"), "horizon")
+  expect_equal(w$x$xtype, "number")
+  expect_setequal(w$x$series, unique(nights$canton))
+  expect_equal(w$x$bands, 3L)
+  # The shared band scale is the uniform construction: the largest
+  # absolute value anywhere in the data, split into `bands` slices.
+  expect_equal(w$x$bandWidth, max(abs(nights$nights)) / 3)
+  expect_true(w$x$mirror)
+  expect_equal(w$x$vlab, "nights")
+  expect_equal(w$x$xlab, "year")
+  expect_equal(nrow(w$x$data), nrow(nights))
+  expect_error(pv_horizon(nights, "nope", "nights", series = "canton"),
+               "not in `data`")
+})
+
+test_that("horizon validates bands and mirror", {
+  df <- data.frame(t = rep(1:3, 2), v = 1:6, s = rep(c("a", "b"), each = 3))
+  expect_equal(pv_horizon(df, "t", "v", series = "s", bands = 2)$x$bands, 2L)
+  expect_equal(pv_horizon(df, "t", "v", series = "s", bands = 5)$x$bands, 5L)
+  for (bad in list(1, 6, 2.5, "three", NA)) {
+    expect_error(pv_horizon(df, "t", "v", series = "s", bands = bad),
+                 "between 2 and 5")
+  }
+  expect_false(pv_horizon(df, "t", "v", series = "s",
+                          mirror = FALSE)$x$mirror)
+  # No "auto" here: whether negatives exist is a fact of the data, not a
+  # render-time decision.
+  expect_error(pv_horizon(df, "t", "v", series = "s", mirror = "auto"),
+               "TRUE or FALSE")
+})
+
+test_that("horizon folds negatives only when mirrored", {
+  df <- data.frame(t = rep(1:3, 2), v = c(1, -2, 3, -4, 5, -6),
+                   s = rep(c("a", "b"), each = 3))
+  # The scale is symmetric in construction: the largest |value| sets it.
+  expect_equal(pv_horizon(df, "t", "v", series = "s")$x$bandWidth, 2)
+  expect_error(pv_horizon(df, "t", "v", series = "s", mirror = FALSE),
+               "nowhere to fold")
+})
+
+test_that("horizon orders rows by appearance, name, or peak", {
+  df <- data.frame(t = rep(1:2, 3), v = c(5, 5, 9, -9, 1, 1),
+                   s = rep(c("beta", "zed", "ant"), each = 2))
+  expect_equal(pv_horizon(df, "t", "v", series = "s")$x$series,
+               c("beta", "zed", "ant"))
+  expect_equal(pv_horizon(df, "t", "v", series = "s",
+                          order = "alpha")$x$series,
+               c("ant", "beta", "zed"))
+  # "max" ranks by each series' largest absolute value, so the mirrored
+  # -9 puts zed first.
+  expect_equal(pv_horizon(df, "t", "v", series = "s",
+                          order = "max")$x$series,
+               c("zed", "beta", "ant"))
+  expect_error(pv_horizon(df, "t", "v", series = "s", order = "sideways"))
+})
+
+test_that("horizon refuses duplicates and drops missing values", {
+  dup <- data.frame(t = c(1, 1, 2), v = 1:3, s = "a")
+  expect_error(pv_horizon(dup, "t", "v", series = "s"), "aggregate")
+  nas <- data.frame(t = 1:3, v = c(1, NA, 3), s = "a")
+  expect_warning(w <- pv_horizon(nas, "t", "v", series = "s"),
+                 "Dropped 1 row\\(s\\) with missing `v` values")
+  expect_equal(nrow(w$x$data), 2)
+  all_na <- data.frame(t = 1:2, v = NA_real_, s = "a")
+  expect_error(pv_horizon(all_na, "t", "v", series = "s"), "non-missing")
+})
+
+test_that("horizon gives an all-zero band scale a token width", {
+  flat <- data.frame(t = 1:3, v = 0, s = "a")
+  expect_equal(pv_horizon(flat, "t", "v", series = "s")$x$bandWidth, 1)
+})
+
+test_that("horizon refuses more series than the height can hold", {
+  many <- expand.grid(t = 1:3, s = sprintf("s%02d", 1:30))
+  many$v <- as.numeric(seq_len(nrow(many)))
+  # 30 rows at the 12px floor need 460px; the default height is 420.
+  expect_error(pv_horizon(many, "t", "v", series = "s"),
+               "Too many series for the height")
+  expect_error(pv_horizon(many, "t", "v", series = "s"), "height = 460")
+  expect_pvchart(pv_horizon(many, "t", "v", series = "s", height = 460),
+                 "horizon")
+  # A non-numeric height (a CSS string) falls back to the 420 default.
+  expect_error(pv_horizon(many, "t", "v", series = "s", height = "100%"),
+               "Too many series")
+})
+
+test_that("horizon sorts rows by x within series and understands x types", {
+  df <- data.frame(t = c(3, 1, 2, 2, 3, 1), v = 1:6,
+                   s = rep(c("a", "b"), each = 3))
+  w <- pv_horizon(df, "t", "v", series = "s")
+  expect_equal(w$x$data$x, rep(1:3, 2))
+  expect_equal(w$x$data$y[1:3], c(2, 3, 1))
+  dated <- data.frame(d = as.Date(c("2024-02-01", "2024-01-01")), v = 1:2,
+                      s = "a")
+  wd <- pv_horizon(dated, "d", "v", series = "s")
+  expect_equal(wd$x$xtype, "date")
+  # Dates travel as ISO strings for d3 to re-parse, sorted within series.
+  expect_equal(wd$x$data$x, c("2024-01-01", "2024-02-01"))
+  # A category axis keeps the rows' arrival order.
+  cats <- data.frame(m = rep(month.abb[1:3], 2), v = 1:6,
+                     s = rep(c("a", "b"), each = 3))
+  wc <- pv_horizon(cats, "m", "v", series = "s")
+  expect_equal(wc$x$xtype, "category")
+  expect_equal(wc$x$data$x, rep(month.abb[1:3], 2))
+})
+
+test_that("horizon resolves the x-axis title override", {
+  df <- data.frame(t = rep(1:3, 2), v = 1:6, s = rep(c("a", "b"), each = 3))
+  expect_equal(pv_horizon(df, "t", "v", series = "s")$x$xlab, "t")
+  expect_equal(pv_horizon(df, "t", "v", series = "s", xlab = NA)$x$xlab, "")
+  expect_equal(pv_horizon(df, "t", "v", series = "s", xlab = "")$x$xlab, "")
+  expect_equal(pv_horizon(df, "t", "v", series = "s",
+                          xlab = "Year")$x$xlab, "Year")
+  expect_error(pv_horizon(df, "t", "v", series = "s",
+                          xlab = c("a", "b")), "single string")
+})
+
+test_that("horizon carries generated alt text", {
+  df <- data.frame(t = rep(1:3, 2), v = 1:6, s = rep(c("a", "b"), each = 3))
+  w <- pv_horizon(df, "t", "v", series = "s", title = "Two ribbons")
+  txt <- pv_alt_text(w)
+  expect_true(is.character(txt) && length(txt) == 1 && nzchar(txt))
+  expect_identical(w$x$alt, txt)
+})
+
+test_that("horizon renders and exports a standalone SVG", {
+  render_skip_if_no_chrome()
+  nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+  w <- pv_horizon(nights, "year", "nights", series = "canton",
+                  title = "Where Switzerland's guests sleep")
+  png <- tempfile(fileext = ".png")
+  expect_no_warning(pv_save(w, png, quiet = TRUE))
+  expect_gt(file.size(png), 20000)
+  unlink(png)
+  svg_path <- tempfile(fileext = ".svg")
+  expect_no_warning(pv_save(w, svg_path, quiet = TRUE))
+  svg <- paste(readLines(svg_path, warn = FALSE, encoding = "UTF-8"),
+               collapse = "\n")
+  expect_match(svg, "^<\\?xml")
+  # The root document plus the one embedded plot.
+  expect_equal(lengths(regmatches(svg, gregexpr("<svg", svg))), 2L)
+  expect_match(svg, "Where Switzerland's guests sleep", fixed = TRUE)
+  # The band-scale legend rides along into the export.
+  expect_match(svg, "each shade = one band of 2.31M nights", fixed = TRUE)
+  unlink(svg_path)
+})
+
+test_that("a mirrored horizon renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  w <- pv_weather
+  w$doy <- as.integer(format(w$date, "%j"))
+  w$anomaly <- w$temp_mean - ave(w$temp_mean, format(w$date, "%m-%d"))
+  w$year <- format(w$date, "%Y")
+  wh <- pv_horizon(w, "doy", "anomaly", series = "year",
+                   title = "Warm and cold spells")
+  png <- tempfile(fileext = ".png")
+  expect_no_warning(pv_save(wh, png, quiet = TRUE))
+  expect_gt(file.size(png), 20000)
+  unlink(png)
+})
+
+# Stages a widget the way pv_save() does (light mode, no entrance
+# animation, filling a page opened at a fixed size) and hands back the
+# live Chrome session, for the crosshair check below. Same machinery as
+# test-charts-comparison.R - each test file stands alone.
+evolution_page_session <- function(w, width = 700, height = 460) {
+  w$x$mode <- "light"
+  w$x$duration <- 0
+  w$width <- NULL
+  w$height <- NULL
+  w$sizingPolicy$browser$fill <- TRUE
+  w$sizingPolicy$browser$padding <- 0
+  stage <- tempfile("pv-evolution-page-")
+  dir.create(stage)
+  page <- file.path(stage, "chart.html")
+  htmlwidgets::saveWidget(w, page, selfcontained = FALSE, libdir = "lib")
+  b <- chromote::ChromoteSession$new(width = width, height = height)
+  errors <- polyviz:::export_watch_errors(b)
+  loaded <- b$Page$loadEventFired(wait_ = FALSE)
+  b$Page$navigate(utils::URLencode(paste0("file://", normalizePath(page))),
+                  wait_ = FALSE)
+  b$wait_for(loaded)
+  polyviz:::export_wait_settled(b, errors, 0,
+                                polyviz:::export_settle_count_js(w))
+  list(b = b, errors = errors)
+}
+
+test_that("the horizon crosshair reads every series out of one tooltip", {
+  render_skip_if_no_chrome()
+  hz <- data.frame(t = rep(1:5, 2),
+                   v = c(1, 2, 3, 4, 5, -1, -2, -3, -4, -5),
+                   s = rep(c("north", "south"), each = 5))
+  s <- evolution_page_session(pv_horizon(hz, "t", "v", series = "s",
+                                         title = "Crosshair check"))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      /* Poke the pointer at the middle of the hover overlay - with five
+         x positions the nearest one is exactly t = 3 - and read the
+         tooltip. The pointer's y falls in the second ribbon, so 'south'
+         is the emphasised row. */
+      var over = document.querySelector('rect.pv-hover');
+      if (!over) return 'no overlay';
+      var r = over.getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height * 0.75;
+      over.dispatchEvent(new PointerEvent('pointermove',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      var tip = document.querySelector('.pv-tooltip');
+      var cross = document.querySelector('svg line[stroke-dasharray]');
+      return JSON.stringify({ opacity: tip.style.opacity,
+        html: tip.innerHTML,
+        cross: cross ? cross.getAttribute('opacity') : 'none' });
+    })()", returnByValue = TRUE)$result$value
+  got <- jsonlite::fromJSON(res)
+  expect_equal(got$opacity, "1")
+  # The crosshair line is up across the rows.
+  expect_equal(got$cross, "1")
+  # The header names the x position, and every series reads out its true
+  # value there - the negative one included (d3 writes the minus sign).
+  expect_match(got$html, "^<b>3</b>")
+  expect_match(got$html, "north: <b>3</b>")
+  expect_match(got$html, "<b>south</b>: <b>[\u2212-]3</b>")
+})

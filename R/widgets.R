@@ -448,9 +448,9 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #'
 #' Scatter plot with per-point tooltips; optional colour (categorical) and
 #' size (numeric) encodings. For clouds too dense to read point by point,
-#' `density = TRUE` redraws the joint distribution as filled contours,
-#' and `canvas` moves the marks to a canvas layer so very large clouds
-#' stay responsive.
+#' `density` redraws the joint distribution as filled contours or as
+#' count-filled hexagonal bins, and `canvas` moves the marks to a canvas
+#' layer so very large clouds stay responsive.
 #'
 #' @param data A data frame. Rows missing an x, y, or (when mapped) size
 #'   value are dropped with a warning.
@@ -462,21 +462,30 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #' @param legend Show the colour legend row above the chart? `TRUE` always
 #'   shows it (when a `color` mapping exists), `FALSE` hides it; `"auto"`
 #'   (default) shows it exactly when a `color` mapping exists.
-#' @param density Draw the joint distribution as filled density contours
-#'   instead of point marks? `FALSE` (default) or `TRUE`. When on, a 2D
-#'   kernel density estimate over the points (d3.contourDensity) replaces
-#'   the cloud with filled bands on the theme's sequential ramp, light
-#'   where points are sparse to dark at the peak, with thin
-#'   surface-coloured separators between bands — the readable treatment
-#'   for clouds too dense to show structure point by point. The
-#'   bandwidth and the number of bands are picked adaptively from the
-#'   point count and the plot size, and the tooltip reports the band
-#'   under the cursor as a share of the peak density. Contours have no
+#' @param density Draw the joint distribution as an aggregate surface
+#'   instead of point marks? `FALSE` (default) keeps the points.
+#'   `"contours"` — or `TRUE`, its original spelling, which still works
+#'   everywhere — replaces the cloud with a 2D kernel density estimate
+#'   (d3.contourDensity): filled bands on the theme's sequential ramp,
+#'   light where points are sparse to dark at the peak, with thin
+#'   surface-coloured separators between bands. The bandwidth and the
+#'   number of bands are picked adaptively from the point count and the
+#'   plot size, and the tooltip reports the band under the cursor as a
+#'   share of the peak density. `"hex"` bins the points into hexagons
+#'   (d3.hexbin) filled on the same sequential ramp by how many points
+#'   each holds, with thin surface-coloured borders between cells; its
+#'   tooltip gives the exact count and the cell's centre. The hexagon
+#'   radius adapts to the data and the panel: it targets about
+#'   \eqn{2\sqrt[3]{n}}{2 * n^(1/3)} hexes across the plot's shorter
+#'   side — more points earn finer bins — clamped between 8 and 32
+#'   pixels so a small sample never coarsens into a handful of blobs
+#'   and a huge cloud never dissolves into speckle. Both aggregate
+#'   views have no
 #'   per-point aesthetics, so `color`, `size`, and `label` are refused;
 #'   the drag-to-select brush and [pv_link()] dimming have no marks to
 #'   act on either, so both quietly stay off. [pv_trend()] and
-#'   [pv_annotate()] layers still draw, over the contours. When `canvas`
-#'   is also requested, density wins — the contours are already the
+#'   [pv_annotate()] layers still draw, over the surface. When `canvas`
+#'   is also requested, density wins — the surface is already the
 #'   aggregate view, so `canvas` is ignored.
 #' @param canvas Draw the point marks on a `<canvas>` layer instead of as
 #'   SVG circles? `TRUE` forces it, `FALSE` keeps every mark an SVG
@@ -488,8 +497,8 @@ pv_line <- function(data, x, y, series = NULL, legend = "auto",
 #'   [pv_link()] dimming behave as before, and the layer is
 #'   device-pixel-ratio aware so it stays crisp on high-density screens.
 #'   SVG exports embed the canvas layer as a raster image at the same
-#'   position and size; PNG and PDF saves are unaffected. Ignored when
-#'   `density = TRUE`.
+#'   position and size; PNG and PDF saves are unaffected. Ignored
+#'   whenever `density` asks for an aggregate view.
 #' @inheritParams pv_bar
 #' @return An htmlwidget.
 #' @examples
@@ -508,23 +517,37 @@ pv_scatter <- function(data, x, y, color = NULL, size = NULL, label = NULL,
   check_value_column(data, y)
   if (!is.null(size)) check_value_column(data, size)
   check_flag(legend, "legend")
-  # Density is a plain on/off switch: the contours either replace the
-  # points or they don't, and there is no data-driven middle ground for
-  # the JavaScript side to decide - so "auto" has no meaning here.
-  if (!isTRUE(density) && !isFALSE(density)) {
-    rlang::abort("`density` must be TRUE or FALSE.")
+  # Density grew from a plain switch into a small menu, but there is
+  # still no data-driven middle ground for the JavaScript side to decide,
+  # so "auto" has no meaning here. TRUE keeps its original meaning - the
+  # contour treatment - and "contours" is simply its readable spelling,
+  # normalised to TRUE below so old and new payloads stay identical.
+  ok <- isTRUE(density) || isFALSE(density) ||
+    (is.character(density) && length(density) == 1 && !is.na(density) &&
+       density %in% c("contours", "hex"))
+  if (!ok) {
+    rlang::abort('`density` must be TRUE or FALSE, "contours", or "hex".')
+  }
+  if (identical(density, "contours")) {
+    density <- TRUE
   }
   check_flag(canvas, "canvas")
-  # Contours aggregate the cloud into one surface, so there is no point
-  # left for a per-point mapping to colour, size, or name. Refuse the
-  # mappings by name rather than silently dropping them.
-  if (isTRUE(density)) {
+  # Contours and hexagons alike aggregate the cloud into one surface, so
+  # there is no point left for a per-point mapping to colour, size, or
+  # name. Refuse the mappings by name rather than silently dropping them.
+  if (!isFALSE(density)) {
     mapped <- c(color = !is.null(color), size = !is.null(size),
                 label = !is.null(label))
     if (any(mapped)) {
+      spelling <- if (identical(density, "hex")) {
+        c('`density = "hex"`', "count-filled hexagons")
+      } else {
+        c("`density = TRUE`", "filled contours")
+      }
       rlang::abort(sprintf(paste(
-        "`density = TRUE` replaces the point marks with filled contours,",
+        "%s replaces the point marks with %s,",
         "which have no per-point aesthetics - drop the %s mapping%s."),
+        spelling[[1]], spelling[[2]],
         paste0("`", names(mapped)[mapped], "`", collapse = ", "),
         if (sum(mapped) > 1) "s" else ""))
     }

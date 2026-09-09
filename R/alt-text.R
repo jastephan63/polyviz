@@ -837,6 +837,59 @@ alt_icicle <- function(x) {
         collapse = " ")
 }
 
+# The horizon: how many ribbons fold into how many bands, the span of
+# the shared x axis, and the series whose peak reaches the deepest band
+# - the row a reader's eye lands on first.
+alt_horizon <- function(x) {
+  df <- x$data
+  sers <- x$series
+  xl <- alt_lab(x$xlab, "x")
+  yl <- alt_lab(x$vlab)
+  xs <- unique(df$x)
+  span <- if (identical(x$xtype, "category")) {
+    c(xs[[1]], xs[[length(xs)]])
+  } else {
+    range(df$x)
+  }
+  # The deepest band belongs to the largest magnitude anywhere - with
+  # mirroring on, a deep negative fold counts just as a positive one
+  # does, so the peak is picked by absolute value and reported signed.
+  peaks <- tapply(abs(df$y), df$series, max)
+  top <- names(peaks)[which.max(peaks)]
+  ty <- df$y[df$series == top]
+  top_val <- ty[which.max(abs(ty))]
+  paste(
+    alt_lead(x, "A horizon chart",
+             sprintf("folding %s for %s%s into %s of shading, one ribbon per series",
+                     yl, alt_count(length(sers), "series", "series"),
+                     alt_names(sers),
+                     alt_count(x$bands, "band", "bands"))),
+    sprintf("The %s axis runs from %s to %s.",
+            xl, alt_pos(span[1]), alt_pos(span[2])),
+    sprintf("%s reaches the deepest band, peaking at %s.",
+            top, alt_num(top_val)))
+}
+
+# The flow map: how many flows among how many places, and the largest
+# flow named end to end - the band a reader would trace first.
+alt_flowmap <- function(x) {
+  df <- x$data
+  places <- x$places$place
+  out <- alt_lead(x, "A flow map",
+                  sprintf("tracing %s of %s among %s%s",
+                          alt_count(nrow(df), "directed flow",
+                                    "directed flows"),
+                          alt_lab(x$vlab),
+                          alt_count(length(places), "place", "places"),
+                          alt_names(places)))
+  if (nrow(df) && max(df$value) > 0) {
+    i <- which.max(df$value)
+    out <- paste(out, sprintf("The largest flow runs from %s to %s, at %s.",
+                              df$from[i], df$to[i], alt_num(df$value[i])))
+  }
+  out
+}
+
 alt_describe <- function(x) {
   type <- if (alt_str(x$type)) x$type else "data"
   switch(type,
@@ -873,6 +926,8 @@ alt_describe <- function(x) {
     bullet = alt_bullet(x),
     waffle = alt_waffle(x),
     icicle = alt_icicle(x),
+    horizon = alt_horizon(x),
+    flowmap = alt_flowmap(x),
     alt_lead(x, sprintf("An interactive %s chart", type))
   )
 }

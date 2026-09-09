@@ -186,7 +186,73 @@ test_that("an icicle's alt text mirrors the sunburst's structure", {
                    sub("^.*? (The largest group,.*)$", "\\1", sun))
 })
 
-# The canonical-loop hygiene checks, run over the six new chart types
+test_that("a horizon chart's alt text counts ribbons, spans the axis, and names the deepest peak", {
+  nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+  w <- pv_horizon(nights, x = "year", y = "nights", series = "canton",
+                  title = "Where the guests sleep")
+  a <- w$x$alt
+  expect_match(a, "^A horizon chart titled \u201cWhere the guests sleep\u201d")
+  expect_match(a, "folding nights for 26 series", fixed = TRUE)
+  expect_match(a, "3 bands of shading", fixed = TRUE)
+  expect_match(a, sprintf("The year axis runs from %d to %d.",
+                          min(nights$year), max(nights$year)), fixed = TRUE)
+  peak <- nights[which.max(nights$nights), ]
+  expect_match(a, sprintf("%s reaches the deepest band, peaking at %s.",
+                          peak$canton,
+                          format(round(peak$nights), big.mark = ",")),
+               fixed = TRUE)
+  expect_identical(pv_alt_text(w), a)
+  # More bands show up in the text, and so does a suppressed axis title.
+  five <- pv_horizon(nights, x = "year", y = "nights", series = "canton",
+                     bands = 5, xlab = NA)
+  expect_match(five$x$alt, "5 bands of shading", fixed = TRUE)
+  expect_match(five$x$alt, "The x axis runs from", fixed = TRUE)
+})
+
+test_that("a mirrored horizon reports a negative peak honestly", {
+  df <- data.frame(t = rep(1:4, 2), v = c(1, 2, -9, 3, 2, 1, 4, 2),
+                   s = rep(c("cold", "warm"), each = 4))
+  a <- pv_horizon(df, "t", "v", series = "s")$x$alt
+  # The deepest band is picked by magnitude and reported signed.
+  expect_match(a, "cold reaches the deepest band, peaking at -9.",
+               fixed = TRUE)
+  # A category axis spans its first and last level, in data order.
+  cats <- data.frame(m = rep(c("Jan", "Feb", "Mar"), 2), v = 1:6,
+                     s = rep(c("a", "b"), each = 3))
+  expect_match(pv_horizon(cats, "m", "v", series = "s")$x$alt,
+               "The m axis runs from Jan to Mar.", fixed = TRUE)
+})
+
+test_that("a flow map's alt text counts flows and places and names the largest flow", {
+  latest <- subset(pv_commuters,
+                   period == "2022-2024" & region != "Restliche Schweiz")
+  flows <- data.frame(
+    from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+    to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+    commuters = latest$commuters)
+  w <- pv_flow_map(flows, from = "from", to = "to", value = "commuters",
+                   title = "Commuting with Zug")
+  a <- w$x$alt
+  expect_match(a, "^A flow map titled \u201cCommuting with Zug\u201d")
+  expect_match(a, sprintf("tracing %d directed flows of commuters",
+                          nrow(flows)), fixed = TRUE)
+  expect_match(a, sprintf("among %d places",
+                          length(unique(c(flows$from, flows$to)))),
+               fixed = TRUE)
+  top <- flows[which.max(flows$commuters), ]
+  expect_match(a, sprintf("The largest flow runs from %s to %s, at %s.",
+                          top$from, top$to,
+                          format(round(top$commuters), big.mark = ",")),
+               fixed = TRUE)
+  expect_identical(pv_alt_text(w), a)
+  # A single flow keeps its grammar singular.
+  one <- data.frame(from = "Luzern", to = "Zug", n = 120)
+  expect_match(pv_flow_map(one, from = "from", to = "to", value = "n")$x$alt,
+               "tracing 1 directed flow of n among 2 places (Luzern and Zug).",
+               fixed = TRUE)
+})
+
+# The canonical-loop hygiene checks, run over the newer chart types
 # directly so their describers stay covered whatever the render helpers
 # currently enumerate.
 test_that("the new chart types carry clean, period-terminated alt text", {
@@ -232,6 +298,20 @@ test_that("the new chart types carry clean, period-terminated alt text", {
     icicle = function() {
       pv_icicle(pv_city_landuse[pv_city_landuse$city == "Luzern", ],
                 levels = c("group", "category"), value = "hectares")
+    },
+    horizon = function() {
+      nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+      pv_horizon(nights, x = "year", y = "nights", series = "canton")
+    },
+    flowmap = function() {
+      latest <- subset(pv_commuters,
+                       period == "2022-2024" &
+                         region != "Restliche Schweiz")
+      flows <- data.frame(
+        from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+        to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+        commuters = latest$commuters)
+      pv_flow_map(flows, from = "from", to = "to", value = "commuters")
     })
   for (id in names(builders)) {
     w <- builders[[id]]()

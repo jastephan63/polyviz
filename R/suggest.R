@@ -35,21 +35,36 @@ suggest_fun <- function(nm, kind) {
   if (grepl(ratey, tolower(nm))) "mean" else "sum"
 }
 
-# The join-key sets of the bundled map layers, as character vectors (ids
-# are compared as strings on both sides, exactly as pv_choropleth does).
-# The fetched country-wide municipal layer is deliberately absent: a
-# suggestion should never trigger a download.
+# The join keys of the bundled map layers: the feature ids as character
+# vectors (ids are compared as strings on both sides, exactly as
+# pv_choropleth does) and the feature names (what pv_flow_map matches
+# endpoints against first). Each layer also records how it is asked for
+# in a printed call: map_arg for pv_choropleth (whose default layer is
+# Lucerne) and flow_arg for pv_flow_map (whose default is the cantons) -
+# NULL where the layer is that chart's default and the argument can stay
+# home. The fetched country-wide municipal layer is deliberately absent:
+# a suggestion should never trigger a download.
 suggest_map_layers <- function() {
   ids_of <- function(m) {
     v <- unlist(lapply(m$features, function(f) f$properties$id))
     as.character(v)
   }
+  names_of <- function(m) {
+    v <- unlist(lapply(m$features, function(f) f$properties$name))
+    as.character(v)
+  }
   list(
-    lucerne = list(ids = ids_of(pv_lucerne_map), map_arg = NULL,
+    lucerne = list(ids = ids_of(pv_lucerne_map),
+                   names = names_of(pv_lucerne_map),
+                   map_arg = NULL, flow_arg = "lucerne",
                    label = "Lucerne municipality"),
-    cantons = list(ids = ids_of(pv_swiss_cantons), map_arg = "cantons",
+    cantons = list(ids = ids_of(pv_swiss_cantons),
+                   names = names_of(pv_swiss_cantons),
+                   map_arg = "cantons", flow_arg = NULL,
                    label = "canton"),
-    districts = list(ids = ids_of(pv_swiss_districts), map_arg = "districts",
+    districts = list(ids = ids_of(pv_swiss_districts),
+                     names = names_of(pv_swiss_districts),
+                     map_arg = "districts", flow_arg = "districts",
                      label = "district")
   )
 }
@@ -361,6 +376,115 @@ suggest_bubble_map <- function(p, nm) {
        score = 94)
 }
 
+# Two category columns whose every value is a feature name on one
+# bundled layer, plus a non-negative measure: the origin-destination
+# shape, and pv_flow_map's home ground. The bar mirrors pv_flow_map's
+# own rules - full precision (an endpoint matching no feature is an
+# error there), no place flowing to itself, and at least three places in
+# play so a two-place shuttle stays with the plainer forms.
+suggest_flow_map <- function(p, nm) {
+  m <- NULL
+  for (cand in p$measures) {
+    if (cand$kind == "numeric" && cand$min >= 0 && cand$max > 0) {
+      m <- cand
+      break
+    }
+  }
+  if (is.null(m)) {
+    return(NULL)
+  }
+  # An origin and a destination are two category columns whose every
+  # value is a feature name on the SAME layer, so the search runs layer
+  # by layer rather than column by column - a column holding only
+  # "Luzern" belongs to whichever layer its partner column pins down.
+  # The cantons come first: they are the layer whole-country flows
+  # actually use, and the one pv_flow_map defaults to.
+  nms <- names(p$data)
+  candidates <- character(0)
+  for (i in seq_along(nms)) {
+    if (p$kind[[i]] != "category" || suggest_calendar_name(nms[[i]])) next
+    candidates <- c(candidates, nms[[i]])
+  }
+  if (length(candidates) < 2) {
+    return(NULL)
+  }
+  vals_of <- function(col) {
+    v <- unique(as.character(p$data[[col]]))
+    v[!is.na(v)]
+  }
+  pair <- NULL
+  for (layer in c("cantons", "districts", "lucerne")) {
+    layer_names <- suggest_the$layers[[layer]]$names
+    hits <- candidates[vapply(candidates, function(col) {
+      v <- vals_of(col)
+      length(v) > 0 && all(v %in% layer_names)
+    }, logical(1))]
+    if (length(hits) >= 2) {
+      pair <- list(cols = hits[1:2], layer = layer)
+      break
+    }
+  }
+  if (is.null(pair)) {
+    return(NULL)
+  }
+  # Column order decides which end is which, unless the names say so
+  # themselves - a column called "to" should not become the origin. The
+  # words must stand alone or lead a compound ("to", "to_canton"), so a
+  # column called "town" stays untouched.
+  from <- pair$cols[[1]]
+  to <- pair$cols[[2]]
+  fromish <- grepl("^(from|origin|source|start|von|herkunft)([_.]|$)",
+                   tolower(c(from, to)))
+  toish <- grepl("^(to|dest|destination|target|ziel|nach)([_.]|$)",
+                 tolower(c(from, to)))
+  if ((toish[[1]] && !toish[[2]]) || (fromish[[2]] && !fromish[[1]])) {
+    tmp <- from
+    from <- to
+    to <- tmp
+  }
+  keep <- suggest_complete(p$data, c(from, to, m$name))
+  if (!any(keep)) {
+    return(NULL)
+  }
+  fv <- as.character(p$data[[from]][keep])
+  tv <- as.character(p$data[[to]][keep])
+  # A place flowing to itself cannot be drawn, and fewer than three
+  # places is not much of a map.
+  if (any(fv == tv) || length(unique(c(fv, tv))) < 3) {
+    return(NULL)
+  }
+  # One row per directed pair, exactly as pv_flow_map demands; repeated
+  # pairs (or missing values) get the aggregate() step spelled out.
+  dup <- anyDuplicated(paste(fv, tv, sep = "\r")) > 0
+  nas <- anyNA(p$data[[m$name]])
+  note <- ""
+  if (dup || nas) {
+    if (!suggest_syntactic(c(m$name, from, to))) {
+      return(NULL)
+    }
+    agg <- suggest_agg(m$name, c(from, to), nm, m$fun)
+    frame <- agg$var
+    lines <- agg$line
+    note <- agg$note
+  } else {
+    frame <- nm
+    lines <- character(0)
+  }
+  layer <- suggest_the$layers[[pair$layer]]
+  map_part <- if (is.null(layer$flow_arg)) "" else {
+    sprintf(", map = %s", suggest_q(layer$flow_arg))
+  }
+  call_line <- sprintf("pv_flow_map(%s, from = %s, to = %s, value = %s%s)",
+                       frame, suggest_q(from), suggest_q(to),
+                       suggest_q(m$name), map_part)
+  list(chart = "pv_flow_map",
+       code = paste(c(lines, call_line), collapse = "\n"),
+       reason = sprintf(
+         "`%s` and `%s` hold %s names, so each row draws as a curved band from origin to destination%s",
+         from, to, layer$label, note),
+       score = 93)
+}
+
 suggest_calendar <- function(p, nm) {
   if (is.null(p$date_col)) {
     return(NULL)
@@ -575,6 +699,71 @@ suggest_slope <- function(p, nm) {
          "`%s` holds exactly two %ss (%s and %s), so each `%s` draws one line whose slope is its change",
          x, axis_word, pos[[1]], pos[[2]], g$name),
        score = 88)
+}
+
+# A time axis, a measure, and a grouping with more levels than the
+# palette holds: the spaghetti threshold. Past it a line chart drowns -
+# every extra series is one more indistinguishable strand - so the
+# horizon takes over and folds each series into its own compact shaded
+# ribbon. The cap comes from pv_horizon's own height floor: the default
+# 420px chart holds at most 26 rows at 12px each, and a suggestion must
+# run exactly as printed.
+suggest_horizon <- function(p, nm) {
+  if (is.null(p$time)) {
+    return(NULL)
+  }
+  x <- p$time$col
+  m <- NULL
+  for (cand in p$measures) {
+    if (cand$kind == "numeric" && cand$n_ok >= 3) {
+      m <- cand
+      break
+    }
+  }
+  if (is.null(m)) {
+    return(NULL)
+  }
+  # The largest grouping that still fits the default height: the horizon
+  # is the many-series form, so the more ribbons the better its case.
+  slots <- theme_palette_slots()
+  g <- NULL
+  for (cc in p$cats) {
+    if (cc$distinct <= slots || cc$distinct > 26) next
+    if (is.null(g) || cc$distinct > g$distinct) {
+      g <- cc
+    }
+  }
+  if (is.null(g)) {
+    return(NULL)
+  }
+  keep <- suggest_complete(p$data, c(x, m$name, g$name))
+  if (!any(keep)) {
+    return(NULL)
+  }
+  dup <- anyDuplicated(paste(p$data[[x]][keep],
+                             p$data[[g$name]][keep], sep = "\r")) > 0
+  note <- ""
+  if (dup) {
+    if (!suggest_syntactic(c(m$name, x, g$name))) {
+      return(NULL)
+    }
+    agg <- suggest_agg(m$name, c(x, g$name), nm, m$fun)
+    frame <- agg$var
+    lines <- agg$line
+    note <- agg$note
+  } else {
+    frame <- nm
+    lines <- character(0)
+  }
+  call_line <- sprintf("pv_horizon(%s, x = %s, y = %s, series = %s)",
+                       frame, suggest_q(x), suggest_q(m$name),
+                       suggest_q(g$name))
+  list(chart = "pv_horizon",
+       code = paste(c(lines, call_line), collapse = "\n"),
+       reason = sprintf(
+         "%d `%s` series would tangle as spaghetti lines; the horizon folds each into its own compact shaded ribbon%s",
+         g$distinct, g$name, note),
+       score = 86)
 }
 
 # Exactly two numeric columns on one shared scale, one row per category:
@@ -854,7 +1043,7 @@ suggest_scatter <- function(p, nm) {
   }
   reason <- if (density) {
     sprintf(
-      "%s rows would smear as dots; density = TRUE draws the joint shape as filled contours instead",
+      "%s rows would smear as dots; density = TRUE draws the joint shape as filled contours instead (or density = \"hex\" as countable hexagon bins)",
       format(p$n, big.mark = ","))
   } else {
     sprintf("two numeric columns invite a look at how `%s` moves with `%s`",
@@ -1206,19 +1395,23 @@ suggest_runs <- function(code, nm, data) {
 #' and cardinalities, whether keys repeat (which decides between a direct
 #' call and an `aggregate()` step, printed as part of the code), a `Date`
 #' or year column (lines; a calendar for daily dates; a slope chart when
-#' it holds exactly two moments per group), pairs of numeric columns
-#' (scatter, with `density = TRUE` past a few thousand rows; a dumbbell
-#' when exactly two share a scale with one row per category), many
-#' numeric columns (a pairs matrix), longitude/latitude pairs (a bubble
-#' map), id columns matching the bundled Swiss map layers (a
-#' choropleth), grouped numeric columns (boxplot, violin, or ridgeline,
-#' by group count), a signed measure whose losses are a real minority (a
-#' waterfall, offered as a guess), nested category columns (a sunburst,
-#' with the icicle named as its readable-label twin), and parts of a
-#' whole (a donut, with a waffle beside it as the precise-reading
-#' alternative). Every candidate is built once behind the scenes before
-#' it is offered, so a printed suggestion never errors on the data it
-#' was suggested for.
+#' it holds exactly two moments per group; a horizon chart when a
+#' grouping holds more series than the palette has colours, the point
+#' where a line chart turns to spaghetti), pairs of numeric columns
+#' (scatter, with `density = TRUE` past a few thousand rows and the
+#' reason naming `density = "hex"` as the countable alternative; a
+#' dumbbell when exactly two share a scale with one row per category),
+#' many numeric columns (a pairs matrix), longitude/latitude pairs (a
+#' bubble map), id columns matching the bundled Swiss map layers (a
+#' choropleth), two place-name columns whose values are feature names on
+#' one bundled layer plus a non-negative measure (a flow map), grouped
+#' numeric columns (boxplot, violin, or ridgeline, by group count), a
+#' signed measure whose losses are a real minority (a waterfall, offered
+#' as a guess), nested category columns (a sunburst, with the icicle
+#' named as its readable-label twin), and parts of a whole (a donut,
+#' with a waffle beside it as the precise-reading alternative). Every
+#' candidate is built once behind the scenes before it is offered, so a
+#' printed suggestion never errors on the data it was suggested for.
 #'
 #' @param data A data frame to inspect.
 #' @param n Maximum number of suggestions to keep, best fit first
@@ -1244,6 +1437,17 @@ suggest_runs <- function(code, nm, data) {
 #' # Exactly two census years per city: the slope chart's home ground.
 #' census <- subset(pv_city_population, year %in% c(1930, 2024))
 #' pv_suggest(census)
+#'
+#' # 26 cantons over 21 years - past the spaghetti threshold, so a
+#' # horizon chart is offered where a line chart would drown.
+#' pv_suggest(pv_tourism)
+#'
+#' # Two columns of canton names and a count: origin-destination flows.
+#' pendler <- data.frame(
+#'   from = c("Aargau", "Luzern", "Schwyz", "Zug"),
+#'   to = c("Zug", "Zug", "Zug", "Luzern"),
+#'   commuters = c(4905, 11251, 4576, 4925))
+#' pv_suggest(pendler)
 #' @export
 pv_suggest <- function(data, n = 4) {
   check_columns(data, list())
@@ -1266,12 +1470,13 @@ pv_suggest <- function(data, n = 4) {
 
   p <- suggest_profile(data)
   builders <- list(
-    suggest_choropleth, suggest_bubble_map, suggest_calendar,
-    suggest_slope, suggest_line, suggest_pairs, suggest_heatmap,
-    suggest_dumbbell, suggest_scatter, suggest_area, suggest_sunburst,
-    suggest_category, suggest_distribution, suggest_waterfall,
-    suggest_parallel, suggest_spark_table, suggest_histogram,
-    suggest_donut, suggest_waffle, suggest_fallback_table)
+    suggest_choropleth, suggest_bubble_map, suggest_flow_map,
+    suggest_calendar, suggest_slope, suggest_horizon, suggest_line,
+    suggest_pairs, suggest_heatmap, suggest_dumbbell, suggest_scatter,
+    suggest_area, suggest_sunburst, suggest_category,
+    suggest_distribution, suggest_waterfall, suggest_parallel,
+    suggest_spark_table, suggest_histogram, suggest_donut,
+    suggest_waffle, suggest_fallback_table)
   cands <- Filter(Negate(is.null), lapply(builders, function(b) b(p, nm)))
   if (length(cands)) {
     cands <- cands[order(-vapply(cands, function(s) s$score, numeric(1)))]

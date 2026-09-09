@@ -187,6 +187,9 @@ test_that("big point clouds get the density treatment, small ones do not", {
   code <- suggest_code(s, "pv_scatter")
   expect_match(code, "density = TRUE", fixed = TRUE)
   expect_match(suggest_reason(s, "pv_scatter"), "10,000", fixed = TRUE)
+  # The reason names the hexagon binning as the countable alternative.
+  expect_match(suggest_reason(s, "pv_scatter"), 'density = "hex"',
+               fixed = TRUE)
   # density = TRUE refuses per-point mappings, so no label rides along.
   expect_false(grepl("label =", code, fixed = TRUE))
   small <- data.frame(x = sin(1:200), y = cos(1:200))
@@ -258,6 +261,125 @@ test_that("the slope outranks the line when both shapes are present", {
   charts <- suggest_charts(s)
   expect_true(all(c("pv_slope", "pv_line") %in% charts))
   expect_lt(match("pv_slope", charts), match("pv_line", charts))
+})
+
+test_that("more series than the palette holds fold into a horizon chart", {
+  s <- pv_suggest(pv_tourism, n = 10)
+  charts <- suggest_charts(s)
+  expect_true(all(c("pv_horizon", "pv_line") %in% charts))
+  # The horizon is the rescue for exactly the frame where the line
+  # drowns, so it edges ahead of the line.
+  expect_lt(match("pv_horizon", charts), match("pv_line", charts))
+  code <- suggest_code(s, "pv_horizon")
+  # 26 cantons, several origins per canton/year: the aggregate() step
+  # comes spelled out, keyed on the axis and the series.
+  expect_match(code, "aggregate(arrivals ~ year + canton", fixed = TRUE)
+  expect_match(code, 'x = "year"', fixed = TRUE)
+  expect_match(code, 'series = "canton"', fixed = TRUE)
+  reason <- suggest_reason(s, "pv_horizon")
+  expect_match(reason, "26 `canton` series", fixed = TRUE)
+  expect_match(reason, "spaghetti")
+  w <- suggest_eval(code, list(pv_tourism = pv_tourism))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("an already-aggregated spaghetti panel gets the direct horizon call", {
+  nights <- aggregate(nights ~ canton + year, pv_tourism, sum)
+  s <- pv_suggest(nights, n = 10)
+  code <- suggest_code(s, "pv_horizon")
+  expect_false(grepl("aggregate(", code, fixed = TRUE))
+  expect_identical(
+    code, 'pv_horizon(nights, x = "year", y = "nights", series = "canton")')
+  w <- suggest_eval(code, list(nights = nights))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("the horizon stays away below the spaghetti threshold and above the height cap", {
+  # A handful of series still fits the palette: that is line territory.
+  few <- data.frame(year = rep(2000:2010, 4),
+                    g = rep(c("a", "b", "c", "d"), each = 11), v = 1:44)
+  s <- pv_suggest(few, n = 10)
+  expect_false("pv_horizon" %in% suggest_charts(s))
+  expect_true("pv_line" %in% suggest_charts(s))
+  # 180 cities need more rows than the default height holds, and a
+  # printed suggestion must run exactly as printed - so none is made.
+  expect_false("pv_horizon" %in%
+                 suggest_charts(pv_suggest(pv_city_population, n = 10)))
+  # No time axis, no horizon, however many levels the grouping has.
+  no_time <- data.frame(g = rep(letters[1:12], each = 3),
+                        step = rep(1:3, 12) / 10, v = 1:36)
+  expect_false("pv_horizon" %in% suggest_charts(pv_suggest(no_time, n = 10)))
+})
+
+test_that("two columns of place names and a measure read as a flow map", {
+  latest <- subset(pv_commuters,
+                   period == "2022-2024" & region != "Restliche Schweiz")
+  flows <- data.frame(
+    from = ifelse(latest$direction == "to Zug", latest$region, "Zug"),
+    to = ifelse(latest$direction == "to Zug", "Zug", latest$region),
+    commuters = latest$commuters)
+  s <- pv_suggest(flows, n = 10)
+  charts <- suggest_charts(s)
+  expect_true("pv_flow_map" %in% charts)
+  # The origin-destination shape is the most specific read here.
+  expect_identical(charts[[1]], "pv_flow_map")
+  code <- suggest_code(s, "pv_flow_map")
+  expect_match(code, 'from = "from"', fixed = TRUE)
+  expect_match(code, 'to = "to"', fixed = TRUE)
+  expect_match(code, 'value = "commuters"', fixed = TRUE)
+  # The cantons are pv_flow_map's default layer; no map argument.
+  expect_false(grepl("map =", code, fixed = TRUE))
+  expect_match(suggest_reason(s, "pv_flow_map"), "canton names")
+  w <- suggest_eval(code, list(flows = flows))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("municipality names point the flow map at the Lucerne layer", {
+  lu <- data.frame(a = c("Emmen", "Kriens", "Horw"),
+                   b = c("Luzern", "Luzern", "Luzern"),
+                   n = c(10, 20, 30))
+  s <- pv_suggest(lu, n = 10)
+  code <- suggest_code(s, "pv_flow_map")
+  expect_match(code, 'map = "lucerne"', fixed = TRUE)
+  expect_match(code, 'from = "a"', fixed = TRUE)
+  expect_match(suggest_reason(s, "pv_flow_map"), "Lucerne municipality")
+  w <- suggest_eval(code, list(lu = lu))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("the flow map reads endpoint roles off the column names", {
+  # Destination column first: the names, not the order, decide the ends.
+  swapped <- data.frame(to = c("Zug", "Zug", "Luzern"),
+                        from = c("Aargau", "Schwyz", "Zug"),
+                        n = c(5, 3, 4))
+  code <- suggest_code(pv_suggest(swapped, n = 10), "pv_flow_map")
+  expect_match(code, 'from = "from", to = "to"', fixed = TRUE)
+})
+
+test_that("repeated flow pairs get the aggregate() step, loops and strangers get nothing", {
+  base <- data.frame(from = c("Aargau", "Schwyz", "Zug"),
+                     to = c("Zug", "Zug", "Luzern"), n = c(5, 3, 4))
+  # The same directed pair twice folds down before the map draws.
+  doubled <- rbind(base, base[1, ])
+  s <- pv_suggest(doubled, n = 10)
+  code <- suggest_code(s, "pv_flow_map")
+  expect_match(code, "aggregate(n ~ from + to", fixed = TRUE)
+  w <- suggest_eval(code, list(doubled = doubled))
+  expect_s3_class(w, "pvchart")
+  # A place flowing to itself cannot be drawn, so nothing is offered.
+  loop <- rbind(base, data.frame(from = "Zug", to = "Zug", n = 2))
+  expect_false("pv_flow_map" %in% suggest_charts(pv_suggest(loop, n = 10)))
+  # One name off the layer breaks the match - full precision, as in the
+  # constructor, where an unmatched endpoint is an error.
+  stranger <- rbind(base,
+                    data.frame(from = "Restliche Schweiz", to = "Zug", n = 9))
+  expect_false("pv_flow_map" %in%
+                 suggest_charts(pv_suggest(stranger, n = 10)))
+  # Two places shuttling between themselves stay with the plainer forms.
+  shuttle <- data.frame(from = c("Zug", "Luzern"), to = c("Luzern", "Zug"),
+                        n = c(7, 5))
+  expect_false("pv_flow_map" %in%
+                 suggest_charts(pv_suggest(shuttle, n = 10)))
 })
 
 test_that("two same-scale numerics per category earn a dumbbell beside the scatter", {
@@ -394,10 +516,16 @@ test_that("every printed suggestion for the new-shape frames builds a widget", {
       change_chf = c(420, -180, 260, -90, 35, 150)),
     shares = data.frame(party = c("A", "B", "C", "D"), n = c(6, 3, 2, 1)),
     nested = pv_city_landuse[pv_city_landuse$city %in%
-                               c("Luzern", "Zug", "Emmen"), ])
+                               c("Luzern", "Zug", "Emmen"), ],
+    spaghetti = aggregate(arrivals ~ year + canton, pv_tourism, sum),
+    od_flows = data.frame(
+      from = c("Aargau", "Luzern", "Schwyz", "Z\u00fcrich"),
+      to = c("Zug", "Zug", "Zug", "Zug"),
+      commuters = c(4905, 11251, 4576, 8000)))
   triggers <- list(two_moments = "pv_slope", paired_wide = "pv_dumbbell",
                    contributions = "pv_waterfall", shares = "pv_waffle",
-                   nested = "pv_sunburst")
+                   nested = "pv_sunburst", spaghetti = "pv_horizon",
+                   od_flows = "pv_flow_map")
   for (nm in names(frames)) {
     assign(nm, frames[[nm]])
     s <- eval(call("pv_suggest", as.name(nm), n = 10L))

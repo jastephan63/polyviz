@@ -52,6 +52,7 @@ reference:
   - pv_beeswarm
   - pv_heatmap
   - pv_calendar
+  - pv_horizon
   - pv_bump
   - pv_parallel
   - pv_sankey
@@ -60,6 +61,7 @@ reference:
   - pv_arc
   - pv_choropleth
   - pv_bubble_map
+  - pv_flow_map
   - pv_race
   - pv_table
 

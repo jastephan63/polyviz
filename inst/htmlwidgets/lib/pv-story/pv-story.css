@@ -1,0 +1,242 @@
+/*
+ * The structural stylesheet for pv_story() pages. Everything here is
+ * scoped to .pv-story and painted with the theme tokens (--surface,
+ * --primary, ...) that the R side writes onto the container - light by
+ * default, swapped by a prefers-color-scheme block in "auto" mode - so
+ * this file never needs to know a single colour.
+ *
+ * The layout contract with pv-story.js:
+ *   - a scene is a two-column grid: prose cards on the left, one sticky
+ *     pinned pane on the right, vertically centred in the viewport;
+ *   - every step's widget is rendered up front inside the pane,
+ *     absolutely stacked, hidden with opacity/visibility (NOT
+ *     display:none, which would zero the widgets' boxes and break the
+ *     size they lay themselves out for);
+ *   - without the script - or under prefers-reduced-motion, where the
+ *     script stands down - the :last-child rule below shows each
+ *     scene's final widget, so no pane is ever blank;
+ *   - the script announces itself by putting .pv-story-js on the story
+ *     root, and from then on .pv-active picks the visible widget and
+ *     the emphasised card.
+ */
+
+.pv-story {
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--primary);
+  padding: 8px 0 40px;
+}
+
+.pv-story-header {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 44px 24px 10px;
+}
+
+.pv-story-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.pv-story-subtitle {
+  color: var(--secondary);
+  line-height: 1.55;
+  max-width: 640px;
+  font-size: 15.5px;
+  margin: 8px 0 0;
+}
+
+/* ---- scenes: sticky pane right, scrolling prose left ------------- */
+
+.pv-story-scene {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  column-gap: 48px;
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 16px 24px;
+}
+
+/* The pane comes FIRST in the DOM so the narrow-screen block layout can
+   stick it above the prose; on the grid it is simply placed into the
+   right-hand column of the one shared row. align-self keeps it at its
+   own height, and the top offset centres it in the viewport (never
+   closer than 18px to the edge). --pv-pane-h is set inline per scene by
+   the R side: the tallest step widget of that scene. */
+.pv-story-pane {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  position: sticky;
+  position: -webkit-sticky;
+  top: 18px;
+  top: max(18px, calc(50vh - var(--pv-pane-h, 420px) / 2));
+  height: var(--pv-pane-h, 420px);
+  min-width: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+/* Every step's widget, stacked and hidden in place. Layout is
+   preserved, so htmlwidgets' static render measures the true box and
+   the charts' own ResizeObservers keep them honest afterwards. The
+   visibility transition is delayed past the opacity fade, so an
+   outgoing widget stays hit-test-invisible only after it has faded. */
+.pv-story-widget {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 300ms ease, visibility 0s linear 300ms;
+}
+
+/* No script (or reduced motion): the scene shows its last step's
+   widget, statically. */
+.pv-story-widget:last-child {
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+
+/* The script is driving: only the active widget shows. The two rules
+   tie on specificity, so the .pv-active one must stay below the
+   :last-child override. */
+.pv-story-js .pv-story-widget:last-child {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 300ms ease, visibility 0s linear 300ms;
+}
+
+.pv-story-js .pv-story-widget.pv-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 300ms ease;
+}
+
+/* ---- the prose column -------------------------------------------- */
+
+.pv-story-prose {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: 6vh 0 1px;
+}
+
+.pv-story-step {
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  padding: 18px 20px;
+  color: var(--secondary);
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0 0 55vh;
+}
+
+/* Room below the final card. This must stay generous: the card has to
+   be able to reach the viewport's centre band to trigger its step, and
+   a scene at the very end of the page has nothing after it to scroll
+   against - half a viewport of runway guarantees the last step always
+   activates. */
+.pv-story-step:last-child {
+  margin-bottom: 50vh;
+}
+
+.pv-story-step p {
+  margin: 0 0 10px;
+}
+
+.pv-story-step p:last-child {
+  margin-bottom: 0;
+}
+
+.pv-story-step h3 {
+  color: var(--primary);
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+
+.pv-story-step strong {
+  color: var(--primary);
+}
+
+/* While the script drives, the cards away from the viewport centre
+   recede a little and the active one reads at full strength. */
+.pv-story-js .pv-story-step {
+  opacity: 0.55;
+  transition: opacity 300ms ease;
+}
+
+.pv-story-js .pv-story-step.pv-active {
+  opacity: 1;
+}
+
+/* ---- full-width breaks between scenes ---------------------------- */
+
+.pv-story-break {
+  max-width: 1140px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 26px 24px;
+  line-height: 1.6;
+}
+
+.pv-story-break h2 {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+
+.pv-story-break p {
+  color: var(--secondary);
+  max-width: 700px;
+  margin: 0 0 10px;
+}
+
+/* A wide table or chart dropped in as a break scrolls inside itself
+   instead of pushing the page sideways. */
+.pv-story-break {
+  overflow-x: auto;
+}
+
+/* ---- the story's own source line --------------------------------- */
+
+.pv-story-source {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+  border-top: 1px solid var(--grid);
+  max-width: 1092px;
+  margin: 28px auto 0;
+  padding: 12px 24px 0;
+}
+
+/* ---- narrow screens: pane pinned on top, prose beneath ------------ */
+
+@media (max-width: 860px) {
+  .pv-story-scene {
+    display: block;
+  }
+  .pv-story-pane {
+    top: 8px;
+    margin-bottom: 28px;
+  }
+  .pv-story-step {
+    max-width: none;
+    margin: 0 0 45vh;
+  }
+}
+
+/* Reduced motion: no fades anywhere. The script also stands down
+   entirely (pv-story.js checks the same media query), leaving the
+   static last-step view above. */
+@media (prefers-reduced-motion: reduce) {
+  .pv-story-widget,
+  .pv-story-step {
+    transition: none !important;
+  }
+}

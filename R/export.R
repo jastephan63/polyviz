@@ -586,11 +586,15 @@ format_px <- function(v) {
 pv_save <- function(widget, file, width = 900, height = NULL, scale = 2,
                     mode = "light", delay = 0.5, embed_fonts = TRUE,
                     quiet = FALSE, fps = 20) {
-  # A chart board takes its own save path (R/board.R); the single-chart
-  # path below is untouched.
+  # A chart board takes its own save path (R/board.R), and a scrolly
+  # story its own (R/story.R); the single-chart path below is untouched.
   if (inherits(widget, "pv_board")) {
     return(board_save(widget, file, width = width, height = height,
                       scale = scale, mode = mode, delay = delay,
+                      embed_fonts = embed_fonts, quiet = quiet))
+  }
+  if (inherits(widget, "pv_story")) {
+    return(story_save(widget, file, mode = mode,
                       embed_fonts = embed_fonts, quiet = quiet))
   }
   if (!inherits(widget, "pvchart")) {

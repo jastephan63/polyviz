@@ -1,5 +1,5 @@
-/* The comparison family: slope charts, dumbbells, waterfalls, and
-   bullet charts - the forms whose whole job is putting two or more
+/* The comparison family: slope charts, dumbbells, pyramids, waterfalls,
+   and bullet charts - the forms whose whole job is putting two or more
    values side by side so the gap is the message. Each registers on
    pvRenderers like every other chart family. */
 (function () {
@@ -375,6 +375,163 @@
       })
       .on("click", function (event, d) {
         ctx.emit("click", { category: d.y, from: d.x1, to: d.x2 });
+      });
+  };
+
+  /* ---------- pyramid ---------- */
+
+  pvRenderers.pyramid = function (ctx) {
+    var data = ctx.x.data;
+    var labels = ctx.x.labels;
+    /* Two categorical palette slots by convention: slot 1 for the left
+       side, slot 2 for the right. The legend explains the pairing once,
+       up top, exactly as the dumbbell's does. */
+    var color = d3.scaleOrdinal().domain(labels)
+      .range([ctx.theme.palette[0], ctx.theme.palette[1]]);
+    pv.buildLegend(ctx.header, labels, color, ctx.theme);
+    ctx.height = Math.max(120, ctx.height - 26);
+
+    /* The category margin logic of every horizontal form: grow with
+       the longest name, never eat the plot, truncate what remains
+       (the tooltip keeps the full text). */
+    var perChar = pv.textWidth("x", 11);
+    var longest = d3.max(data, function (d) {
+      return pv.textWidth(d.y, 11); }) || perChar * 4;
+    var left = Math.max(70, Math.min(190, Math.ceil(22 + longest),
+      Math.floor(ctx.width * 0.45)));
+    var maxChars = Math.max(4, Math.floor((left - 12) / perChar + 0.01));
+    var m = { top: 8, right: 20, bottom: ctx.x.xlab ? 48 : 34, left: left };
+    var iw = ctx.width - m.left - m.right,
+        ih = ctx.height - m.top - m.bottom;
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var yBand = d3.scaleBand()
+      .domain(data.map(function (d) { return d.y; }))
+      .range([0, ih]).paddingInner(0.3).paddingOuter(0.1);
+    /* One symmetric scale sized to the larger side, so equal values
+       mirror at equal lengths whichever side they sit on. The tick
+       labels read as absolute values on both sides - a leftward bar of
+       12,000 says 12,000, never -12,000. */
+    var most = d3.max(data, function (d) {
+      return Math.max(d.left, d.right); }) || 1;
+    var x = d3.scaleLinear().domain([-most, most]).nice().range([0, iw]);
+    var cx = x(0);
+
+    var xAxis = g.append("g").attr("transform", "translate(0," + ih + ")")
+      .call(d3.axisBottom(x).ticks(Math.min(7, Math.floor(iw / 70)))
+        .tickFormat(function (v) { return pv.fmtTick(Math.abs(v)); })
+        .tickSizeOuter(0));
+    pv.styleAxis(xAxis, ctx.theme, true);
+    var yAxis = g.append("g").call(d3.axisLeft(yBand).tickSize(0)
+      .tickFormat(function (d) { return pv.truncate(d, maxChars); }));
+    pv.styleAxis(yAxis, ctx.theme, false);
+    pv.axisLabels(svg, ctx, m, iw, ih, ctx.x.xlab, "");
+
+    /* The centre spine both sides grow from, in the grid ink - present
+       but never competing with the bars. */
+    g.append("line")
+      .attr("x1", cx).attr("x2", cx).attr("y1", 0).attr("y2", ih)
+      .attr("stroke", ctx.theme.ink.grid);
+
+    /* pv.rightRoundedBar rounds the data end of a rightward bar; the
+       leftward bars need its mirror - same path rotated half a turn, so
+       only the LEFT corners round. `xEnd` is the bar's inner edge at
+       the spine; the bar grows leftward from it. */
+    function leftRoundedBar(xEnd, y0, w, h, r) {
+      r = Math.max(0, Math.min(r, h / 2, w));
+      return "M" + xEnd + "," + (y0 + h) +
+        "h" + (-(w - r)) +
+        "a" + r + "," + r + " 0 0 1 " + (-r) + "," + (-r) +
+        "v" + (-(h - 2 * r)) +
+        "a" + r + "," + r + " 0 0 1 " + r + "," + (-r) +
+        "h" + (w - r) + "z";
+    }
+
+    var rows = g.selectAll("g.row").data(data).enter().append("g")
+      .attr("class", "row");
+
+    /* Each bar keeps a 2px surface gap to the spine, so the centre
+       line reads through between the two sides; the data end sits at
+       the true value position, wearing the 4px rounding. */
+    var gap = 2;
+    function leftW(d) { return Math.max(0, cx - gap - x(-d.left)); }
+    function rightW(d) { return Math.max(0, x(d.right) - cx - gap); }
+
+    var barsL = rows.append("path")
+      .attr("fill", color(labels[0]))
+      .attr("d", function (d) {
+        return leftRoundedBar(cx - gap, yBand(d.y), 0,
+          yBand.bandwidth(), 4);
+      });
+    var barsR = rows.append("path")
+      .attr("fill", color(labels[1]))
+      .attr("d", function (d) {
+        return pv.rightRoundedBar(cx + gap, yBand(d.y), 0,
+          yBand.bandwidth(), 4);
+      });
+
+    /* Both sides grow outward from the spine together, row by row with
+       the family stagger. */
+    if (ctx.duration > 0) {
+      var delayOf = function (d, i) { return Math.min(i * 18, 480); };
+      barsL.transition().duration(ctx.duration).delay(delayOf)
+        .ease(d3.easeCubicOut)
+        .attrTween("d", function (d) {
+          var w = leftW(d);
+          return function (t) {
+            return leftRoundedBar(cx - gap, yBand(d.y), t * w,
+              yBand.bandwidth(), 4);
+          };
+        });
+      barsR.transition().duration(ctx.duration).delay(delayOf)
+        .ease(d3.easeCubicOut)
+        .attrTween("d", function (d) {
+          var w = rightW(d);
+          return function (t) {
+            return pv.rightRoundedBar(cx + gap, yBand(d.y), t * w,
+              yBand.bandwidth(), 4);
+          };
+        });
+    } else {
+      barsL.attr("d", function (d) {
+        return leftRoundedBar(cx - gap, yBand(d.y), leftW(d),
+          yBand.bandwidth(), 4);
+      });
+      barsR.attr("d", function (d) {
+        return pv.rightRoundedBar(cx + gap, yBand(d.y), rightW(d),
+          yBand.bandwidth(), 4);
+      });
+    }
+
+    /* An invisible strip per row makes the whole row hoverable. */
+    rows.append("rect")
+      .attr("x", 0)
+      .attr("y", function (d) { return yBand(d.y) - yBand.step() *
+        yBand.paddingInner() / 2; })
+      .attr("width", iw).attr("height", yBand.step())
+      .attr("fill", "transparent");
+
+    rows
+      .on("pointerenter pointermove", function (event, d) {
+        rows.attr("opacity", function (r) { return r === d ? 1 : 0.3; });
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", { category: d.y, left: d.left,
+            right: d.right });
+        }
+        pv.showTip(ctx, event, "<b>" + pv.esc(d.y) + "</b><br>" +
+          pv.swatchRow(color(labels[0]), labels[0], ctx.fmt(d.left)) +
+          "<br>" +
+          pv.swatchRow(color(labels[1]), labels[1], ctx.fmt(d.right)));
+      })
+      .on("pointerleave", function () {
+        rows.attr("opacity", 1);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", { category: d.y, left: d.left,
+          right: d.right });
       });
   };
 

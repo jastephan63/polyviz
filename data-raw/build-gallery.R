@@ -21,6 +21,7 @@ display_names <- c(
   arc = "Arc diagram",
   sunburst = "Zoomable sunburst", icicle = "Zoomable icicle",
   slope = "Slope chart", dumbbell = "Dumbbell chart",
+  pyramid = "Pyramid chart",
   waterfall = "Waterfall chart", bullet = "Bullet chart",
   waffle = "Waffle chart", histogram = "Histogram",
   boxplot = "Boxplot", ridgeline = "Ridgeline", donut = "Donut chart",

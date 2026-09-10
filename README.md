@@ -6,9 +6,9 @@
 
 polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wanting to write JavaScript. Every chart is rendered by a bundled copy of D3 v7 — real d3 scales, transitions, tooltips, force simulations — but you drive it entirely from R data frames.
 
-**→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — a six-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, and an ageing no scenario escapes — every number computed from the data.
+**→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — an eight-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, an ageing no scenario escapes, a housing market read through thirty years of vacancy counts, and a fleet caught mid-electrification — every number computed from the data.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 36 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 37 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 **Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.
 
@@ -16,7 +16,7 @@ Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 36 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 37 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -48,6 +48,7 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_slope()` — two moments compared | `pv_dumbbell()` — the gap on every row | `pv_waterfall()` — running totals |
 | `pv_bullet()` — value, target, bands | `pv_waffle()` — countable squares | `pv_icicle()` — zoomable |
 | `pv_horizon()` — many series, folded into ribbons | `pv_flow_map()` — tapered flows on a map | `pv_table()` — sortable, in-cell bars, shading & sparklines |
+| `pv_pyramid()` — opposing flows, mirrored | | |
 
 ## Charts in papers and documents
 

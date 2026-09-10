@@ -13,7 +13,7 @@ pv_cache_status())."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -61,7 +61,14 @@ and parses it into a tidy data frame. Downloads are cached (see
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">pv_fetch_bfs</span><span class="op">(</span><span class="va">id</span>, agency <span class="op">=</span> <span class="cn">NULL</span>, refresh <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">pv_fetch_bfs</span><span class="op">(</span></span>
+<span>  <span class="va">id</span>,</span>
+<span>  agency <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  filter <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  start <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  end <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  refresh <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -78,6 +85,21 @@ derived from the theme code in the id (<code>DF_SSV_*</code> belongs to
 <dt id="arg-agency">agency<a class="anchor" aria-label="anchor" href="#arg-agency"></a></dt>
 <dd><p>SDMX agency id owning the dataflow, e.g. <code>"CH1.SSV"</code>.
 Defaults to <code>"CH1.&lt;theme&gt;"</code> derived from <code>id</code>.</p></dd>
+
+
+<dt id="arg-filter">filter<a class="anchor" aria-label="anchor" href="#arg-filter"></a></dt>
+<dd><p>A single SDMX data key restricting the download to a
+slice of the dataflow, e.g. <code>"LU...."</code> - dimension values in the
+dataflow's dimension order, separated by dots, where an empty segment
+keeps all values of a dimension and <code>+</code> combines several. The default
+<code>NULL</code> downloads the complete flow. See Details for how to find the
+dimension order.</p></dd>
+
+
+<dt id="arg-start-end">start, end<a class="anchor" aria-label="anchor" href="#arg-start-end"></a></dt>
+<dd><p>First / last period to download, a single year or
+period such as <code>"2015"</code> (sent as the <code>startPeriod</code> / <code>endPeriod</code>
+query parameters). The default <code>NULL</code> places no bound.</p></dd>
 
 
 <dt id="arg-refresh">refresh<a class="anchor" aria-label="anchor" href="#arg-refresh"></a></dt>
@@ -104,6 +126,25 @@ years (<code>pop_ref_period_1930</code> ...) with current-period codes
 plus density and percent-change variants. Rows whose indicator code
 starts with <code>"pop_ref_period"</code> and whose label is a bare four-digit year
 are the population counts.</p>
+<p>Some dataflows are enormous when pulled whole - the vacancy dataflow
+<code>DF_LWZ_1</code> and the dwelling register <code>DF_GWS_REG5</code>, for instance, run to
+hundreds of megabytes unfiltered. <code>filter</code> narrows the download on the
+server with an SDMX data key: one value per dimension, separated by
+dots, in the dataflow's dimension order, where an empty segment keeps
+every value of that dimension and <code>+</code> combines alternatives within one.
+The dimension order comes from the dataflow's data structure - request
+<code>https://disseminate.stats.swiss/rest/dataflow/&lt;agency&gt;/&lt;id&gt;/latest?references=all</code>
+to discover it. For <code>"CH1.LWZ,DF_LWZ_1"</code> the order is
+<code>GR_KT_GDE.WOHN_ANZAHL.LEERWOHN_TYP.MEASURE_DIMENSION.FREQ</code>, so the key
+<code>"LU...."</code> fixes the region to canton Lucerne and leaves the other four
+dimensions open. <code>start</code> and <code>end</code> bound the time axis the same way.
+Because the download cache keys on the full request URL, differently
+filtered pulls of one dataflow cache independently of each other and of
+the complete flow.</p>
+<p>One quirk of filtered exports: the server names their time column
+<code>TIME_PERIOD</code> where the complete <code>/all</code> exports say <code>PERIOD</code>, so a
+filtered result carries a <code>time_period</code> column where an unfiltered one
+has <code>period</code>. Everything else parses identically.</p>
 <p>BFS publishes stats.swiss data under the opendata.swiss "OPEN BY" terms:
 free use with source citation ("Quelle: Bundesamt für Statistik").
 Check the dataset page on stats.swiss should a dataflow state different
@@ -121,6 +162,11 @@ terms.</p>
 <span class="r-in"><span><span class="va">cities</span> <span class="op">&lt;-</span> <span class="va">pop</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/startsWith.html" class="external-link">startsWith</a></span><span class="op">(</span><span class="va">pop</span><span class="op">$</span><span class="va">ssv_pop_1930_code</span>, <span class="st">"pop_ref_period"</span><span class="op">)</span> <span class="op">&amp;</span></span></span>
 <span class="r-in"><span>                <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^\\d{4}$"</span>, <span class="va">pop</span><span class="op">$</span><span class="va">ssv_pop_1930</span><span class="op">)</span> <span class="op">&amp;</span></span></span>
 <span class="r-in"><span>                <span class="va">pop</span><span class="op">$</span><span class="va">ssv_swiss_city_code</span> <span class="op">!=</span> <span class="st">"_ST"</span>, <span class="op">]</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># canton Lucerne's vacancy rate only - the complete DF_LWZ_1 flow runs</span></span></span>
+<span class="r-in"><span><span class="co"># to hundreds of megabytes, this slice is a few kilobytes</span></span></span>
+<span class="r-in"><span><span class="va">lwz</span> <span class="op">&lt;-</span> <span class="fu">pv_fetch_bfs</span><span class="op">(</span><span class="st">"CH1.LWZ,DF_LWZ_1"</span>, filter <span class="op">=</span> <span class="st">"LU._T._T.PC.A"</span>,</span></span>
+<span class="r-in"><span>                    start <span class="op">=</span> <span class="st">"2015"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

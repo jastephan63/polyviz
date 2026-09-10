@@ -1,7 +1,7 @@
-# Gallery snippets for the comparison family: slope, dumbbell, waterfall,
-# bullet. Each block: an id, an explanation for the demo page, and one
-# runnable expression on the real bundled data. data-raw/build-gallery.R
-# assembles these into docs/.
+# Gallery snippets for the comparison family: slope, dumbbell, pyramid,
+# waterfall, bullet. Each block: an id, an explanation for the demo page,
+# and one runnable expression on the real bundled data.
+# data-raw/build-gallery.R assembles these into docs/.
 
 ## slope
 # explain: The slope chart is for exactly two moments and the change
@@ -59,6 +59,39 @@ local({
               title = "Whose tax base moved most",
               subtitle = "Resource index of Lucerne municipalities, first vs latest published year (100 = cantonal average)",
               source = "Source: LUSTAT Statistik Luzern")
+})
+
+## pyramid
+# explain: The pyramid is the mirrored form for opposing flows: one row
+#   per category, two non-negative values drawn as bars growing left and
+#   right from a shared centre spine - age bands split male/female,
+#   commuters in against commuters out, imports against exports. Both
+#   sides share one symmetric scale sized to the larger side, and the
+#   tick labels read as absolute values on both, so a leftward bar of
+#   12,000 says 12,000, never -12,000. Reach for it over grouped bars
+#   whenever the two columns are two directions of one thing - the
+#   mirroring makes every imbalance a visible asymmetry. Canton Zug is a
+#   jobs magnet, and the pyramid says so at a glance: every one of the
+#   five regions leans left. Zürich runs the biggest exchange, 14,910
+#   commuters in against 10,189 out, but Lucerne's is the most lopsided
+#   of the big ones - 12,376 in against 5,136 heading back - and Aargau
+#   sends more than four commuters for every one it receives. Hover a
+#   row for both exact counts.
+local({
+  latest <- pv_commuters[pv_commuters$period ==
+                           max(pv_commuters$period), ]
+  inbound <- latest[latest$direction == "to Zug",
+                    c("region", "commuters")]
+  outbound <- latest[latest$direction == "from Zug",
+                     c("region", "commuters")]
+  both <- merge(inbound, outbound, by = "region",
+                suffixes = c("_in", "_out"))
+  pv_pyramid(both, y = "region", left = "commuters_in",
+             right = "commuters_out", labels = c("to Zug", "from Zug"),
+             sort = "total",
+             title = "Commuters in and out of Canton Zug",
+             subtitle = "Both directions of the commuter exchange, 2022–2024 average",
+             source = "Source: Bundesamt für Statistik – Pendlermobilität")
 })
 
 ## waterfall

@@ -1,5 +1,5 @@
 # Builds the printable cheatsheet: one A4 landscape page that groups all
-# 36 chart constructors by intent, states the shared grammar, and lists
+# 37 chart constructors by intent, states the shared grammar, and lists
 # the ways in (data) and out (paper). The page is laid out as HTML in the
 # package's own light-mode design tokens (pv_colors), set in the bundled
 # Inter, and printed to a true vector PDF by headless Chrome - the same
@@ -34,6 +34,7 @@ chooser <- list(
       c("pv_lollipop()", "a ranking with less ink than bars"),
       c("pv_slope()", "two moments, one line per group; the slope is the change"),
       c("pv_dumbbell()", "two values per category, the gap on every row"),
+      c("pv_pyramid()", "opposing flows mirrored from a centre spine"),
       c("pv_waterfall()", "signed contributions building to a total"),
       c("pv_bullet()", "measures against their targets, in compact rows"),
       c("pv_heatmap()", "one value across two category axes"))),
@@ -87,7 +88,7 @@ chooser <- list(
       c("pv_dendrogram()", "an hclust tree, cut into k groups"))))
 
 n_charts <- sum(vapply(chooser, function(g) length(g$entries), integer(1)))
-stopifnot(n_charts == 36L)
+stopifnot(n_charts == 37L)
 
 # ---------------------------------------------------------------------
 # Small builders, so the markup below reads like the sheet.
@@ -403,7 +404,7 @@ if (length(missing)) {
 constructors <- unlist(lapply(chooser, function(g) {
   vapply(g$entries, function(e) sub("\\(\\)$", "", e[[1]]), character(1))
 }))
-stopifnot(length(constructors) == 36L,
+stopifnot(length(constructors) == 37L,
           !anyDuplicated(constructors),
           all(vapply(constructors, function(f) {
             is.function(get0(f, envir = asNamespace("polyviz")))

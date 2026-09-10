@@ -88,6 +88,23 @@ city_bubbles <- merge(pv_city_coords,
                       pv_city_population[pv_city_population$year == 2024, ],
                       by = "city")
 
+# Hotel nights per canton for the hexmap: the total for the sequential
+# ramp, and the foreign-guest share for the diverging one.
+canton_nights <- local({
+  n24 <- pv_tourism[pv_tourism$year == 2024, ]
+  total <- aggregate(nights ~ canton_id, n24, sum)
+  foreign <- aggregate(nights ~ canton_id,
+                       n24[n24$origin != "Switzerland", ], sum)
+  m <- merge(total, foreign, by = "canton_id",
+             suffixes = c("", "_foreign"))
+  m$foreign_pct <- round(100 * m$nights_foreign / m$nights, 1)
+  m
+})
+
+# The national foreign share anchors the diverging palette's midpoint.
+foreign_share_ch <- round(
+  100 * sum(canton_nights$nights_foreign) / sum(canton_nights$nights))
+
 # The largest cities as a table: today's population, growth since 1990,
 # and the full census series as a sparkline per row.
 city_table <- local({
@@ -254,7 +271,7 @@ demo_chart_ids <- c(
   "evo_line", "evo_zoom", "evo_area", "evo_calendar",
   "comp_donut", "comp_treemap", "comp_sunburst",
   "rel_scatter", "rel_force", "rel_arc", "rel_sankey",
-  "geo_lucerne", "geo_cantons", "geo_bubbles",
+  "geo_lucerne", "geo_cantons", "geo_hexmap", "geo_bubbles",
   "mot_race", "mot_bump",
   "tab_table", "tab_heatmap", "tab_pairs")
 
@@ -363,6 +380,11 @@ ui <- fluidPage(
                                  c("sequential", "diverging"),
                                  selected = "diverging")),
             demo_card("geo_cantons"),
+            demo_card("geo_hexmap",
+                      demo_radio("geo_hex_palette", "palette",
+                                 c("sequential", "diverging"),
+                                 selected = "diverging"),
+                      wide = TRUE, height = "460px"),
             demo_card("geo_bubbles", wide = TRUE, height = "460px"))),
       tabPanel(
         "Motion",
@@ -606,6 +628,25 @@ server <- function(input, output, session) {
                   title = "Where urban Switzerland lives",
                   subtitle = "City population by canton, 2024",
                   source = bfs, mode = mode())
+  }))
+
+  output$geo_hexmap <- renderPvchart(demo_widget(function() {
+    diverging <- identical(input$geo_hex_palette %||% "diverging",
+                           "diverging")
+    if (diverging) {
+      pv_hexmap(canton_nights, id = "canton_id", value = "foreign_pct",
+                palette = "diverging", center = foreign_share_ch,
+                title = "Geneva sleeps international, the Jura sleeps Swiss",
+                subtitle = sprintf(paste("Foreign share of hotel nights,",
+                                         "2024; Switzerland overall: %d%%"),
+                                   foreign_share_ch),
+                source = bfs, mode = mode())
+    } else {
+      pv_hexmap(canton_nights, id = "canton_id", value = "nights",
+                title = "Where Switzerland's guests sleep",
+                subtitle = "Hotel nights by canton, 2024",
+                source = bfs, mode = mode())
+    }
   }))
 
   output$geo_bubbles <- renderPvchart(demo_widget(function() {

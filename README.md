@@ -8,15 +8,15 @@ polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wa
 
 **→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — an eight-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, an ageing no scenario escapes, a housing market read through thirty years of vacancy counts, and a fleet caught mid-electrification — every number computed from the data.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 37 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 38 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 **Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.
 
 ## Contents
 
 - [Installation](#installation) · [A first chart](#a-first-chart)
-- [The charts — all 37](#the-charts) · [Layers: annotate, trend, facet, link](#layers-annotate-trend-facet-link)
-- [Time-series statistics](#time-series-statistics) · [Boards and decks](#boards-and-decks)
+- [The charts — all 38](#the-charts) · [Layers: annotate, trend, facet, link](#layers-annotate-trend-facet-link)
+- [Time-series statistics](#time-series-statistics) · [Boards and decks](#boards-and-decks) · [Scrollytelling stories](#scrollytelling-stories)
 - [Charts in papers and documents](#charts-in-papers-and-documents)
 - [Design](#design) · [Accessibility](#accessibility)
 - [Getting data in](#getting-data-in) · [Analysing it](#analysing-it)
@@ -26,8 +26,8 @@ Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 37 interactive chart types |
-| **SQL** | `R/sql.R`, `inst/sql/` | SQLite querying, parameterised queries, runnable `.sql` script files |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 38 interactive chart types |
+| **SQL** | `R/sql.R`, `inst/sql/` | SQLite and DuckDB querying, parameterised queries, runnable `.sql` script files, Parquet files read in place |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
 
@@ -130,6 +130,7 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_choropleth()` | Regions coloured by value — Lucerne municipalities bundled; cantons, districts, or all ~2,100 Swiss municipalities via `map =` |
 | `pv_bubble_map()` | Sized circles at coordinates on the Swiss layers |
 | `pv_flow_map()` | Tapered movement arcs between places |
+| `pv_hexmap()` | The equal-area canton cartogram: one hexagon per canton, so Basel-Stadt reads as large as Graubünden |
 
 **Read exact values**
 
@@ -178,6 +179,10 @@ Each states plainly what it assumes and what its intervals don't know: the fitte
 
 `pv_deck(charts, "review.pptx")` renders a list of charts straight into a PowerPoint deck — one real 2x capture per 16:9 slide, title slide and speaker notes included (needs the officer package).
 
+## Scrollytelling stories
+
+`pv_story()` composes charts and prose into a long-form scrollytelling page — again no Shiny, no R Markdown. Consecutive `pv_story_step(chart, "<p>prose</p>")` blocks form a *scene*: the prose cards scroll up one column while the scene's chart pane stays pinned beside them (on top, on narrow screens), and as each card reaches the middle of the viewport the pane crossfades to that step's chart — every step simply carries its complete widget, so a scene is typically one chart told in beats: more annotations, a changed subtitle, a different year. `pv_story_break(x)` ends the scene and lays a heading, connecting prose, or a full-width chart across the page before the next one begins. The result prints to the viewer, embeds in an R Markdown or Quarto chunk, and saves whole with `htmltools::save_html(story, "story.html")`. And it degrades honestly: in a browser without IntersectionObserver, or for a reader whose system asks for reduced motion, the prose flows normally and each scene shows its last chart statically — never a blank pane.
+
 ## Charts in papers and documents
 
 Interactive is the default, but every chart also leaves the browser as a print-quality file — `pv_save()` picks the format from the extension:
@@ -208,6 +213,8 @@ The system is programmable. `pv_set_theme()` restyles every subsequent chart (an
 
 Every chart describes itself: an automatically generated description of type, variables, extremes, and shape is attached as `aria` alt text for screen readers and flows into knitted documents as `fig.alt`. `pv_alt(w, "...")` replaces it with your own words when the data deserves better ones; `pv_alt_text(w)` shows what a chart will say. Charts carry `role="img"` with the description as their accessible name, boards expose real headings, and `pv_static()` produces a still figure for contexts where motion is unwelcome. The palette's colour-vision-deficiency guarantees and the `pv_textures()` hatching layer mean series identity never rides on colour alone.
 
+Charts are keyboard-navigable too. Tab focuses a chart; the arrow keys then walk it mark by mark, driving the same tooltip and hover machinery the pointer does, ringing the current mark, and echoing each tooltip's text to a polite `aria-live` region — `Home`/`End` jump to the ends, `Escape` clears. Honest coverage: every family that binds hover per mark gets the full walk (bars in all layouts, the distribution and hierarchy charts, scatter, the networks and flows, the maps, and more); line and area — and the scatter's canvas and density modes — take their hover through a single overlay, so keyboard users get one stop announcing the values at the chart's centre rather than a per-point walk; the table is real HTML and needs none of this; and `pv_static()` charts opt out along with everything else interactive.
+
 ## Getting data in
 
 ```r
@@ -224,13 +231,25 @@ pv_query(con, "SELECT * FROM sales WHERE region = ?", params = list("North"))
 pv_run_sql_file(con, system.file("sql", "demo.sql", package = "polyviz"))
 pv_db_disconnect(con)
 
+# DuckDB drives the same functions (needs the duckdb package; a
+# .duckdb/.ddb path picks it automatically) and queries Parquet and CSV
+# files straight from disk — an aggregation over a larger-than-memory
+# file never imports it:
+con <- pv_db_connect(driver = "duckdb")
+pv_query(con, "SELECT region, SUM(revenue) AS revenue
+               FROM 'sales.parquet' GROUP BY region")
+pv_db_disconnect(con)
+
+# pv_read() dispatches .parquet the same way — read in place by DuckDB
+pv_read("sales.parquet")
+
 # SAS: round-trip datasets with variable labels intact
 df <- pv_set_labels(pv_sales, c(revenue = "Net revenue, EUR"))
 pv_write_sas(df, "sales.xpt")
 pv_labels(pv_read_sas("sales.xpt"))
 ```
 
-### Live Swiss open data
+### Live Swiss and European open data
 
 ```r
 pv_search_opendata("Finanzausgleich Luzern")        # the federal catalogue
@@ -243,6 +262,18 @@ pv_fetch_lustat("fa-lu-ra")       # a LUSTAT Statistik Luzern CSV
 # '+' = or). DF_LWZ_1 is hundreds of MB whole; canton Lucerne's vacancy
 # rate since 2015 is a few KB:
 pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU._T._T.PC.A", start = "2015")
+
+# Or skip memorising the dimension order: name the dimensions as a list
+# and polyviz builds the key from the dataflow's structure — unnamed
+# dimensions stay open, and a misspelt name errors with the real
+# dimension ids in key order
+pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", start = "2015",
+             filter = list(GR_KT_GDE = "LU", MEASURE_DIMENSION = "PC"))
+
+# One portal beyond Switzerland: Eurostat, with the same key mechanics
+# (codes rather than labels; CC BY 4.0, "Source: Eurostat")
+pv_fetch_eurostat("demo_pjan", filter = "A.NR.TOTAL.T.CH+LU",
+                  start = "2015")
 ```
 
 Every fetch prints the data's source and licence terms and attaches them to the result; resources without an open licence are refused rather than delivered. Downloads are cached under the URL's hash — `pv_cache_status()` lists the cache, `pv_cache_clear()` empties it, and a cached build re-runs offline. Portals, keys, and obligations: `vignette("swiss-open-data")`.

@@ -1,6 +1,6 @@
 Package: polyviz
 Title: Polyglot Data Analysis and 'D3'-Powered Visualisation
-Version: 1.4.0
+Version: 1.5.0
 Authors@R:
     person("Jake", "Stephan", email = "jake@stephan-j.com",
            role = c("aut", "cre"))
@@ -38,6 +38,7 @@ Imports:
 Suggests:
     chromote,
     curl,
+    duckdb,
     gifski,
     officer,
     reticulate,

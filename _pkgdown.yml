@@ -63,6 +63,7 @@ reference:
   - pv_choropleth
   - pv_bubble_map
   - pv_flow_map
+  - pv_hexmap
   - pv_race
   - pv_table
 
@@ -81,12 +82,15 @@ reference:
 
 - title: Composition & time series
   desc: >
-    Several finished charts composed into one page, and the three
-    time-series tools - seasonal decomposition, forecast fans, and
-    changepoint marks - computed entirely in base R's stats and drawn
-    by the chart machinery that already exists.
+    Several finished charts composed into one page or one scrollytelling
+    story, and the three time-series tools - seasonal decomposition,
+    forecast fans, and changepoint marks - computed entirely in base R's
+    stats and drawn by the chart machinery that already exists.
   contents:
   - pv_board
+  - pv_story
+  - pv_story_step
+  - pv_story_break
   - pv_decompose
   - pv_forecast
   - pv_changepoints
@@ -130,17 +134,18 @@ reference:
   - pv_query
   - pv_run_sql_file
 
-- title: Swiss open data
+- title: Swiss and European open data
   desc: >
-    Live access to the portals the bundled datasets come from - search
-    the opendata.swiss catalogue, fetch from the BFS and LUSTAT, pull
-    the country-wide boundary layers, and manage the shared download
+    Live access to the open-data portals - search the opendata.swiss
+    catalogue, fetch from the BFS, LUSTAT, and Eurostat, pull the
+    country-wide boundary layers, and manage the shared download
     cache. Every fetch states its source and licence terms.
   contents:
   - pv_search_opendata
   - pv_fetch_opendata
   - pv_fetch_bfs
   - pv_fetch_lustat
+  - pv_fetch_eurostat
   - pv_fetch_map
   - pv_cache_status
 

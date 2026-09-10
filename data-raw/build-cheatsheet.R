@@ -1,5 +1,5 @@
 # Builds the printable cheatsheet: one A4 landscape page that groups all
-# 37 chart constructors by intent, states the shared grammar, and lists
+# 38 chart constructors by intent, states the shared grammar, and lists
 # the ways in (data) and out (paper). The page is laid out as HTML in the
 # package's own light-mode design tokens (pv_colors), set in the bundled
 # Inter, and printed to a true vector PDF by headless Chrome - the same
@@ -79,7 +79,8 @@ chooser <- list(
     entries = list(
       c("pv_choropleth()", "a value per region, shaded on its map"),
       c("pv_bubble_map()", "sized points at real coordinates"),
-      c("pv_flow_map()", "movement between places, as tapered bands"))),
+      c("pv_flow_map()", "movement between places, as tapered bands"),
+      c("pv_hexmap()", "the cantons as equal hexagons, shaded by value"))),
   list(
     label = "Special",
     entries = list(
@@ -88,7 +89,7 @@ chooser <- list(
       c("pv_dendrogram()", "an hclust tree, cut into k groups"))))
 
 n_charts <- sum(vapply(chooser, function(g) length(g$entries), integer(1)))
-stopifnot(n_charts == 37L)
+stopifnot(n_charts == 38L)
 
 # ---------------------------------------------------------------------
 # Small builders, so the markup below reads like the sheet.
@@ -181,6 +182,9 @@ col3 <- tag$div(class = "col",
     def("pv_board(a, b)",
         list("finished charts composed into one page; ",
              fn("pv_save()"), " takes the board whole")),
+    def("pv_story(steps)",
+        list("scrollytelling — ", fn("pv_story_step()"),
+             " cards scroll past a pinned chart pane")),
     def("pv_decompose(d, x, y)",
         list("trend / seasonal / remainder panels \u2014 ",
              fn("stats::stl()"), " or classical")),
@@ -217,12 +221,16 @@ col4 <- tag$div(class = "col",
   section("Data in",
     def('pv_read("f.csv")',
         list("one reader for ", fn(".csv"), ", ", fn(".sqlite"), ", ",
+             fn(".duckdb"), ", ", fn(".parquet"), ", ",
              fn(".sas7bdat"), " and ", fn(".xpt"))),
     def("pv_search_opendata(q)",
         list("search the federal catalogue; ",
              fn("pv_fetch_opendata()"), " fetches what it lists")),
-    def("pv_fetch_bfs(id)", "a stats.swiss SDMX dataflow, tidied"),
-    def("pv_fetch_lustat(id)", "a LUSTAT Statistik Luzern table"),
+    def("pv_fetch_bfs(id, filter=)",
+        "a stats.swiss dataflow, sliced on the server"),
+    def("pv_fetch_lustat(id)",
+        list("a LUSTAT table; ", fn("pv_fetch_eurostat(id)"),
+             " the same for Europe")),
     def('pv_fetch_map("municipalities")',
         "the one boundary layer too big to bundle"),
     tag$p(class = "note",
@@ -296,7 +304,7 @@ html, body { width: 297mm; height: 210mm; }
 body {
   font-family: "InterVariable", "Inter", system-ui, sans-serif;
   background: ', ink$surface, '; color: ', ink$primary, ';
-  font-size: 7.2pt; line-height: 1.38;
+  font-size: 7.2pt; line-height: 1.32;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 code, pre {
@@ -404,7 +412,7 @@ if (length(missing)) {
 constructors <- unlist(lapply(chooser, function(g) {
   vapply(g$entries, function(e) sub("\\(\\)$", "", e[[1]]), character(1))
 }))
-stopifnot(length(constructors) == 37L,
+stopifnot(length(constructors) == 38L,
           !anyDuplicated(constructors),
           all(vapply(constructors, function(f) {
             is.function(get0(f, envir = asNamespace("polyviz")))

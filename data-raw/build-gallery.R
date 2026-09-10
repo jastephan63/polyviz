@@ -33,6 +33,7 @@ display_names <- c(
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
   `choropleth-cantons` = "Country-wide choropleth",
   `bubble-map` = "Bubble map", `flow-map` = "Flow map",
+  hexmap = "Hex cartogram",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
   pairs = "Scatterplot matrix", table = "Data table",
   violin = "Violin plot", calendar = "Calendar heatmap",
@@ -77,14 +78,17 @@ for (f in files) {
   for (s in parse_snippets(f)) {
     widget <- eval(parse(text = s$code), envir = new.env(parent = globalenv()))
     widget$width <- "100%"
-    widget$height <- if (s$id %in% names(section_heights)) {
+    height <- if (s$id %in% names(section_heights)) {
       section_heights[[s$id]]
     } else {
       470
     }
+    widget$height <- height
     nm <- display_names[[s$id]] %||% s$id
+    # The height rides on the section so the in-browser runner (the webR
+    # script below) can size its output the same as the built-in widget.
     sections[[length(sections) + 1]] <- tags$section(
-      id = s$id, class = "chart",
+      id = s$id, class = "chart", `data-run-height` = height,
       tags$h2(nm),
       tags$p(class = "explain", s$explain),
       widget,
@@ -102,6 +106,172 @@ toc <- tags$nav(lapply(sections, function(s) {
          display_names[[s$attribs$id]] %||% s$attribs$id)
 }))
 
+# The "Run in your browser" enhancement. Each snippet's code block gets
+# an editable surface and a button that runs the code on webR - a real R
+# interpreter compiled to WebAssembly, loaded from its CDN on first use.
+# polyviz itself installs from docs/wasm-repo/ (data-raw/build-wasm-repo.R
+# builds it; keep the webR release pinned here and that script's contrib
+# version in step). The snippet's widget payload comes back as the same
+# JSON htmlwidgets would embed, and the page's already-loaded pvchart
+# binding draws it via the global pvRender() - no saveWidget, no iframe,
+# no second copy of d3. Progressive enhancement throughout: without
+# JavaScript, on file://, or with the CDN unreachable, the gallery is
+# exactly the page it always was.
+webr_js <- r"---(
+(function () {
+  "use strict";
+  /* Wasm fetches need a real server, and the whole feature rides on the
+     pvchart binding already being on the page. */
+  if (!/^https?:$/.test(location.protocol)) return;
+  if (typeof window.pvRender !== "function") return;
+
+  var WEBR_URL = "https://webr.r-wasm.org/v0.6.0/webr.mjs";
+  var REPO_URL = new URL("wasm-repo", location.href).href;
+  var mql = window.matchMedia ?
+    window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  /* Status lines of every run currently waiting on the shared boot, so
+     one download's progress messages reach each pressed button. */
+  var statusEls = [];
+  function announce(msg) {
+    statusEls.forEach(function (el) {
+      el.classList.remove("webr-error");
+      el.textContent = msg;
+    });
+  }
+
+  /* One webR for the whole page, booted on the first click and reused by
+     every later run. A failed boot clears the promise so the next click
+     can try again. */
+  var bootPromise = null;
+  function boot() {
+    if (!bootPromise) {
+      bootPromise = (async function () {
+        announce("loading webR — the first run downloads about 30 MB…");
+        var mod = await import(WEBR_URL);
+        var webR = new mod.WebR();
+        await webR.init();
+        announce("installing polyviz into the browser R…");
+        await webR.evalRVoid(
+          'webr::install("polyviz", repos = c("' + REPO_URL +
+          '", "https://repo.r-wasm.org"), quiet = TRUE, mount = FALSE)');
+        await webR.evalRVoid("library(polyviz)");
+        /* The bridge: run a snippet, insist it made a widget, and hand
+           the payload back serialized exactly as htmlwidgets embeds it.
+           The serializer reads the widget's TOJSON_ARGS (rows, not
+           columns) off the $x element of the list it is handed, so the
+           payload goes over wrapped the same way and the page unwraps
+           .x after parsing. */
+        await webR.evalRVoid(
+          ".pv_gallery_json <- function(code) {\n" +
+          "  w <- eval(parse(text = code), envir = new.env(parent = globalenv()))\n" +
+          "  if (!inherits(w, \"htmlwidget\"))\n" +
+          "    stop(\"the code must end in a polyviz chart\", call. = FALSE)\n" +
+          "  as.character(htmlwidgets:::toJSON(list(x = w$x)))\n" +
+          "}");
+        return webR;
+      })();
+      bootPromise.catch(function () { bootPromise = null; });
+    }
+    return bootPromise;
+  }
+
+  /* Charts the runner drew, redrawn on resize and on theme flips - the
+     same behaviour the htmlwidgets factory gives the built-in charts.
+     pvRender itself leaves the payload on the element as __pvLastX. */
+  var outs = [];
+  function redraw(out) {
+    if (!out.__pvLastX) return;
+    window.pvRender(out, out.__pvLastX, out.offsetWidth, out.__pvH, mql);
+  }
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { outs.forEach(redraw); }, 150);
+  });
+  if (mql && mql.addEventListener) {
+    mql.addEventListener("change", function () { outs.forEach(redraw); });
+  }
+
+  async function run(section, codeEl, bar, statusEl, btn) {
+    btn.disabled = true;
+    statusEl.classList.remove("webr-error");
+    statusEls.push(statusEl);
+    try {
+      var webR = await boot();
+      announce("running…");
+      /* innerText keeps the line breaks a contenteditable edit made;
+         textContent is the fallback for anything that lacks it. */
+      var code = codeEl.innerText != null ?
+        codeEl.innerText : codeEl.textContent;
+      var json = await webR.evalRString(".pv_gallery_json(code)",
+        { env: { code: code } });
+      var out = bar.nextElementSibling;
+      if (!out || !out.classList.contains("webr-out")) {
+        out = document.createElement("div");
+        out.className = "webr-out";
+        bar.parentNode.insertBefore(out, bar.nextSibling);
+        outs.push(out);
+      }
+      out.__pvH = parseInt(section.getAttribute("data-run-height"), 10) || 470;
+      out.style.height = out.__pvH + "px";
+      window.pvRender(out, JSON.parse(json).x, out.offsetWidth, out.__pvH, mql);
+      statusEl.textContent = "";
+      btn.textContent = "Run again";
+    } catch (err) {
+      statusEl.classList.add("webr-error");
+      statusEl.textContent = err && err.message ? err.message : String(err);
+    } finally {
+      btn.disabled = false;
+      var i = statusEls.indexOf(statusEl);
+      if (i >= 0) statusEls.splice(i, 1);
+    }
+  }
+
+  document.querySelectorAll("section.chart").forEach(function (section) {
+    var details = section.querySelector("details");
+    var codeEl = details && details.querySelector("pre code");
+    if (!codeEl) return;
+    var original = codeEl.textContent;
+    /* plaintext-only keeps pasted formatting out; browsers without it
+       accept plain contenteditable, whose text still reads back fine. */
+    try { codeEl.contentEditable = "plaintext-only"; }
+    catch (e) { codeEl.contentEditable = "true"; }
+    codeEl.spellcheck = false;
+
+    var bar = document.createElement("div");
+    bar.className = "webr-bar";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "webr-run";
+    btn.textContent = "Run in your browser";
+    var reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "webr-reset";
+    reset.textContent = "Reset code";
+    var statusEl = document.createElement("span");
+    statusEl.className = "webr-status";
+    statusEl.setAttribute("aria-live", "polite");
+    var hint = document.createElement("span");
+    hint.className = "webr-hint";
+    hint.textContent = "The code above is editable, and the button " +
+      "runs it on a real R — webR, R compiled to WebAssembly — " +
+      "right here in the page.";
+    bar.appendChild(btn);
+    bar.appendChild(reset);
+    bar.appendChild(statusEl);
+    bar.appendChild(hint);
+    details.appendChild(bar);
+    btn.addEventListener("click", function () {
+      run(section, codeEl, bar, statusEl, btn);
+    });
+    reset.addEventListener("click", function () {
+      codeEl.textContent = original;
+    });
+  });
+})();
+)---"
+
 page <- tags$html(lang = "en", tags$head(
   tags$meta(charset = "utf-8"),
   tags$meta(name = "viewport",
@@ -115,6 +285,9 @@ page <- tags$html(lang = "en", tags$head(
       body { background: #1b1a18; color: #f6f4ef; }
       header p, .explain, nav a, footer { color: #c7c3b8 !important; }
       details { border-color: #45433d !important; }
+      .webr-run, .webr-reset { border-color: #45433d; }
+      .webr-status { color: #c7c3b8; }
+      .webr-status.webr-error { color: #d98b83; }
     }
     main { max-width: 880px; margin: 0 auto; padding: 0 20px 60px; }
     header { padding: 48px 0 8px; }
@@ -136,6 +309,23 @@ page <- tags$html(lang = "en", tags$head(
               border-radius: 8px; padding: 8px 12px; }
     summary { cursor: pointer; font-size: 13px; }
     pre { overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+    /* The 'Run in your browser' strip the webR script adds under each
+       code block. Without JavaScript none of this ever appears. */
+    .webr-bar { display: flex; align-items: center; flex-wrap: wrap;
+                gap: 8px 12px; margin: 4px 0 8px; }
+    .webr-run, .webr-reset { font: inherit; font-size: 13px;
+                cursor: pointer; color: #006ba2; background: none;
+                border: 1px solid #ddd8cc; border-radius: 6px;
+                padding: 4px 12px; }
+    .webr-run:hover, .webr-reset:hover { border-color: #006ba2; }
+    .webr-run:disabled { color: #8b8779; cursor: default;
+                border-color: #ddd8cc; }
+    .webr-status { font-size: 12.5px; color: #57544b; }
+    .webr-status.webr-error { color: #b3564d; }
+    .webr-hint { font-size: 12px; color: #8b8779; flex-basis: 100%; }
+    .webr-out { margin-top: 4px; }
+    code[contenteditable]:focus { outline: 1px solid #006ba2;
+                outline-offset: 6px; border-radius: 2px; }
     footer { color: #8b8779; font-size: 12.5px; line-height: 1.6;
              border-top: 1px solid #ddd8cc; padding-top: 18px;
              margin-top: 48px; }
@@ -170,7 +360,7 @@ page <- tags$html(lang = "en", tags$head(
     "MIT-licensed R package:",
     "<a href='https://github.com/jastephan63/polyviz'>jastephan63/polyviz</a>."
   )))
-)))
+), tags$script(HTML(webr_js))))
 
 dir.create("docs", showWarnings = FALSE)
 save_html(page, "docs/index.html", libdir = "lib")

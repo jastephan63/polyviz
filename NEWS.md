@@ -1,3 +1,44 @@
+# polyviz 1.5.0
+
+The storytelling release: charts learn to narrate, the gallery learns
+to run R in your browser, and the backends grow up.
+
+* `pv_story()` — scrollytelling: prose cards scroll past a pinned
+  chart pane that crossfades to each step's chart as the reader
+  arrives (`pv_story_step()`), with full-width interludes
+  (`pv_story_break()`) for headings, tables, and standalone charts.
+  Sticky two-column on desktop, stacked on narrow screens; honest
+  fallbacks for reduced motion and missing IntersectionObserver;
+  saves self-contained via `pv_save("story.html")`.
+* The gallery runs its own code: every snippet on the live gallery is
+  now editable and executable in the browser through webR — no
+  server, no installation; the built site carries its own wasm
+  package repository.
+* `pv_hexmap()` — chart type 38: an equal-area hex cartogram of
+  Switzerland, one hexagon per canton on a curated layout that keeps
+  the neighbourhoods honest, so Basel-Stadt reads as large as
+  Graubünden. Joins on canton codes or BFS numbers.
+* Keyboard-navigable charts: every chart container is focusable;
+  arrow keys walk the marks with the real tooltip following, Home/End
+  jump, Escape clears, and a screen-reader live region announces each
+  focused value. No pointer, no problem.
+* `pv_fetch_bfs(filter = list(...))` — name the dimensions instead of
+  memorising the key order; the dataflow's structure is fetched and
+  the key built for you, and an unknown dimension name errors with
+  the real dimension ids in order.
+* `pv_fetch_eurostat()` — the same fetch-print-licence discipline
+  against Eurostat's SDMX API (codes-only SDMX-CSV, CC BY 4.0),
+  with `filter`/`start`/`end` like the BFS fetcher.
+* DuckDB joins the SQL backend: `pv_db_connect(driver = "duckdb")`
+  (auto-detected for `.duckdb`/`.ddb`), every downstream helper
+  working identically on both engines, Parquet and CSV files
+  queryable in place — larger than memory — and
+  `pv_read("data.parquet")` dispatching through it.
+* "Anatomy of a Swiss canton" is rebuilt on `pv_story()`: the same
+  eight chapters and every verified number, now told as scenes —
+  charts gaining their changepoints, bands, and forecasts step by
+  step as the prose walks through them.
+
 # polyviz 1.4.0
 
 Housing and mobility: the fetcher learns to ask for less, the

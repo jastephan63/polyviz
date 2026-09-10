@@ -2193,25 +2193,134 @@ story_css <- local({
     "footer a { color: inherit; }\n")
 })
 
-chart_block <- function(id, heading, analysis, widget) {
-  tags$div(id = id, class = "chart-block",
-           tags$h3(heading), tags$p(class = "analysis", analysis), widget)
+
+# ---- assemble the story ----------------------------------------------------
+# Since 1.5.0 the page is told through pv_story(): chapter openings and
+# the appendix flow as full-width breaks, every chart pins itself beside
+# its prose as a scene, and the two showpiece series - the vacancy rate
+# and the electric share - unfold step by step as the reader scrolls.
+
+esc <- htmltools::htmlEscape
+
+# One step card: optional heading (carrying the block's anchor id), then
+# one paragraph per remaining argument.
+card <- function(id = NULL, heading = NULL, ...) {
+  paste0(
+    if (!is.null(heading)) {
+      paste0("<h3", if (!is.null(id)) paste0(" id='", id, "'"), ">",
+             esc(heading), "</h3>")
+    } else "",
+    paste0("<p>", vapply(list(...), esc, character(1)), "</p>",
+           collapse = ""))
 }
 
-theme_section <- function(id, german, english, intro, ...) {
-  tags$section(id = id, class = "theme",
-               tags$h2(german, tags$span(paste0(" — ", english))),
-               tags$p(class = "theme-intro", intro), ...)
+# The common case: one chart, one card - a single-step scene.
+scene1 <- function(id, heading, analysis, w) {
+  pv_story_step(w, card(id, heading, analysis))
 }
 
-page <- tags$html(lang = "en", tags$head(
-  tags$meta(charset = "utf-8"),
-  tags$meta(name = "viewport",
-            content = "width=device-width, initial-scale=1"),
-  tags$title("Anatomy of a Swiss canton"),
-  tags$style(HTML(story_css))
-), tags$body(tags$main(
-  tags$header(
+chapter <- function(id, german, english, intro) {
+  pv_story_break(tags$section(
+    id = id, class = "theme",
+    tags$h2(german, tags$span(paste0(" — ", english))),
+    tags$p(class = "theme-intro", intro)))
+}
+
+# ---- the two progressive scenes --------------------------------------------
+
+# Chapter 7's opening chart grows as the prose walks it: the bare series
+# first, then the detected shifts, then the regime means. Same numbers
+# as ever - the cards below reuse the values computed in chapter 7.
+w_vac_plain <- sized(pv_line(
+  kt_vac, x = "year", y = "rate",
+  ylab = "vacant dwellings, % of stock",
+  title = "Thirty years of empty flats",
+  subtitle = sprintf("Vacancy rate of Canton Lucerne each 1 June, %d–%d",
+                     vac_y0, vac_y1),
+  source = quelle_bfs), 440)
+w_vac_cp <- sized(pv_changepoints(pv_line(
+  kt_vac, x = "year", y = "rate",
+  ylab = "vacant dwellings, % of stock",
+  title = "Thirty years of empty flats",
+  subtitle = sprintf(
+    "Vacancy rate of Canton Lucerne each 1 June, %d–%d, with detected level shifts",
+    vac_y0, vac_y1),
+  source = quelle_bfs)), 440)
+
+vacancy_scene <- list(
+  pv_story_step(w_vac_plain, card(
+    "vacancy-cycle", "Thirty years of empty flats",
+    sprintf(paste(
+      "A housing market's one honest thermometer is the share of homes",
+      "standing empty on counting day. Lucerne's has swung hard: %s in",
+      "%d, %s at the %d peak, and %s by this June's count. Look at the",
+      "shape before the statistics arrive - a long slide, a recovery",
+      "through the 2010s, and a sharp turn somewhere after 2020."),
+      fmt_pct(kt_vac$rate[1], 2), vac_y0, fmt_pct(vac_peak, 2),
+      vac_peak_yr, fmt_pct(vac_now, 2)))),
+  pv_story_step(w_vac_cp, card(
+    NULL, NULL,
+    sprintf(paste(
+      "Now let the changepoint machinery date the turns. Binary",
+      "segmentation with a BIC stopping rule - the same method the",
+      "appendix describes - finds %d sustained level shifts, starting",
+      "in %s. The eye guessed a story; the algorithm signs three",
+      "specific years of it."),
+      length(cp_vac_years), paste(cp_vac_years, collapse = ", ")))),
+  pv_story_step(w_vacancy, card(
+    NULL, NULL,
+    sprintf(paste(
+      "The dashed lines are what each regime actually averaged: %s",
+      "empty in the first stretch of the series, %s in the regime",
+      "since the last shift. A vacancy rate below one percent is",
+      "conventionally read as a housing shortage; the canton's recent",
+      "average sits %s that line, and the rest of this chapter asks",
+      "who feels it and what it costs."),
+      fmt_pct(cp_vac_first_mean, 2), fmt_pct(cp_vac_last_mean, 2),
+      if (cp_vac_last_mean < 1) "below" else "above"))))
+
+# Chapter 8's closer: the electric share alone, then its dated take-off,
+# then the only forecast this page allows itself.
+w_bev_plain <- sized(w_bev_line, 450)
+w_bev_cp <- sized(pv_changepoints(w_bev_line), 450)
+
+ev_scene <- list(
+  pv_story_step(w_bev_plain, card(
+    "ev-forecast", "The only forecast this page dares",
+    sprintf(paste(
+      "Chapter five taught this page suspicion of predictions, so its",
+      "one forecast is narrow and labelled - and it starts with the",
+      "series alone: the battery-electric share of the canton's new",
+      "registrations, %d to %d, a flat floor and then a wall."),
+      min(bev_flow$year), max(bev_flow$year)))),
+  pv_story_step(w_bev_cp, card(
+    NULL, NULL,
+    sprintf(paste(
+      "The changepoint machinery dates the take-off to %s - across",
+      "the years before that shift the share averaged %s; across the",
+      "years since, %s. One dated year, found by the same first-",
+      "principles segmentation as the vacancy shifts, not read off a",
+      "press release."),
+      paste(as.integer(cp_bev$x), collapse = " and "),
+      fmt_pct(cp_bev$mean[1], 1),
+      fmt_pct(cp_bev$mean[length(cp_bev$mean)], 1)))),
+  pv_story_step(w_bev_fc, card(
+    NULL, NULL,
+    sprintf(paste(
+      "The fan extends the series five years with %s: the central",
+      "path reaches %s of new registrations by %d, and the %d%% band",
+      "runs from %s to %s. The bands widen the way honesty requires -",
+      "this is an extrapolation of the curve's own momentum, blind to",
+      "subsidy changes, price wars, and charging-grid politics, and it",
+      "should be read as momentum made visible, not as a claim about",
+      "%d."),
+      fc_label, fmt_pct(fc_point_end, 0), fc_end, fc_widest,
+      fmt_pct(fc_lo_end, 0), fmt_pct(fc_hi_end, 0), fc_end))))
+
+# ---- the blocks, in reading order ------------------------------------------
+
+story_blocks <- c(list(
+  pv_story_break(tags$header(
     tags$p(class = "eyebrow", "A polyviz data investigation"),
     tags$h1("Anatomy of a Swiss canton"),
     tags$p(class = "lede", sprintf(paste(
@@ -2234,9 +2343,8 @@ page <- tags$html(lang = "en", tags$head(
       "top-right corner — and every number in the text is computed",
       "from the data at build time, none typed in from memory. The",
       "methods, and their limits, are laid out in the appendix."),
-      fmt_n(pop_now), yr_first))
-  ),
-  tags$nav(
+      fmt_n(pop_now), yr_first)))),
+  pv_story_break(tags$nav(
     tags$a(href = "#zukuenfte", "1 · Drei Zukünfte"),
     tags$a(href = "#wachstum", "2 · Wo das Wachstum landet"),
     tags$a(href = "#kassen", "3 · Ungleiche Kassen"),
@@ -2247,109 +2355,94 @@ page <- tags$html(lang = "en", tags$head(
     tags$a(href = "#unterwegs", "8 · Unterwegs"),
     tags$a(href = "#methoden", "Appendix"),
     tags$a(href = "index.html", "← polyviz gallery")
-  ),
-  theme_section(
-    "zukuenfte", "Drei Zukünfte", "three futures",
+  )),
+
+  chapter("zukuenfte", "Drei Zukünfte", "three futures",
     paste("LUSTAT projects every municipality's population to 2055,",
           "three ways, one year and one year of age at a time. The",
           "question this chapter asks of the scenarios is not how big",
           "the canton gets — all three agree it grows — but what the",
           "growth is made of, and which parts of the future no",
-          "scenario can bend."),
-    chart_block("scenarios", "Three roads out of the present",
-                analysis_scenarios, w_scenarios),
-    chart_block("components", "What the growth is made of",
-                analysis_components, w_components),
-    chart_block("dependency", "The ratio no scenario can bend",
-                analysis_dependency, w_dependency),
-    chart_block("ageing", "The ageing wave", analysis_ageing, w_ageing)
-  ),
-  theme_section(
-    "wachstum", "Wo das Wachstum landet", "where the growth lands",
+          "scenario can bend.")),
+  scene1("scenarios", "Three roads out of the present",
+         analysis_scenarios, w_scenarios),
+  scene1("components", "What the growth is made of",
+         analysis_components, w_components),
+  scene1("dependency", "The ratio no scenario can bend",
+         analysis_dependency, w_dependency),
+  scene1("ageing", "The ageing wave", analysis_ageing, w_ageing),
+
+  chapter("wachstum", "Wo das Wachstum landet", "where the growth lands",
     paste("A canton does not grow in the aggregate; particular houses",
           "get built in particular villages. This chapter drops the",
           "projected growth onto the map and asks which municipalities",
           "carry it, whether it arrives in cradles or moving vans, and",
           "why the demand for homes grows faster than the count of",
-          "people."),
-    chart_block("growth-map", "Where the growth lands",
-                analysis_growth, w_growth),
-    chart_block("growth-size", "Who carries the growth",
-                analysis_swarm, w_swarm),
-    chart_block("cradles", "Cradles or moving vans",
-                analysis_cradles, w_cradles),
-    chart_block("households", "The households it arrives in",
-                analysis_households, w_households)
-  ),
-  theme_section(
-    "kassen", "Ungleiche Kassen", "unequal coffers",
+          "people.")),
+  scene1("growth-map", "Where the growth lands", analysis_growth, w_growth),
+  scene1("growth-size", "Who carries the growth", analysis_swarm, w_swarm),
+  scene1("cradles", "Cradles or moving vans", analysis_cradles, w_cradles),
+  scene1("households", "The households it arrives in",
+         analysis_households, w_households),
+
+  chapter("kassen", "Ungleiche Kassen", "unequal coffers",
     paste("Do poor municipalities catch up with rich ones? Growth",
           "theory says they should; this chapter tests it on eight",
           "years of Lucerne's equalisation accounts — the classic",
           "convergence regressions first, then the concentration of",
           "the tax base, what the equalisation transfers actually",
           "achieve against it, and what fiscal weakness costs the",
-          "people who live in it."),
-    chart_block("fiscal", "The fiscal map", analysis_fiscal, w_fiscal),
-    chart_block("beta", "The catch-up that isn't happening",
-                analysis_beta, w_beta),
-    chart_block("sigma", "The spread, measured twice",
-                analysis_sigma, w_sigma),
-    chart_block("lorenz", "How far the curve bends",
-                analysis_lorenz, w_lorenz),
-    chart_block("gini", "Running to stand still",
-                analysis_gini, w_gini),
-    chart_block("tax", "The price of a weak tax base",
-                analysis_tax, w_tax)
-  ),
-  theme_section(
-    "familien", "Familien von Gemeinden", "families of municipalities",
+          "people who live in it.")),
+  scene1("fiscal", "The fiscal map", analysis_fiscal, w_fiscal),
+  scene1("beta", "The catch-up that isn't happening", analysis_beta, w_beta),
+  scene1("sigma", "The spread, measured twice", analysis_sigma, w_sigma),
+  scene1("lorenz", "How far the curve bends", analysis_lorenz, w_lorenz),
+  scene1("gini", "Running to stand still", analysis_gini, w_gini),
+  scene1("tax", "The price of a weak tax base", analysis_tax, w_tax),
+
+  chapter("familien", "Familien von Gemeinden", "families of municipalities",
     paste("Eighty municipal stories are too many to hold in the head,",
           "so this chapter lets the data sort them: every municipality",
           "becomes ten standardised numbers, Ward's method builds the",
           "family tree, and the map and the profiles say what makes",
           "each family a family — and whether the families the",
           "algorithm finds are the regions the earlier chapters kept",
-          "meeting."),
-    chart_block("dendrogram", "The family tree",
-                analysis_dendro, w_dendro),
-    chart_block("family-map", "The families on the map",
-                analysis_family_map, w_family_map),
-    chart_block("profiles", "What makes each family a family",
-                analysis_profiles, w_profiles)
-  ),
-  theme_section(
-    "wissen", "Was sich wissen lässt", "what can be known",
+          "meeting.")),
+  scene1("dendrogram", "The family tree", analysis_dendro, w_dendro),
+  scene1("family-map", "The families on the map",
+         analysis_family_map, w_family_map),
+  scene1("profiles", "What makes each family a family",
+         analysis_profiles, w_profiles),
+
+  chapter("wissen", "Was sich wissen lässt", "what can be known",
     paste("A projection is a claim about the future, and claims can be",
           "interrogated: what is this one made of? This chapter runs",
           "three honest prediction exercises — each scored out of",
           "sample, each reported with the boring baseline it must",
           "beat — and finds that the projected map is mostly today's",
           "structure, that momentum alone is a poor guide, and that",
-          "one future in this story is genuinely unpredictable."),
-    chart_block("momentum", "Momentum is not the model",
-                analysis_momentum, w_momentum),
-    chart_block("predict-proj", "Reverse-engineering the projection",
-                analysis_predict_proj, w_predict_proj),
-    chart_block("predict-fisc", "The unpredictable part",
-                analysis_predict_fisc, w_predict_fisc)
-  ),
-  theme_section(
-    "kontext", "Der Kanton im Land", "the canton in the country",
+          "one future in this story is genuinely unpredictable.")),
+  scene1("momentum", "Momentum is not the model",
+         analysis_momentum, w_momentum),
+  scene1("predict-proj", "Reverse-engineering the projection",
+         analysis_predict_proj, w_predict_proj),
+  scene1("predict-fisc", "The unpredictable part",
+         analysis_predict_fisc, w_predict_fisc),
+
+  chapter("kontext", "Der Kanton im Land", "the canton in the country",
     paste("None of this happens on an island. Three federal series",
           "place Lucerne in the Swiss frame: the capital's rank among",
           "the cities, the growth engine every city runs on, and the",
           "sector that already dominates the capital's economy just as",
-          "the ageing wave heads its way."),
-    chart_block("cities", "The capital on the national ladder",
-                analysis_cities, w_cities),
-    chart_block("engines", "Every city's growth engine",
-                analysis_engines, w_engines),
-    chart_block("sectors", "What the capital does for a living",
-                analysis_sectors, w_sectors)
-  ),
-  theme_section(
-    "wohnen", "Vier Wände", "four walls",
+          "the ageing wave heads its way.")),
+  scene1("cities", "The capital on the national ladder",
+         analysis_cities, w_cities),
+  scene1("engines", "Every city's growth engine",
+         analysis_engines, w_engines),
+  scene1("sectors", "What the capital does for a living",
+         analysis_sectors, w_sectors),
+
+  chapter("wohnen", "Vier Wände", "four walls",
     paste("Everyone the first chapters projected needs somewhere to",
           "live. This chapter reads the housing market's one honest",
           "thermometer — the vacancy count — across thirty years and",
@@ -2357,22 +2450,20 @@ page <- tags$html(lang = "en", tags$head(
           "who pays it as rent, and how the age of the walls decides",
           "how they are heated. Two of its datasets were out of this",
           "page's reach until the package learned to ask the",
-          "statistics server for slices instead of whole registers."),
-    chart_block("vacancy-cycle", "Thirty years of empty flats",
-                analysis_vacancy, w_vacancy),
-    chart_block("vacancy-rooms", "Which flats stand empty",
-                analysis_room_vac, w_room_vac),
-    chart_block("vacancy-map", "Where the empty flats stand",
-                analysis_vac_map, w_vac_map),
-    chart_block("rent-vacancy", "What a tight market charges",
-                analysis_rent_vac, w_rent_vac),
-    chart_block("tenure", "A country of tenants",
-                analysis_tenure, w_tenure),
-    chart_block("heating-age", "New walls bring new heat",
-                analysis_heat_age, w_heat_age)
-  ),
-  theme_section(
-    "unterwegs", "Unterwegs", "on the move",
+          "statistics server for slices instead of whole registers."))),
+  vacancy_scene,
+  list(
+  scene1("vacancy-rooms", "Which flats stand empty",
+         analysis_room_vac, w_room_vac),
+  scene1("vacancy-map", "Where the empty flats stand",
+         analysis_vac_map, w_vac_map),
+  scene1("rent-vacancy", "What a tight market charges",
+         analysis_rent_vac, w_rent_vac),
+  scene1("tenure", "A country of tenants", analysis_tenure, w_tenure),
+  scene1("heating-age", "New walls bring new heat",
+         analysis_heat_age, w_heat_age),
+
+  chapter("unterwegs", "Unterwegs", "on the move",
     paste("A canton is not a place people stay put in; it is a",
           "machine for daily motion. This chapter counts the",
           "capital's morning intake of commuters — the debut of the",
@@ -2380,29 +2471,27 @@ page <- tags$html(lang = "en", tags$head(
           "whether they arrive by rail or by road, and watches the",
           "fleet itself change drive: twenty years of new",
           "registrations, the slow arithmetic of the stock, and the",
-          "one carefully fenced forecast this page allows itself."),
-    chart_block("commuter-pyramid", "The city breathes in",
-                analysis_pyramid, w_pyramid),
-    chart_block("modal-motor", "The garage predicts the platform",
-                analysis_modal, w_modal),
-    chart_block("fuel-mix", "What arrives at the registration office",
-                analysis_fuel_mix, w_fuel_mix),
-    chart_block("flow-stock", "The showroom runs ahead of the road",
-                analysis_flow_stock, w_flow_stock),
-    chart_block("ev-forecast", "The only forecast this page dares",
-                analysis_bev_fc, w_bev_fc)
-  ),
-  tags$section(
+          "one carefully fenced forecast this page allows itself.")),
+  scene1("commuter-pyramid", "The city breathes in",
+         analysis_pyramid, w_pyramid),
+  scene1("modal-motor", "The garage predicts the platform",
+         analysis_modal, w_modal),
+  scene1("fuel-mix", "What arrives at the registration office",
+         analysis_fuel_mix, w_fuel_mix),
+  scene1("flow-stock", "The showroom runs ahead of the road",
+         analysis_flow_stock, w_flow_stock)),
+  ev_scene,
+  list(
+  pv_story_break(tags$section(
     id = "methoden", class = "theme",
     tags$h2("Methoden und Daten", tags$span(" — methods and data")),
     tags$p(class = "theme-intro", paste(
       "What was computed, how, and what it cannot show. Shorter than a",
       "journal's methods section, longer than a caption — enough to",
       "re-run every number on this page.")),
-    tags$div(class = "methods", HTML(methods_html)),
-    tags$div(class = "chart-block", w_datasets)
-  ),
-  tags$footer(HTML(paste0(
+    tags$div(class = "methods", HTML(methods_html)))),
+  pv_story_break(tags$div(class = "chart-block", w_datasets)),
+  pv_story_break(tags$footer(HTML(paste0(
     "Data: LUSTAT Statistik Luzern via data.lustat.ch, published under ",
     "the opendata.swiss “OPEN BY ASK” terms — free use ",
     "with source citation (“Quelle: LUSTAT Statistik Luzern”); ",
@@ -2416,9 +2505,20 @@ page <- tags$html(lang = "en", tags$head(
     "<a href='https://github.com/jastephan63/polyviz'>jastephan63/",
     "polyviz</a> on ", format(Sys.Date(), "%Y-%m-%d"),
     "; every figure and every number in the prose is recomputed from ",
-    "the source data on each build. ",
-    "<a href='index.html'>Back to the gallery</a>.")))
-)))
+    "the source data on each build, and since version 1.5.0 the page ",
+    "itself is a pv_story() — the charts walk beside the words. ",
+    "<a href='index.html'>Back to the gallery</a>.")))))
+)
+
+story <- pv_story(story_blocks, mode = "auto")
+
+page <- tags$html(lang = "en", tags$head(
+  tags$meta(charset = "utf-8"),
+  tags$meta(name = "viewport",
+            content = "width=device-width, initial-scale=1"),
+  tags$title("Anatomy of a Swiss canton"),
+  tags$style(HTML(story_css))
+), tags$body(story))
 
 dir.create("docs", showWarnings = FALSE)
 save_html(page, "docs/story.html", libdir = "lib")

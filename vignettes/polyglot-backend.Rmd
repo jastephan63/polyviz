@@ -16,17 +16,22 @@ library(polyviz)
 ```
 
 You write R. Underneath, polyviz talks to whatever engine fits the job:
-SQLite for data that lives in a database, `haven` for SAS files and
-their variable labels, an optional Python module for numeric profiling,
-and D3.js for every chart. This vignette shows each seam — and makes
-the point that none of them require you to leave R, or even to notice
-which engine did the work.
+SQLite or DuckDB for data that lives in a database (`pv_db_connect()`
+picks by file extension, or take `driver = "duckdb"` explicitly — a
+DuckDB connection also queries Parquet and CSV files in place, larger
+than memory), `haven` for SAS files and their variable labels, an
+optional Python module for numeric profiling, and D3.js for every
+chart. This vignette shows each seam — and makes the point that none
+of them require you to leave R, or even to notice which engine did
+the work.
 
 ## One reader for every file
 
 `pv_read()` dispatches on the file extension: CSV and RDS via base R,
-`.sas7bdat`/`.xpt` via haven, `.sqlite`/`.db` via DBI. The package
-bundles a small SQLite database to demonstrate:
+`.sas7bdat`/`.xpt` via haven, `.sqlite`/`.db` via DBI, and — with the
+duckdb package installed — `.duckdb`/`.ddb` databases and `.parquet`
+files via DuckDB. The package bundles a small SQLite database to
+demonstrate:
 
 ```{r read-dispatch}
 db <- system.file("extdata", "demo.sqlite", package = "polyviz")

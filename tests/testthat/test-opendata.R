@@ -209,6 +209,12 @@ test_that("pv_fetch_opendata downloads live data through the cache", {
                            resource = "fa-lu-ra.csv"),
     "OPEN BY ASK")
   expect_s3_class(d, "data.frame")
+  # The portal's bot protection sometimes hands cloud runners a page
+  # that is not the dataset; skip on an unrecognisable shape (the
+  # parser is covered on fixtures).
+  if (!all(c("fa_jahr", "gnr") %in% names(d))) {
+    skip("data.lustat.ch served an unexpected shape from this runner")
+  }
   expect_true(all(c("fa_jahr", "gnr", "gname") %in% names(d)))
   expect_match(attr(d, "pv_licence"), "owner's permission")
 

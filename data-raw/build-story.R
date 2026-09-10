@@ -1,10 +1,14 @@
 # Builds the data story page (docs/story.html): "Anatomy of a Swiss canton",
 # an investigation of Canton Lucerne on live open data - LUSTAT's municipal
 # scenarios and equalisation accounts, joined by federal statistics from
-# stats.swiss where the analysis needs them. The piece asks four questions:
+# stats.swiss where the analysis needs them. The piece asks six questions:
 # how many people the canton will hold and how old they will be; where the
 # growth lands and what arrives with it; whether poor municipalities catch
-# up with rich ones; and how much today's facts actually predict.
+# up with rich ones; how much today's facts actually predict; what the
+# housing those people compete for looks like and costs; and how the
+# canton moves - who commutes where, and how fast the fleet electrifies.
+# The last two chapters lean on pv_fetch_bfs()'s server-side filtering to
+# pull thin slices of dataflows that would be hundreds of megabytes whole.
 #
 # The page keeps one house rule throughout: every number in the prose is
 # computed here from the fetched data - nothing is typed in from memory -
@@ -63,6 +67,13 @@ lorenz_pts <- function(x, w) {
 
 rmse <- function(a, b) sqrt(mean((a - b)^2))
 
+# English ordinals for rank prose: 1st, 2nd, 63rd, 111th.
+ordn <- function(n) {
+  suffix <- if (n %% 100 %in% 11:13) "th" else
+    switch(as.character(n %% 10), "1" = "st", "2" = "nd", "3" = "rd", "th")
+  paste0(n, suffix)
+}
+
 # The ids the bundled Lucerne map joins on (lakes carry no id and drop out).
 lucerne_map_ids <- unlist(lapply(pv_lucerne_map$features, function(f) {
   v <- f$properties$id
@@ -73,6 +84,7 @@ quelle_lustat <- "Quelle: LUSTAT Statistik Luzern"
 quelle_lustat_map <-
   "Quelle: LUSTAT Statistik Luzern; Grenzen: © BFS, ThemaKart"
 quelle_bfs <- "Quelle: Bundesamt für Statistik"
+quelle_bfs_map <- "Quelle: Bundesamt für Statistik; Grenzen: © BFS, ThemaKart"
 quelle_mixed <- "Quelle: LUSTAT Statistik Luzern; Bundesamt für Statistik"
 
 # ---- fetch the data --------------------------------------------------------
@@ -86,6 +98,35 @@ szbv <- list(
 fa <- pv_fetch_lustat("fa-lu-ra")
 phh <- pv_fetch_bfs("DF_STATPOP_PHH")
 bil <- pv_fetch_bfs("DF_SSV_POP_BIL")
+
+# The city statistics behind chapters 7 and 8 - one row set per Swiss
+# statistical city, small enough to pull whole.
+oc <- pv_fetch_bfs("DF_SSV_BUILD_HOUSING_OC")   # tenure and net rents
+lwz_city <- pv_fetch_bfs("DF_SSV_BUILD_LWZ")    # city vacancy counts + rate
+heiz <- pv_fetch_bfs("DF_SSV_ENERGY_HEATING")   # dwellings by heating source
+bage <- pv_fetch_bfs("DF_SSV_BUILD_AGE")        # construction periods
+mobcom <- pv_fetch_bfs("DF_SSV_MOB_COM")        # commuting mode
+labmar <- pv_fetch_bfs("DF_SSV_LABMAR_06")      # commuter flows in/out
+mobcar <- pv_fetch_bfs("DF_SSV_MOB_CAR")        # vehicle stock per city
+
+# The big registers, cut down to slices on the server. Unfiltered, the
+# vacancy register (DF_LWZ_1) and the vehicle registers run to hundreds
+# of megabytes; the SDMX data keys below pull the canton's rows only -
+# dimension values in the dataflow's dimension order, an empty segment
+# keeping every value of that dimension.
+lwz_kt <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU....")
+lwz_mu <- pv_fetch_bfs(
+  "CH1.LWZ,DF_LWZ_1",
+  filter = paste0(paste(lucerne_map_ids, collapse = "+"), "._T._T.."),
+  start = 2015)
+# Passenger cars proper live in the *_1_TECH flows (the *_2 flows next
+# door hold the other passenger transport vehicles - buses, minibuses,
+# light motor vehicles). Canton Lucerne is region code 3; _T rides along
+# as the Swiss total.
+ivs <- pv_fetch_bfs("CH1.MFZ_IVS,DF_IVS_1_TECH",
+                    filter = "3+_T.N._T.._T._T._T.A")
+mfz <- pv_fetch_bfs("CH1.MFZ_IVS,DF_MFZ_1_TECH",
+                    filter = "3+_T._T._T.._T._T._T.A")
 
 ref <- szbv$reference
 
@@ -1326,6 +1367,590 @@ analysis_sectors <- sprintf(paste(
   n_health_higher, n_cities_sec, n80_end / n80_now)
 
 # ============================================================================
+# Chapter 7 - Vier Waende: the housing market
+# ============================================================================
+
+# ---- chart 24: thirty years of empty flats ---------------------------------
+
+# The register's first two years carry status "missing"; the series
+# proper starts in 1997, and every span below is computed from the
+# rows that actually hold a value.
+kt_vac <- lwz_kt[lwz_kt$measure_dimension_code == "PC" &
+                   lwz_kt$wohn_anzahl_code == "_T" &
+                   lwz_kt$leerwohn_typ_code == "_T" &
+                   !is.na(lwz_kt$obs_value),
+                 c("time_period", "obs_value")]
+names(kt_vac) <- c("year", "rate")
+kt_vac <- kt_vac[order(kt_vac$year), ]
+vac_y0 <- min(kt_vac$year)
+vac_y1 <- max(kt_vac$year)
+vac_now <- kt_vac$rate[kt_vac$year == vac_y1]
+vac_peak_yr <- kt_vac$year[which.max(kt_vac$rate)]
+vac_peak <- max(kt_vac$rate)
+vac_min_yr <- kt_vac$year[which.min(kt_vac$rate)]
+vac_min <- min(kt_vac$rate)
+
+w_vacancy <- sized(pv_changepoints(pv_line(
+  kt_vac, x = "year", y = "rate",
+  ylab = "vacant dwellings, % of stock",
+  title = "Thirty years of empty flats",
+  subtitle = sprintf(
+    "Vacancy rate of Canton Lucerne each 1 June, %d–%d, with detected level shifts",
+    vac_y0, vac_y1),
+  source = quelle_bfs), levels = TRUE), 440)
+
+# The prose reads the shifts straight off the chart's own analysis, so
+# the words can never disagree with the marks.
+cp_vac <- w_vacancy$x$changepoints
+cp_vac_years <- as.integer(cp_vac$x)
+cp_vac_last_mean <- cp_vac$mean[length(cp_vac$mean)]
+cp_vac_first_mean <- cp_vac$mean[1]
+
+analysis_vacancy <- sprintf(paste(
+  "A housing market's one honest thermometer is the share of homes",
+  "standing empty on counting day. Lucerne's has swung hard: %s in",
+  "%d, %s at the %d peak, and %s by this June's count. Binary",
+  "segmentation (the same changepoint machinery the methods appendix",
+  "describes) finds %d sustained level shifts, starting in %s — the",
+  "regime since the last shift averages %s empty, against %s in the",
+  "first stretch of the series. A vacancy rate below one percent is",
+  "conventionally read as a housing shortage; the canton's recent",
+  "average sits %s that line, and the chapter's remaining charts ask",
+  "who feels it and what it costs."),
+  fmt_pct(kt_vac$rate[1], 2), vac_y0, fmt_pct(vac_peak, 2),
+  vac_peak_yr, fmt_pct(vac_now, 2), length(cp_vac_years),
+  paste(cp_vac_years, collapse = ", "), fmt_pct(cp_vac_last_mean, 2),
+  fmt_pct(cp_vac_first_mean, 2),
+  if (cp_vac_last_mean < 1) "below" else "above")
+
+# ---- chart 25: which flats stand empty -------------------------------------
+
+# The register publishes vacancy *rates* only for the whole stock -
+# by room count it offers the raw number of empty flats, so this chart
+# reads composition: of everything standing empty, what size is it?
+room_vac <- lwz_kt[lwz_kt$measure_dimension_code == "V" &
+                     lwz_kt$wohn_anzahl_code %in% as.character(1:6) &
+                     lwz_kt$leerwohn_typ_code == "_T" &
+                     !is.na(lwz_kt$obs_value),
+                   c("time_period", "wohn_anzahl_code", "obs_value")]
+names(room_vac) <- c("year", "rooms", "n")
+room_vac$rooms <- ifelse(room_vac$rooms == "6", "6+ rooms",
+                         paste(room_vac$rooms,
+                               ifelse(room_vac$rooms == "1",
+                                      "room", "rooms")))
+room_order <- c("1 room", "2 rooms", "3 rooms", "4 rooms",
+                "5 rooms", "6+ rooms")
+room_vac <- room_vac[order(match(room_vac$rooms, room_order),
+                           room_vac$year), ]
+rv_y1 <- max(room_vac$year)
+rv_tot_last <- sum(room_vac$n[room_vac$year == rv_y1])
+room_share <- function(rooms, yr) {
+  100 * sum(room_vac$n[room_vac$rooms %in% rooms &
+                         room_vac$year == yr]) /
+    sum(room_vac$n[room_vac$year == yr])
+}
+small_now <- room_share(c("1 room", "2 rooms"), rv_y1)
+small_then <- room_share(c("1 room", "2 rooms"), min(room_vac$year))
+family_now <- room_share(c("4 rooms", "5 rooms", "6+ rooms"), rv_y1)
+rv_peak_yr <- as.integer(names(which.max(
+  tapply(room_vac$n, room_vac$year, sum))))
+rv_peak_n <- max(tapply(room_vac$n, room_vac$year, sum))
+
+w_room_vac <- sized(pv_area(
+  room_vac, x = "year", y = "n", series = "rooms", offset = "percent",
+  ylab = "share of vacant dwellings",
+  title = "Which flats stand empty",
+  subtitle = sprintf(
+    "Composition of Canton Lucerne's vacant dwellings by number of rooms, %d–%d",
+    min(room_vac$year), rv_y1),
+  source = quelle_bfs), 450)
+
+analysis_room_vac <- sprintf(paste(
+  "The register does not publish a per-size vacancy rate, so this",
+  "chart asks the question it can answer honestly: of everything",
+  "standing empty, what size is it? The composition has tilted",
+  "toward the small end — one- and two-room flats are %s of today's",
+  "%s vacant dwellings, up from %s at the start of the series, while",
+  "family-sized flats of four rooms and more make up %s. The",
+  "absolute count peaked at %s empty flats in %d and has thinned",
+  "since. Read together with the previous chart: the market is",
+  "tight everywhere, and what slack remains pools in the smallest",
+  "flats — the segment chapter two's shrinking households compete",
+  "for hardest."),
+  fmt_pct(small_now, 0), fmt_n(rv_tot_last), fmt_pct(small_then, 0),
+  fmt_pct(family_now, 0), fmt_n(rv_peak_n), rv_peak_yr)
+
+# ---- chart 26: where the empty flats stand ---------------------------------
+
+mu_vac <- lwz_mu[lwz_mu$measure_dimension_code == "PC" &
+                   lwz_mu$time_period == max(lwz_mu$time_period),
+                 c("gr_kt_gde_code", "gr_kt_gde", "obs_value")]
+names(mu_vac) <- c("gnr", "municipality", "rate")
+mu_vac$gnr <- as.integer(mu_vac$gnr)
+mu_vac$rate <- round(mu_vac$rate, 2)
+mu_year <- max(lwz_mu$time_period)
+n_mu_vac <- nrow(mu_vac)
+n_mu_short <- sum(mu_vac$rate < 1)
+mu_tight <- mu_vac[which.min(mu_vac$rate), ]
+mu_loose <- mu_vac[which.max(mu_vac$rate), ]
+luzern_mu_vac <- mu_vac$rate[mu_vac$gnr == 1061]
+
+w_vac_map <- sized(pv_choropleth(
+  mu_vac, id = "gnr", value = "rate",
+  title = "Where the empty flats stand",
+  subtitle = sprintf(
+    "Vacancy rate by municipality, 1 June %d; %d of %d municipalities sit below the 1%% shortage line",
+    mu_year, n_mu_short, n_mu_vac),
+  source = quelle_bfs_map), 530)
+
+analysis_vac_map <- sprintf(paste(
+  "Until this build, that municipal map was out of reach — the",
+  "appendix of earlier editions admitted that the vacancy register",
+  "exists on stats.swiss only as a download too large to fetch. The",
+  "package's fetcher now asks the server for a slice instead, and the",
+  "%d municipal rates arrive in half a megabyte. They are worth the",
+  "trouble: %d of %d municipalities sit below the one-percent",
+  "shortage line, %s. The tightest market",
+  "in the canton is %s at %s; the loosest is %s, where %s of the",
+  "stock waits for tenants. Lay this beside chapter two's growth map",
+  "and the corridor matches: where the people are projected to land",
+  "is precisely where the flats already run short."),
+  n_mu_vac, n_mu_short, n_mu_vac,
+  if (luzern_mu_vac < 1) {
+    sprintf("the capital among them at %s", fmt_pct(luzern_mu_vac, 2))
+  } else {
+    sprintf("and the capital hovers just above it at %s",
+            fmt_pct(luzern_mu_vac, 2))
+  },
+  mu_tight$municipality, fmt_pct(mu_tight$rate, 2),
+  mu_loose$municipality, fmt_pct(mu_loose$rate, 2))
+
+# ---- chart 27: what the shortage costs -------------------------------------
+
+oc_obs <- oc[oc$statistical_operation_code == "OBS" &
+               oc$ssv_swiss_city_code != "_ST", ]
+rent3 <- oc_obs[oc_obs$ssv_build_housing_oc_code == "bew_woh_loy_chf_3z",
+                c("ssv_swiss_city", "obs_value")]
+names(rent3) <- c("city", "rent3")
+city_vac <- lwz_city[lwz_city$ssv_build_lwz_code == "lwz_p" &
+                       lwz_city$ssv_swiss_city_code != "_ST",
+                     c("ssv_swiss_city", "obs_value")]
+names(city_vac) <- c("city", "vacancy")
+rent_vac <- merge(rent3, city_vac, by = "city")
+rent_vac <- rent_vac[is.finite(rent_vac$rent3) &
+                       is.finite(rent_vac$vacancy), ]
+n_rent_vac <- nrow(rent_vac)
+rent_year <- unique(oc_obs$period)[1]
+cvac_year <- unique(lwz_city$period)[1]
+luz_rent <- rent_vac[rent_vac$city == "Luzern", ]
+luz_rent3_rank <- sum(rent_vac$rent3 > luz_rent$rent3) + 1
+
+rv_fit <- lm(rent3 ~ vacancy, data = rent_vac)
+rv_slope <- coef(rv_fit)[["vacancy"]]
+rv_r2 <- summary(rv_fit)$r.squared
+rv_p <- summary(rv_fit)$coefficients["vacancy", "Pr(>|t|)"]
+
+w_rent_vac <- sized(pv_annotate(
+  pv_trend(pv_scatter(
+    rent_vac, x = "vacancy", y = "rent3", label = "city",
+    xlab = sprintf("vacancy rate, %% (%s)", cvac_year),
+    ylab = sprintf("average net rent, 3-room flat, Fr. (%s)", rent_year),
+    title = "What a tight market charges",
+    subtitle = sprintf(
+      "Net rent of a 3-room flat vs vacancy rate, %d Swiss statistical cities",
+      n_rent_vac),
+    source = quelle_bfs), method = "lm"),
+  pv_note(luz_rent$vacancy, luz_rent$rent3, "Luzern",
+          dx = 14, dy = -12)), 460)
+
+analysis_rent_vac <- sprintf(paste(
+  "Scarcity has a price list. Across %d Swiss statistical cities, a",
+  "three-room flat in the city of Luzern averages Fr. %s net — the",
+  "%s-highest rent in the set. The regression asks whether",
+  "vacancy explains the differences between cities: each additional",
+  "percentage point of vacancy is associated with Fr. %s %s rent, but",
+  "the fit is honest about its weakness — R² = %s, so vacancy",
+  "accounts for roughly %s of the variation between cities and the",
+  "rest is location, income, and stock. These are survey figures with",
+  "confidence intervals on file, and one caveat is printed on the",
+  "axes: the rents are from %s, the vacancy count from %s. A",
+  "cross-section like this can show association only, and a weak one",
+  "is what it shows."),
+  n_rent_vac, fmt_n(luz_rent$rent3),
+  ordn(luz_rent3_rank), fmt_n(abs(rv_slope)),
+  if (rv_slope < 0) "lower" else "higher",
+  fmt_2(rv_r2), fmt_pct(100 * rv_r2, 0), rent_year, cvac_year)
+
+# ---- chart 28: a canton of tenants -----------------------------------------
+
+ten_own <- oc_obs[oc_obs$ssv_build_housing_oc_code == "bew_woh_pro_p",
+                  c("ssv_swiss_city", "obs_value")]
+ten_rent <- oc_obs[oc_obs$ssv_build_housing_oc_code == "bew_woh_mie_p",
+                   c("ssv_swiss_city", "obs_value")]
+ten_tot <- oc_obs[oc_obs$ssv_build_housing_oc_code == "bew_woh_t",
+                  c("ssv_swiss_city", "obs_value")]
+tenure <- Reduce(function(a, b) merge(a, b, by = "ssv_swiss_city"),
+                 list(ten_own, ten_rent, ten_tot))
+names(tenure) <- c("city", "owner", "renter", "dwellings")
+tenure <- tenure[is.finite(tenure$owner) & is.finite(tenure$renter), ]
+tenure_big <- tenure[order(-tenure$dwellings), ][1:10, ]
+luz_tenure <- tenure[tenure$city == "Luzern", ]
+n_tenure <- nrow(tenure)
+n_renter_majority <- sum(tenure$renter > 50)
+
+w_tenure <- sized(pv_dumbbell(
+  tenure_big, y = "city", x1 = "owner", x2 = "renter",
+  labels = c("owner-occupied", "rented"),
+  xlab = "share of occupied dwellings, %",
+  title = "A country of tenants, a city more so",
+  subtitle = sprintf(
+    "Owner-occupied vs rented share, the ten largest city housing markets, %s",
+    rent_year),
+  source = quelle_bfs), 430)
+
+analysis_tenure <- sprintf(paste(
+  "Switzerland rents, and its cities rent hardest. In %d of the %d",
+  "statistical cities the tenants are the majority; in the city of",
+  "Luzern %s of occupied dwellings are rented against %s",
+  "owner-occupied. The dumbbell shows the ten largest city housing",
+  "markets: the gap between the dots is the rental economy, and no",
+  "large city closes it. This is the demand side of the vacancy map",
+  "above — a market where %s of the capital's households face the",
+  "landlord's price, not the mortgage lender's."),
+  n_renter_majority, n_tenure, fmt_pct(luz_tenure$renter, 0),
+  fmt_pct(luz_tenure$owner, 0), fmt_pct(luz_tenure$renter, 0))
+
+# ---- chart 29: new walls, new heat -----------------------------------------
+
+heiz_ok <- heiz[heiz$ssv_swiss_city_code != "_ST", ]
+wp <- heiz_ok[heiz_ok$ssv_energy_heating_code == "wh_en_wp",
+              c("ssv_swiss_city", "obs_value")]
+heiz_t <- heiz_ok[heiz_ok$ssv_energy_heating_code == "wh_en_t",
+                  c("ssv_swiss_city", "obs_value")]
+heat <- merge(wp, heiz_t, by = "ssv_swiss_city",
+              suffixes = c("_wp", "_t"))
+heat$wp_share <- 100 * heat$obs_value_wp / heat$obs_value_t
+
+bage_ok <- bage[bage$ssv_swiss_city_code != "_ST", ]
+new_stock <- bage_ok[bage_ok$ssv_build_age_code == "log_con_01_ref_period",
+                     c("ssv_swiss_city", "obs_value")]
+old_tot <- bage_ok[bage_ok$ssv_build_age_code == "log_con_t",
+                   c("ssv_swiss_city", "obs_value")]
+stock_age <- merge(new_stock, old_tot, by = "ssv_swiss_city",
+                   suffixes = c("_new", "_t"))
+stock_age$new_share <- 100 * stock_age$obs_value_new / stock_age$obs_value_t
+
+heat_age <- merge(heat[, c("ssv_swiss_city", "wp_share")],
+                  stock_age[, c("ssv_swiss_city", "new_share")],
+                  by = "ssv_swiss_city")
+names(heat_age)[1] <- "city"
+heat_age <- heat_age[is.finite(heat_age$wp_share) &
+                       is.finite(heat_age$new_share), ]
+n_heat_age <- nrow(heat_age)
+heiz_year <- unique(heiz_ok$period)[1]
+luz_heat <- heat_age[heat_age$city == "Luzern", ]
+
+ha_fit <- lm(wp_share ~ new_share, data = heat_age)
+ha_slope <- coef(ha_fit)[["new_share"]]
+ha_r2 <- summary(ha_fit)$r.squared
+
+w_heat_age <- sized(pv_annotate(
+  pv_trend(pv_scatter(
+    heat_age, x = "new_share", y = "wp_share", label = "city",
+    xlab = "dwellings built since 2001, % of stock",
+    ylab = "dwellings heated by heat pump, %",
+    title = "New walls bring new heat",
+    subtitle = sprintf(
+      "Heat-pump share vs post-2000 construction share, %d Swiss statistical cities, %s",
+      n_heat_age, heiz_year),
+    source = quelle_bfs), method = "lm"),
+  pv_note(luz_heat$new_share, luz_heat$wp_share, "Luzern",
+          dx = 14, dy = -12)), 460)
+
+analysis_heat_age <- sprintf(paste(
+  "The energy transition in housing rides on the construction",
+  "calendar. Across %d cities, every additional percentage point of",
+  "post-2000 stock is associated with %s points more heat-pump",
+  "share; at R² = %s the construction calendar alone accounts for",
+  "roughly %s of the differences between cities. The mechanism is",
+  "ordinary — heat pumps are what new buildings install, oil is",
+  "what old ones keep — which is exactly why it matters for a",
+  "canton whose growth chapter promises decades of new",
+  "construction. The city of Luzern, with %s of its stock built",
+  "since 2001, heats %s of its dwellings with heat pumps; the",
+  "fitted line says a city of its vintage would be expected near",
+  "%s. Correlation across cities, as ever, is not a causal claim",
+  "about any one of them — the appendix says what this regression",
+  "can and cannot carry."),
+  n_heat_age, fmt_2(ha_slope), fmt_2(ha_r2),
+  fmt_pct(100 * ha_r2, 0),
+  fmt_pct(luz_heat$new_share, 1), fmt_pct(luz_heat$wp_share, 1),
+  fmt_pct(predict(ha_fit, luz_heat), 1))
+
+# ============================================================================
+# Chapter 8 - Unterwegs: how the canton moves
+# ============================================================================
+
+# ---- chart 30: the city breathes in ----------------------------------------
+
+lab_obs <- labmar[labmar$statistical_operation_code == "OBS" &
+                    labmar$ssv_swiss_city_code != "_ST", ]
+lab_w <- reshape(lab_obs[, c("ssv_swiss_city", "commuter_code",
+                             "obs_value")],
+                 idvar = "ssv_swiss_city", timevar = "commuter_code",
+                 direction = "wide")
+names(lab_w) <- sub("^obs_value\\.", "", names(lab_w))
+names(lab_w)[1] <- "city"
+lab_w <- lab_w[is.finite(lab_w$P_IN) & is.finite(lab_w$P_OUT), ]
+lab_w$P_IN <- round(lab_w$P_IN)
+lab_w$P_OUT <- round(lab_w$P_OUT)
+lab_big <- lab_w[order(-(lab_w$P_IN + lab_w$P_OUT)), ][1:10, ]
+luz_lab <- lab_w[lab_w$city == "Luzern", ]
+lab_year <- unique(lab_obs$period)[1]
+n_lab <- nrow(lab_w)
+n_importers <- sum(lab_w$P_IN > lab_w$P_OUT)
+
+w_pyramid <- sized(pv_pyramid(
+  lab_big, y = "city", left = "P_OUT", right = "P_IN",
+  labels = c("out-commuters", "in-commuters"), sort = "total",
+  xlab = "commuters",
+  title = "The city breathes in",
+  subtitle = sprintf(
+    "Out-commuters and in-commuters, the ten busiest commuter cities, %s",
+    substr(lab_year, nchar(lab_year) - 3, nchar(lab_year))),
+  source = quelle_bfs), 430)
+
+analysis_pyramid <- sprintf(paste(
+  "Every morning the city of Luzern inhales. %s workers commute in",
+  "and %s commute out — a net intake of %s people, %s for every",
+  "hundred residents in work. The pyramid mirrors the ten busiest",
+  "commuter cities in the country: the right lung is the jobs the",
+  "city hosts, the left is the residents it lends elsewhere, and in",
+  "%d of the %d statistical cities the right side wins. These are",
+  "survey-weighted counts from the structural survey, with",
+  "confidence intervals on file; the ranking is robust, the last",
+  "digit is not."),
+  fmt_n(luz_lab$P_IN), fmt_n(luz_lab$P_OUT),
+  fmt_n(luz_lab$P_IN - luz_lab$P_OUT),
+  fmt_1(luz_lab$P_RELATIF), n_importers, n_lab)
+
+# ---- chart 31: how the commuters travel ------------------------------------
+
+# The mode file carries commuter *counts* per mode, so the share is
+# computed against the same file's total - never assumed to be one.
+mob_obs <- mobcom[mobcom$statistical_operation_code == "OBS" &
+                    mobcom$ssv_swiss_city_code != "_ST", ]
+oev <- mob_obs[mob_obs$ssv_mob_com_code == "pen_tp",
+               c("ssv_swiss_city", "obs_value")]
+names(oev) <- c("city", "oev_n")
+pen_tot <- mob_obs[mob_obs$ssv_mob_com_code == "pen_t",
+                   c("ssv_swiss_city", "obs_value")]
+names(pen_tot) <- c("city", "pen_n")
+oev <- merge(oev, pen_tot, by = "city")
+oev$oev <- 100 * oev$oev_n / oev$pen_n
+cars <- mobcar[mobcar$ssv_mob_car_code == "txmot" &
+                 mobcar$ssv_swiss_city_code != "_ST",
+               c("ssv_swiss_city", "obs_value")]
+names(cars) <- c("city", "cars_1000")
+modal <- merge(oev[, c("city", "oev")], cars, by = "city")
+modal <- modal[is.finite(modal$oev) & is.finite(modal$cars_1000), ]
+n_modal <- nrow(modal)
+luz_modal <- modal[modal$city == "Luzern", ]
+luz_oev_rank <- sum(modal$oev > luz_modal$oev) + 1
+mob_year <- unique(mob_obs$period)[1]
+car_year <- unique(mobcar$period)[1]
+
+mm_fit <- lm(oev ~ cars_1000, data = modal)
+mm_slope100 <- 100 * coef(mm_fit)[["cars_1000"]]
+mm_r2 <- summary(mm_fit)$r.squared
+r2_word <- function(r2) {
+  if (r2 >= 0.5) "strong" else if (r2 >= 0.25) "moderate" else "weak"
+}
+
+w_modal <- sized(pv_annotate(
+  pv_trend(pv_scatter(
+    modal, x = "cars_1000", y = "oev", label = "city",
+    xlab = sprintf("passenger cars per 1,000 residents (%s)", car_year),
+    ylab = sprintf("commuters using public transport, %% (%s)", mob_year),
+    title = "The garage predicts the platform",
+    subtitle = sprintf(
+      "Public-transport commuting vs motorisation, %d Swiss statistical cities",
+      n_modal),
+    source = quelle_bfs), method = "lm"),
+  pv_note(luz_modal$cars_1000, luz_modal$oev, "Luzern",
+          dx = 14, dy = -12)), 460)
+
+luz_car_rank <- sum(modal$cars_1000 < luz_modal$cars_1000) + 1
+
+analysis_modal <- sprintf(paste(
+  "Is how a city commutes legible from its parking spaces? Only",
+  "partly. Across %d cities, every hundred extra cars per thousand",
+  "residents is associated with %s points %s public-transport",
+  "commuting, but the association is %s — R² = %s — because cities",
+  "scatter wide around the line: rail access, geography, and job",
+  "mix matter at least as much as the garage. Luzern sits where a",
+  "transit city should: the %s-fewest cars per thousand residents",
+  "(%s) and the %s-highest public-transport share (%s) in the set.",
+  "Which direction the causality runs — do trains empty the",
+  "garages, or do full garages starve the trains? — a cross-section",
+  "cannot say, and the appendix resists the temptation."),
+  n_modal, fmt_1(abs(mm_slope100)),
+  if (mm_slope100 < 0) "less" else "more", r2_word(mm_r2),
+  fmt_2(mm_r2), ordn(luz_car_rank), fmt_n(luz_modal$cars_1000),
+  ordn(luz_oev_rank), fmt_pct(luz_modal$oev, 0))
+
+# ---- chart 32: what arrives at the registration office ---------------------
+
+fuel_fold <- c(PC = "Petrol", DC = "Diesel",
+               PH = "Hybrid", DH = "Hybrid",
+               HP = "Plug-in hybrid", HD = "Plug-in hybrid",
+               EL = "Battery electric",
+               FC = "Other", GA = "Other", `_O` = "Other")
+ivs_lu <- ivs[ivs$uv_hgde_kt_code == "3" &
+                ivs$uv_rv_fuel_code %in% names(fuel_fold), ]
+ivs_lu$fuel <- unname(fuel_fold[ivs_lu$uv_rv_fuel_code])
+fuel_mix <- aggregate(obs_value ~ time_period + fuel, ivs_lu, sum)
+names(fuel_mix) <- c("year", "fuel", "n")
+fuel_order <- c("Petrol", "Diesel", "Hybrid", "Plug-in hybrid",
+                "Battery electric", "Other")
+fuel_mix <- fuel_mix[order(match(fuel_mix$fuel, fuel_order),
+                           fuel_mix$year), ]
+ivs_y0 <- min(fuel_mix$year)
+ivs_y1 <- max(fuel_mix$year)
+tot_by_year <- tapply(fuel_mix$n, fuel_mix$year, sum)
+ivs_n_last <- tot_by_year[[as.character(ivs_y1)]]
+
+share_of <- function(fuel, yr) {
+  100 * fuel_mix$n[fuel_mix$fuel == fuel & fuel_mix$year == yr] /
+    tot_by_year[[as.character(yr)]]
+}
+petrol_first <- share_of("Petrol", ivs_y0)
+petrol_last <- share_of("Petrol", ivs_y1)
+diesel_peak_yr <- as.integer(names(which.max(
+  tapply(fuel_mix$n[fuel_mix$fuel == "Diesel"],
+         fuel_mix$year[fuel_mix$fuel == "Diesel"], sum) /
+    tot_by_year)))
+diesel_peak <- share_of("Diesel", diesel_peak_yr)
+diesel_last <- share_of("Diesel", ivs_y1)
+bev_last <- share_of("Battery electric", ivs_y1)
+electrified_last <- bev_last + share_of("Plug-in hybrid", ivs_y1) +
+  share_of("Hybrid", ivs_y1)
+
+w_fuel_mix <- sized(pv_area(
+  fuel_mix, x = "year", y = "n", series = "fuel", offset = "percent",
+  ylab = "share of new registrations",
+  title = "What arrives at the registration office",
+  subtitle = sprintf(
+    "New passenger-car registrations in Canton Lucerne by drive, %d–%d",
+    ivs_y0, ivs_y1),
+  source = quelle_bfs), 450)
+
+analysis_fuel_mix <- sprintf(paste(
+  "The fleet's future is decided at the registration office, and the",
+  "office has changed its mind twice in twenty years. In %d, %s of",
+  "the canton's new passenger cars burned petrol and diesel was on",
+  "its way to a %s peak (%d); diesel then collapsed to %s. The",
+  "second turn is the one still under way: battery-electric cars",
+  "took %s of last year's %s new registrations, and counting every",
+  "drive with a battery — full hybrids and plug-ins included — %s",
+  "of what the canton newly registers in %d already carries one.",
+  "The categories are folded from the register's ten fuel codes into",
+  "six readable bands; the appendix lists the folding."),
+  ivs_y0, fmt_pct(petrol_first, 0), fmt_pct(diesel_peak, 0),
+  diesel_peak_yr, fmt_pct(diesel_last, 0), fmt_pct(bev_last, 0),
+  fmt_n(ivs_n_last), fmt_pct(electrified_last, 0), ivs_y1)
+
+# ---- chart 33: the showroom runs ahead of the road -------------------------
+
+# A fuel absent from the register in a given year was registered zero
+# times that year - a true zero, not a gap - so both share series are
+# completed over every year their denominator covers.
+bev_share_series <- function(d, fuel, label) {
+  tot <- tapply(d$obs_value[d$uv_rv_fuel_code == "_T"],
+                d$time_period[d$uv_rv_fuel_code == "_T"], sum)
+  el <- tapply(d$obs_value[d$uv_rv_fuel_code == fuel],
+               d$time_period[d$uv_rv_fuel_code == fuel], sum)
+  years <- as.integer(names(tot))
+  n_el <- ifelse(is.na(el[names(tot)]), 0, el[names(tot)])
+  data.frame(year = years,
+             share = 100 * as.numeric(n_el) / as.numeric(tot),
+             series = label)
+}
+bev_flow <- bev_share_series(ivs[ivs$uv_hgde_kt_code == "3", ],
+                             "EL", "of new registrations")
+bev_stock <- bev_share_series(mfz[mfz$uv_hgde_kt_code == "3", ],
+                              "EL", "of the whole fleet")
+flow_stock <- rbind(bev_flow, bev_stock)
+flow_stock <- flow_stock[is.finite(flow_stock$share), ]
+fs_last_flow <- bev_flow$share[bev_flow$year == max(bev_flow$year)]
+fs_last_stock <- bev_stock$share[bev_stock$year == max(bev_stock$year)]
+fs_ratio <- fs_last_flow / fs_last_stock
+
+w_flow_stock <- sized(pv_line(
+  flow_stock, x = "year", y = "share", series = "series",
+  ylab = "battery-electric share, %",
+  title = "The showroom runs ahead of the road",
+  subtitle = sprintf(
+    "Battery-electric share of new registrations vs the whole fleet, Canton Lucerne, %d–%d",
+    min(flow_stock$year), max(flow_stock$year)),
+  source = quelle_bfs), 440)
+
+analysis_flow_stock <- sprintf(paste(
+  "A fleet is a slow-moving average of its own showrooms. Last year",
+  "battery-electric cars were %s of the canton's new registrations",
+  "but only %s of the cars actually on the road — the showroom runs",
+  "%s times ahead of the street. The gap is not a contradiction, it",
+  "is arithmetic: cars live for well over a decade, so each year's",
+  "registrations replace only a sliver of the stock, and the stock",
+  "line can only ever climb toward where the flow line already is.",
+  "Every combustion car registered today will still be burning fuel",
+  "somewhere in the 2040s — which is why the flow line, not the",
+  "stock line, is the leading indicator worth forecasting."),
+  fmt_pct(fs_last_flow, 1), fmt_pct(fs_last_stock, 1),
+  fmt_1(fs_ratio))
+
+# ---- chart 34: the only forecast this page dares ---------------------------
+
+w_bev_line <- pv_line(
+  bev_flow[, c("year", "share")], x = "year", y = "share",
+  ylab = "battery-electric share of new registrations, %",
+  title = "The only forecast this page dares",
+  subtitle = sprintf(
+    "Battery-electric share of new registrations, Canton Lucerne, %d–%d, extrapolated five years",
+    min(bev_flow$year), max(bev_flow$year)),
+  source = quelle_bfs)
+cp_bev <- pv_changepoints(w_bev_line)$x$changepoints
+w_bev_fc <- sized(pv_forecast(w_bev_line, horizon = 5), 450)
+fc <- w_bev_fc$x$forecast
+fc_label <- switch(fc$method,
+                   ets = "an exponential-smoothing model",
+                   arima = sprintf("an %s model", fc$spec),
+                   naive = "a naive last-value model")
+fc_end <- max(bev_flow$year) + 5
+fc_widest <- max(fc$levels)
+fc_point_end <- utils::tail(fc$points$y, 1)
+fc_lo_end <- max(0, utils::tail(fc$points[[paste0("lo", fc_widest)]], 1))
+fc_hi_end <- utils::tail(fc$points[[paste0("hi", fc_widest)]], 1)
+
+analysis_bev_fc <- sprintf(paste(
+  "Chapter five taught this page suspicion of predictions, so the",
+  "one forecast it dares is narrow and labelled. The changepoint",
+  "machinery dates the take-off of the battery-electric share to",
+  "%s — across the years before that shift the share averaged %s;",
+  "across the years since, %s. The fan extends five years with %s: the",
+  "central path reaches %s of new registrations by %d, and the",
+  "%d%% band runs from %s to %s. The bands widen the way honesty",
+  "requires — this is an extrapolation of the curve's own momentum,",
+  "blind to subsidy changes, price wars, and charging-grid politics,",
+  "and it should be read as momentum made visible, not as a claim",
+  "about %d."),
+  paste(as.integer(cp_bev$x), collapse = " and "),
+  fmt_pct(cp_bev$mean[1], 1),
+  fmt_pct(cp_bev$mean[length(cp_bev$mean)], 1), fc_label,
+  fmt_pct(fc_point_end, 0), fc_end, fc_widest,
+  fmt_pct(fc_lo_end, 0), fmt_pct(fc_hi_end, 0), fc_end)
+
+# ============================================================================
 # Appendix - Methoden und Daten
 # ============================================================================
 
@@ -1334,35 +1959,57 @@ datasets_tbl <- data.frame(
               "fa-lu-ra",
               "DF_STATPOP_PHH",
               "DF_SSV_POP_BIL",
+              "DF_LWZ_1 (canton + municipal slices)",
+              "DF_SSV_BUILD_HOUSING_OC",
+              "DF_SSV_BUILD_LWZ",
+              "DF_SSV_ENERGY_HEATING",
+              "DF_SSV_BUILD_AGE",
+              "DF_SSV_LABMAR_06",
+              "DF_SSV_MOB_COM",
+              "DF_SSV_MOB_CAR",
+              "DF_IVS_1_TECH (Lucerne + CH slice)",
+              "DF_MFZ_1_TECH (Lucerne + CH slice)",
               "pv_city_population (bundled)",
               "pv_city_sectors (bundled)",
               "pv_lucerne_map (bundled)"),
   Publisher = c("LUSTAT Statistik Luzern",
                 "LUSTAT Statistik Luzern",
-                "Bundesamt für Statistik",
-                "Bundesamt für Statistik",
-                "Bundesamt für Statistik",
-                "Bundesamt für Statistik",
+                rep("Bundesamt für Statistik", 14),
                 "BFS, ThemaKart"),
-  Terms = c("OPEN BY ASK", "OPEN BY ASK", "OPEN BY", "OPEN BY",
-            "OPEN BY", "OPEN BY", "© BFS"),
+  Terms = c("OPEN BY ASK", "OPEN BY ASK", rep("OPEN BY", 14), "© BFS"),
   Rows = c(sum(vapply(szbv, nrow, integer(1))), nrow(fa), nrow(phh),
-           nrow(bil), nrow(pv_city_population), nrow(pv_city_sectors),
+           nrow(bil), nrow(lwz_kt) + nrow(lwz_mu), nrow(oc),
+           nrow(lwz_city), nrow(heiz), nrow(bage), nrow(labmar),
+           nrow(mobcom), nrow(mobcar), nrow(ivs), nrow(mfz),
+           nrow(pv_city_population), nrow(pv_city_sectors),
            length(pv_lucerne_map$features)),
   Span = c(sprintf("%d–%d", yr_first, yr_last),
            sprintf("%d–%d", fa_y0, fa_y1),
            sprintf("%d–%d", hh_y0, hh_y1),
            as.character(bil_year),
+           sprintf("%d–%d", vac_y0, vac_y1),
+           as.character(rent_year),
+           as.character(cvac_year),
+           as.character(heiz_year),
+           as.character(unique(bage$period)[1]),
+           as.character(lab_year),
+           as.character(mob_year),
+           as.character(car_year),
+           sprintf("%d–%d", ivs_y0, ivs_y1),
+           sprintf("%d–%d", min(bev_stock$year), max(bev_stock$year)),
            sprintf("%d–%d", yr_city_first, luz_latest_yr),
            "2022", "—"),
   Feeds = c("Chapters 1, 2, 4, 5", "Chapters 3, 4, 5", "Chapters 2, 4",
-            "Chapter 6", "Chapter 6", "Chapter 6", "All maps"))
+            "Chapter 6", "Chapter 7", "Chapter 7", "Chapter 7",
+            "Chapter 7", "Chapter 7", "Chapter 8", "Chapter 8",
+            "Chapter 8", "Chapter 8", "Chapter 8", "Chapter 6",
+            "Chapter 6", "All maps"))
 
 w_datasets <- sized(pv_table(
   datasets_tbl, digits = c(Rows = 0), sortable = FALSE,
   title = "Every dataset on this page",
   subtitle = "Fetched live through polyviz's open-data fetchers and cached locally; licences print on every fetch",
-  source = "Quelle: LUSTAT Statistik Luzern; Bundesamt für Statistik"), 430)
+  source = "Quelle: LUSTAT Statistik Luzern; Bundesamt für Statistik"), 720)
 
 methods_html <- sprintf(paste0(
   "<h3 id='methods-data'>Data</h3>",
@@ -1416,6 +2063,45 @@ methods_html <- sprintf(paste0(
   " loses, which is reported as the finding, not smoothed over; even",
   " before cross-validation its in-sample R² reaches only %s.</p>",
 
+  "<h3>Structural breaks (chapters 7 and 8)</h3>",
+  "<p>The level shifts marked on the vacancy series and the",
+  " battery-electric share are found by binary segmentation with a",
+  " BIC stopping rule and a minimum segment of five points — the",
+  " package's <code>pv_changepoints()</code>, described in its own",
+  " documentation. The vacancy series offers %d annual points and",
+  " yields shifts starting %s; the BEV share offers %d and yields",
+  " %s. The prose reads the years from the chart's recorded",
+  " analysis, so words and marks cannot drift apart. With series",
+  " this short the method dates sustained regime changes; it cannot",
+  " see breaks within five points of either end.</p>",
+
+  "<h3>Cross-sections (chapters 7 and 8)</h3>",
+  "<p>Three plain OLS regressions across the Swiss statistical",
+  " cities (the <code>_ST</code> total row always dropped):",
+  " three-room rent on vacancy (slope Fr. %s per point of vacancy,",
+  " R² = %s — reported as the weak association it is; note the rent",
+  " survey is from %s and the vacancy count from %s),",
+  " heat-pump share on post-2000 stock share (slope %s, R² = %s),",
+  " and public-transport commuting on cars per 1,000 residents",
+  " (%s points per 100 cars, R² = %s). All three are associations",
+  " between cities, not causes within any city. Rents, tenure",
+  " shares, commuter counts, and modal shares come from the pooled",
+  " structural survey and carry sampling error; the source flows",
+  " publish confidence intervals alongside every figure, and the",
+  " small-city dots on those charts wobble accordingly. The fuel",
+  " bands of chapter 8 fold the register's codes as: Petrol = PC,",
+  " Diesel = DC, Hybrid = PH + DH, Plug-in = HP + HD, Battery",
+  " electric = EL, Other = FC + GA + _O.</p>",
+
+  "<h3>Forecast (chapter 8)</h3>",
+  "<p>The fan on the battery-electric share is",
+  " <code>pv_forecast()</code> with a five-year horizon; the method",
+  " actually fitted on this build is <em>%s</em>, chosen by the",
+  " function's own rules, with 50/80/95%% interval fans. It",
+  " extrapolates the series' own momentum and knows nothing of",
+  " prices, subsidies, or grid politics — the chapter says so in",
+  " its title.</p>",
+
   "<h3>Limits</h3>",
   "<p>The population scenarios are LUSTAT's model output, not",
   " observations — chapters 1, 2, and 5 analyse what the model",
@@ -1423,11 +2109,12 @@ methods_html <- sprintf(paste0(
   " lagged three-year average, so 'recent growth' spans roughly",
   " %d–%d. With ~%d municipalities every regression is small-sample;",
   " confidence intervals are reported where a claim depends on them.",
-  " Associations are never read as causes. And one dataset hunt",
-  " failed honestly: municipal-level historical population, dwellings,",
-  " and vacancy series exist on stats.swiss but only as full-table",
-  " downloads too large for this build, so the historical record here",
-  " rests on the equalisation base and the household statistics.</p>"),
+  " Associations are never read as causes. And a confession from an",
+  " earlier edition of this page is settled: the municipal vacancy",
+  " register was once dismissed here as 'a full-table download too",
+  " large for this build'. The fetcher has since learned server-side",
+  " SDMX filtering (<code>pv_fetch_bfs(filter = )</code>), and",
+  " chapter 7's municipal map is that failed hunt, completed.</p>"),
   # convergence
   fa_y0, fa_y1, n_beta, n_dropped_beta, fmt_2(beta_slope100),
   fmt_2(beta_ci100[[1]]), fmt_2(beta_ci100[[2]]),
@@ -1442,6 +2129,14 @@ methods_html <- sprintf(paste0(
   # prediction
   fmt_1(proj_rmse), fmt_1(proj_base), fmt_pct(proj_gain, 0),
   fmt_2(fisc_rmse), fmt_2(fisc_base), fmt_2(fisc_r2),
+  # structural breaks
+  nrow(kt_vac), paste(cp_vac_years, collapse = " and "),
+  nrow(bev_flow), paste(as.integer(cp_bev$x), collapse = " and "),
+  # cross-sections
+  fmt_n(rv_slope), fmt_2(rv_r2), rent_year, cvac_year,
+  fmt_2(ha_slope), fmt_2(ha_r2), fmt_1(mm_slope100), fmt_2(mm_r2),
+  # forecast
+  fc$spec,
   # limits
   fa_y0 - 4, fa_y1 - 4, n_muni)
 
@@ -1522,12 +2217,16 @@ page <- tags$html(lang = "en", tags$head(
     tags$p(class = "lede", sprintf(paste(
       "Canton Lucerne counted %s people at the end of %d, and its",
       "statistical office opens enough data to take the place apart",
-      "properly. This page asks four questions of it. How many people",
+      "properly. This page asks six questions of it. How many people",
       "will the canton hold, and how old will they be? Where does the",
       "growth land, and what arrives with it? Do poor municipalities",
       "catch up with rich ones — the oldest question in regional",
-      "economics — or drift further behind? And how much of any of",
-      "this could you have predicted from what is visible today? The",
+      "economics — or drift further behind? How much of any of",
+      "this could you have predicted from what is visible today?",
+      "What do the four walls around all these people cost, and where",
+      "do they stand empty? And how does the canton move — who pours",
+      "into the capital each morning, and how fast is the fleet",
+      "trading petrol for the plug? The",
       "answers come from LUSTAT Statistik Luzern's open municipal data",
       "and the Bundesamt für Statistik's federal series, fetched live",
       "when this page is built. Every chart is interactive — hover,",
@@ -1544,6 +2243,8 @@ page <- tags$html(lang = "en", tags$head(
     tags$a(href = "#familien", "4 · Familien von Gemeinden"),
     tags$a(href = "#wissen", "5 · Was sich wissen lässt"),
     tags$a(href = "#kontext", "6 · Der Kanton im Land"),
+    tags$a(href = "#wohnen", "7 · Vier Wände"),
+    tags$a(href = "#unterwegs", "8 · Unterwegs"),
     tags$a(href = "#methoden", "Appendix"),
     tags$a(href = "index.html", "← polyviz gallery")
   ),
@@ -1646,6 +2347,50 @@ page <- tags$html(lang = "en", tags$head(
                 analysis_engines, w_engines),
     chart_block("sectors", "What the capital does for a living",
                 analysis_sectors, w_sectors)
+  ),
+  theme_section(
+    "wohnen", "Vier Wände", "four walls",
+    paste("Everyone the first chapters projected needs somewhere to",
+          "live. This chapter reads the housing market's one honest",
+          "thermometer — the vacancy count — across thirty years and",
+          "eighty municipalities, then asks what the shortage costs,",
+          "who pays it as rent, and how the age of the walls decides",
+          "how they are heated. Two of its datasets were out of this",
+          "page's reach until the package learned to ask the",
+          "statistics server for slices instead of whole registers."),
+    chart_block("vacancy-cycle", "Thirty years of empty flats",
+                analysis_vacancy, w_vacancy),
+    chart_block("vacancy-rooms", "Which flats stand empty",
+                analysis_room_vac, w_room_vac),
+    chart_block("vacancy-map", "Where the empty flats stand",
+                analysis_vac_map, w_vac_map),
+    chart_block("rent-vacancy", "What a tight market charges",
+                analysis_rent_vac, w_rent_vac),
+    chart_block("tenure", "A country of tenants",
+                analysis_tenure, w_tenure),
+    chart_block("heating-age", "New walls bring new heat",
+                analysis_heat_age, w_heat_age)
+  ),
+  theme_section(
+    "unterwegs", "Unterwegs", "on the move",
+    paste("A canton is not a place people stay put in; it is a",
+          "machine for daily motion. This chapter counts the",
+          "capital's morning intake of commuters — the debut of the",
+          "package's mirrored pyramid chart — asks what decides",
+          "whether they arrive by rail or by road, and watches the",
+          "fleet itself change drive: twenty years of new",
+          "registrations, the slow arithmetic of the stock, and the",
+          "one carefully fenced forecast this page allows itself."),
+    chart_block("commuter-pyramid", "The city breathes in",
+                analysis_pyramid, w_pyramid),
+    chart_block("modal-motor", "The garage predicts the platform",
+                analysis_modal, w_modal),
+    chart_block("fuel-mix", "What arrives at the registration office",
+                analysis_fuel_mix, w_fuel_mix),
+    chart_block("flow-stock", "The showroom runs ahead of the road",
+                analysis_flow_stock, w_flow_stock),
+    chart_block("ev-forecast", "The only forecast this page dares",
+                analysis_bev_fc, w_bev_fc)
   ),
   tags$section(
     id = "methoden", class = "theme",

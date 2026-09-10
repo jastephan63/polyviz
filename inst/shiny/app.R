@@ -26,6 +26,16 @@ equal_top <- utils::head(fiscal25[order(-fiscal25$equalization_chf), ], 25)
 commuters_latest <- pv_commuters[
   pv_commuters$period == max(pv_commuters$period), ]
 
+# The same exchange as one row per region, both directions as columns -
+# the wide shape the pyramid mirrors from its centre spine.
+commuters_wide <- local({
+  inbound <- commuters_latest[commuters_latest$direction == "to Zug",
+                              c("region", "commuters")]
+  outbound <- commuters_latest[commuters_latest$direction == "from Zug",
+                               c("region", "commuters")]
+  merge(inbound, outbound, by = "region", suffixes = c("_in", "_out"))
+})
+
 growth_cities <- pv_city_population[
   pv_city_population$city %in% c("Luzern", "Emmen", "Kriens", "Zug"), ]
 
@@ -239,7 +249,7 @@ demo_check <- function(id, label, value = FALSE) {
 
 # Every widget the app renders; the events panel watches these ids.
 demo_chart_ids <- c(
-  "cmp_bar", "cmp_lollipop", "cmp_commuters",
+  "cmp_bar", "cmp_lollipop", "cmp_pyramid", "cmp_commuters",
   "dist_hist", "dist_violin", "dist_ridge",
   "evo_line", "evo_zoom", "evo_area", "evo_calendar",
   "comp_donut", "comp_treemap", "comp_sunburst",
@@ -284,6 +294,11 @@ ui <- fluidPage(
             demo_card("cmp_lollipop",
                       demo_check("cmp_sort", "sort by value",
                                  value = TRUE)),
+            demo_card("cmp_pyramid",
+                      demo_radio("cmp_pyr_sort", "sort",
+                                 c("none", "total", "left", "right"),
+                                 selected = "total"),
+                      wide = TRUE),
             demo_card("cmp_commuters",
                       demo_check("cmp_labels", "value labels"),
                       wide = TRUE))),
@@ -414,6 +429,18 @@ server <- function(input, output, session) {
                 title = "Where fiscal equalization flows",
                 subtitle = "The 25 largest payments, 2025",
                 source = "LUSTAT Statistik Luzern", mode = mode())
+  }))
+
+  output$cmp_pyramid <- renderPvchart(demo_widget(function() {
+    chosen <- input$cmp_pyr_sort %||% "total"
+    pv_pyramid(commuters_wide, y = "region", left = "commuters_in",
+               right = "commuters_out",
+               labels = c("to Zug", "from Zug"),
+               sort = if (identical(chosen, "none")) FALSE else chosen,
+               title = "Commuters in and out of Canton Zug",
+               subtitle = paste("Both directions of the exchange,",
+                                max(pv_commuters$period)),
+               source = bfs, mode = mode())
   }))
 
   output$cmp_commuters <- renderPvchart(demo_widget(function() {

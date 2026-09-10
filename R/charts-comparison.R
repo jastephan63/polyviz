@@ -1,8 +1,8 @@
-# Comparison charts: slope, dumbbell, waterfall, bullet. The forms whose
-# whole job is putting two or more values side by side so the gap is the
-# message. Each function validates here in R, computes whatever is
-# statistics (running totals, sort orders, the two slope ends), and ships
-# a tidy payload to inst/htmlwidgets/lib/pv-renderers/comparison.js.
+# Comparison charts: slope, dumbbell, pyramid, waterfall, bullet. The
+# forms whose whole job is putting two or more values side by side so the
+# gap is the message. Each function validates here in R, computes whatever
+# is statistics (running totals, sort orders, the two slope ends), and
+# ships a tidy payload to inst/htmlwidgets/lib/pv-renderers/comparison.js.
 
 #' Interactive D3 slope chart
 #'
@@ -224,6 +224,121 @@ pv_dumbbell <- function(data, y, x1, x2, labels = NULL, sort = "gap",
     rownames(df) <- NULL
   }
   pv_widget("dumbbell", c(list(
+    data = df, labels = labels, xlab = axis_title(xlab, "")
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+#' Interactive D3 pyramid chart
+#'
+#' The population-pyramid form: one row per category, two non-negative
+#' values per row drawn as bars mirrored from a shared centre spine —
+#' the first side extends leftward, the second rightward. The classic
+#' shape for opposing flows: age bands split male/female, commuters in
+#' against commuters out, imports against exports. Both sides share one
+#' symmetric scale sized to the larger side, and the tick labels read as
+#' absolute values on both — a leftward bar of 12,000 reads 12,000,
+#' never -12,000. The left side wears the palette's first colour, the
+#' right its second, and a two-entry legend above the chart names them.
+#' Hovering a row shows both exact values.
+#'
+#' @param data A data frame with one row per category — more than one
+#'   is an error; aggregate it first. At most 40 rows (beyond that no
+#'   row list stays readable). Rows with a missing category or value
+#'   are dropped with a warning.
+#' @param y Name of the category column (one row of the chart per level).
+#' @param left,right Names of the two numeric value columns — `left`
+#'   extends leftward from the centre, `right` rightward. Both must be
+#'   non-negative: the mirroring supplies the direction, so a signed
+#'   value has no honest place on either side.
+#' @param labels Names for the two sides, in `left`, `right` order —
+#'   e.g. `c("to Zug", "from Zug")`. They feed the legend and the
+#'   tooltip. `NULL` (default) uses the two column names.
+#' @param sort Row order, top to bottom. `FALSE` (default) keeps the
+#'   rows as they arrive — the right choice for ordered categories like
+#'   age bands; `"total"` sorts by `left + right`, largest first;
+#'   `"left"` and `"right"` sort by that side, largest first.
+#' @param xlab Optional value-axis title under the chart. `NULL`
+#'   (default) draws none — with the legend naming both sides a title
+#'   is usually redundant; any string draws it.
+#' @param ylab Ignored (kept for the family signature): the category
+#'   names down the left are their own axis title.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' latest <- pv_commuters[pv_commuters$period ==
+#'                          max(pv_commuters$period), ]
+#' inbound <- latest[latest$direction == "to Zug",
+#'                   c("region", "commuters")]
+#' outbound <- latest[latest$direction == "from Zug",
+#'                    c("region", "commuters")]
+#' both <- merge(inbound, outbound, by = "region",
+#'               suffixes = c("_in", "_out"))
+#' pv_pyramid(both, y = "region", left = "commuters_in",
+#'            right = "commuters_out", labels = c("to Zug", "from Zug"),
+#'            sort = "total", title = "Commuters in and out of Zug")
+#' @export
+pv_pyramid <- function(data, y, left, right, labels = NULL, sort = FALSE,
+                       xlab = NULL, ylab = NULL,
+                       title = NULL, subtitle = NULL, mode = "auto",
+                       duration = 600, source = NULL, width = NULL,
+                       height = NULL, elementId = NULL) {
+  check_columns(data, list(y, left, right))
+  check_nonempty(data)
+  check_value_column(data, left)
+  check_value_column(data, right)
+  sort_ok <- isFALSE(sort) ||
+    (is.character(sort) && length(sort) == 1 && !is.na(sort) &&
+       sort %in% c("total", "left", "right"))
+  if (!sort_ok) {
+    rlang::abort('`sort` must be "total", "left", "right", or FALSE.')
+  }
+  if (is.null(labels)) {
+    labels <- c(left, right)
+  }
+  if (!is.character(labels) || length(labels) != 2 || anyNA(labels) ||
+      !all(nzchar(labels))) {
+    rlang::abort(
+      "`labels` must be two non-empty strings, one per side.")
+  }
+  df <- data.frame(y = as.character(data[[y]]),
+                   left = as.numeric(data[[left]]),
+                   right = as.numeric(data[[right]]),
+                   stringsAsFactors = FALSE)
+  df <- drop_missing(df, is.na(df$y), y)
+  df <- drop_missing(df, is.na(df$left), left)
+  df <- drop_missing(df, is.na(df$right), right)
+  # The mirroring is the direction channel: leftward means the first
+  # side, rightward the second. A negative value would fold a bar back
+  # across the spine and read as the other side, so both must be
+  # non-negative.
+  for (side in c("left", "right")) {
+    if (any(df[[side]] < 0)) {
+      rlang::abort(sprintf(paste(
+        "`%s` has negative values; pyramid bars grow outward from the",
+        "centre, so both sides must be non-negative."),
+        if (side == "left") left else right))
+    }
+  }
+  if (anyDuplicated(df$y)) {
+    rlang::abort(sprintf(
+      "`data` has more than one row per `%s` category; aggregate it first.",
+      y))
+  }
+  if (nrow(df) > 40) {
+    rlang::abort(sprintf(paste(
+      "%d categories won't fit a readable pyramid (the limit is 40).",
+      "Pre-filter to the categories you care about, e.g. the top 25."),
+      nrow(df)))
+  }
+  # The sort order is a statistic, so it is settled here; the renderer
+  # draws the rows exactly as they arrive.
+  if (!isFALSE(sort)) {
+    df <- df[order(-switch(sort, total = df$left + df$right,
+                           left = df$left, right = df$right)), ]
+    rownames(df) <- NULL
+  }
+  pv_widget("pyramid", c(list(
     data = df, labels = labels, xlab = axis_title(xlab, "")
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)

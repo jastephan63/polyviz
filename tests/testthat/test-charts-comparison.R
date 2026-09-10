@@ -1,7 +1,8 @@
-# The comparison family: slope, dumbbell, waterfall, bullet. These tests
-# cover the R side of each constructor - validation, the statistics
-# computed before shipping, and the payload shape - plus a headless
-# render, an SVG export, and a real hover per the family's contract.
+# The comparison family: slope, dumbbell, pyramid, waterfall, bullet.
+# These tests cover the R side of each constructor - validation, the
+# statistics computed before shipping, and the payload shape - plus a
+# headless render, an SVG export, and a real hover per the family's
+# contract.
 
 expect_pvchart <- function(w, type) {
   expect_s3_class(w, "htmlwidget")
@@ -158,6 +159,96 @@ test_that("dumbbell validates labels, duplicates, caps, and missing rows", {
   expect_error(pv_dumbbell(chr, "m", "v1", "v2"), "not numeric")
 })
 
+# ---- pyramid ---------------------------------------------------------------
+
+# The in/out commuter slice the pyramid tests draw from: one row per
+# region, both directions as columns.
+pyramid_commuters <- function() {
+  latest <- pv_commuters[pv_commuters$period ==
+                           max(pv_commuters$period), ]
+  inb <- latest[latest$direction == "to Zug", c("region", "commuters")]
+  outb <- latest[latest$direction == "from Zug",
+                 c("region", "commuters")]
+  merge(inb, outb, by = "region", suffixes = c("_in", "_out"))
+}
+
+test_that("pyramid builds, defaults its labels, and keeps data order", {
+  both <- pyramid_commuters()
+  w <- expect_pvchart(
+    pv_pyramid(both, y = "region", left = "commuters_in",
+               right = "commuters_out"), "pyramid")
+  expect_equal(sort(names(w$x$data)), c("left", "right", "y"))
+  expect_equal(nrow(w$x$data), nrow(both))
+  # No sort asked for, so the rows arrive exactly as the data did.
+  expect_equal(w$x$data$y, both$region)
+  expect_equal(w$x$labels, c("commuters_in", "commuters_out"))
+  expect_equal(w$x$xlab, "")
+  w2 <- pv_pyramid(both, "region", "commuters_in", "commuters_out",
+                   labels = c("to Zug", "from Zug"))
+  expect_equal(w2$x$labels, c("to Zug", "from Zug"))
+})
+
+test_that("pyramid sorts by total or either side, largest first", {
+  df <- data.frame(g = c("a", "b", "c"), l = c(3, 1, 2), r = c(1, 9, 5))
+  tot <- pv_pyramid(df, "g", "l", "r", sort = "total")
+  expect_equal(tot$x$data$y, c("b", "c", "a"))
+  byl <- pv_pyramid(df, "g", "l", "r", sort = "left")
+  expect_equal(byl$x$data$y, c("a", "c", "b"))
+  byr <- pv_pyramid(df, "g", "l", "r", sort = "right")
+  expect_equal(byr$x$data$y, c("b", "c", "a"))
+  keep <- pv_pyramid(df, "g", "l", "r", sort = FALSE)
+  expect_equal(keep$x$data$y, c("a", "b", "c"))
+  expect_error(pv_pyramid(df, "g", "l", "r", sort = "gap"),
+               '"total", "left", "right", or FALSE')
+  expect_error(pv_pyramid(df, "g", "l", "r", sort = TRUE),
+               '"total", "left", "right", or FALSE')
+})
+
+test_that("pyramid refuses negative sides, naming the column", {
+  neg <- data.frame(g = c("a", "b"), l = c(1, -2), r = c(3, 4))
+  err <- expect_error(pv_pyramid(neg, "g", "l", "r"), "non-negative")
+  expect_match(conditionMessage(err), "`l`")
+  negr <- data.frame(g = c("a", "b"), l = c(1, 2), r = c(-3, 4))
+  err2 <- expect_error(pv_pyramid(negr, "g", "l", "r"), "non-negative")
+  expect_match(conditionMessage(err2), "`r`")
+})
+
+test_that("pyramid validates labels, duplicates, caps, and missing rows", {
+  df <- data.frame(g = c("a", "b"), l = c(1, 2), r = c(3, 4))
+  expect_error(pv_pyramid(df, "g", "l", "r", labels = "one"),
+               "two non-empty strings")
+  expect_error(pv_pyramid(df, "g", "l", "r", labels = c("a", NA)),
+               "two non-empty strings")
+  dup <- data.frame(g = c("a", "a"), l = c(1, 2), r = c(3, 4))
+  expect_error(pv_pyramid(dup, "g", "l", "r"), "aggregate it first")
+  many <- data.frame(g = as.character(1:41), l = 1:41, r = 2:42)
+  expect_error(pv_pyramid(many, "g", "l", "r"), "limit is 40")
+  hole <- data.frame(g = c("a", "b"), l = c(1, NA), r = c(3, 4))
+  expect_warning(w <- pv_pyramid(hole, "g", "l", "r"), "missing `l`")
+  expect_equal(w$x$data$y, "a")
+  chr <- data.frame(g = "a", l = "x", r = 1)
+  expect_error(pv_pyramid(chr, "g", "l", "r"), "not numeric")
+  expect_error(pv_pyramid(df, "nope", "l", "r"), "not in `data`")
+})
+
+test_that("a pyramid's alt text names both sides, the peak, and the balance", {
+  d <- data.frame(band = c("0-19", "20-39", "40-64"),
+                  male = c(10, 30, 25), female = c(12, 28, 27))
+  w <- pv_pyramid(d, y = "band", left = "male", right = "female",
+                  labels = c("Male", "Female"), title = "Ages")
+  a <- w$x$alt
+  expect_match(a, "^A pyramid chart titled \u201cAges\u201d")
+  expect_match(a, "mirroring Male (left) against Female (right) across 3 categories",
+               fixed = TRUE)
+  expect_match(a, "The largest category is 20-39, with 30 Male and 28 Female.",
+               fixed = TRUE)
+  expect_match(a, "Female outweighs Male, 67 to 65.", fixed = TRUE)
+  # Equal totals earn the balance sentence, not an invented winner.
+  even <- data.frame(band = c("x", "y"), male = c(2, 3), female = c(4, 1))
+  expect_match(pv_pyramid(even, "band", "male", "female")$x$alt,
+               "the two sides balance exactly, at 5 each", fixed = TRUE)
+})
+
 # ---- waterfall -------------------------------------------------------------
 
 # Lucerne's population change, period by period - the canonical
@@ -307,6 +398,11 @@ comparison_charts <- function() {
                            x2 = "resource_index_2027",
                            labels = c("2020", "2027"),
                            title = "Tax strength, first vs latest year"),
+    pyramid = pv_pyramid(pyramid_commuters(), y = "region",
+                         left = "commuters_in", right = "commuters_out",
+                         labels = c("to Zug", "from Zug"),
+                         sort = "total",
+                         title = "Commuters in and out of Zug"),
     waterfall = pv_waterfall(wf$steps, x = "period", y = "change",
                              start = wf$start,
                              title = "How Lucerne's population moved"),
@@ -333,7 +429,7 @@ test_that("the standalone HTML export carries the comparison renderers", {
   pv_save(comparison_charts()$slope, f)
   html <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"),
                 collapse = "\n")
-  for (type in c("slope", "dumbbell", "waterfall", "bullet")) {
+  for (type in c("slope", "dumbbell", "pyramid", "waterfall", "bullet")) {
     expect_match(html, paste0("pvRenderers.", type), fixed = TRUE)
   }
 })
@@ -350,6 +446,15 @@ test_that("dumbbell renders without JavaScript errors", {
   render_skip_if_no_chrome()
   path <- tempfile(fileext = ".png")
   expect_no_warning(pv_save(comparison_charts()$dumbbell, path,
+                            quiet = TRUE))
+  expect_gt(file.size(path), 20000)
+  unlink(path)
+})
+
+test_that("pyramid renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  path <- tempfile(fileext = ".png")
+  expect_no_warning(pv_save(comparison_charts()$pyramid, path,
                             quiet = TRUE))
   expect_gt(file.size(path), 20000)
   unlink(path)
@@ -394,7 +499,11 @@ test_that("comparison option variants render without JavaScript errors", {
     # An unsorted dumbbell with custom dot names.
     pv_dumbbell(dumbbell_fiscal(8), y = "municipality",
                 x1 = "resource_index_2020", x2 = "resource_index_2027",
-                labels = c("2020", "2027"), sort = FALSE)
+                labels = c("2020", "2027"), sort = FALSE),
+    # A pyramid in data order with default column-name labels and an
+    # explicit value-axis title.
+    pv_pyramid(pyramid_commuters(), y = "region", left = "commuters_in",
+               right = "commuters_out", xlab = "commuters")
   )
   for (w in variants) {
     path <- tempfile(fileext = ".png")

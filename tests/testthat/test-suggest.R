@@ -418,6 +418,50 @@ test_that("the dumbbell stays away from mismatched scales and wider frames", {
                  suggest_charts(pv_suggest(rep_cat, n = 10)))
 })
 
+test_that("two opposing-flow columns read as a pyramid ahead of the dumbbell", {
+  latest <- subset(pv_commuters, period == "2022-2024")
+  inb <- latest[latest$direction == "to Zug", c("region", "commuters")]
+  outb <- latest[latest$direction == "from Zug", c("region", "commuters")]
+  both <- merge(inb, outb, by = "region", suffixes = c("_in", "_out"))
+  s <- pv_suggest(both, n = 10)
+  charts <- suggest_charts(s)
+  expect_true("pv_pyramid" %in% charts)
+  # The naming signal makes the pyramid the more specific read, so it
+  # edges ahead of the dumbbell offered for the same wide shape.
+  expect_true("pv_dumbbell" %in% charts)
+  expect_lt(match("pv_pyramid", charts), match("pv_dumbbell", charts))
+  code <- suggest_code(s, "pv_pyramid")
+  expect_match(code, 'y = "region"', fixed = TRUE)
+  expect_match(code, 'left = "commuters_in"', fixed = TRUE)
+  expect_match(code, 'right = "commuters_out"', fixed = TRUE)
+  expect_match(suggest_reason(s, "pv_pyramid"), "opposing flows")
+  w <- suggest_eval(code, list(both = both))
+  expect_s3_class(w, "pvchart")
+})
+
+test_that("the pyramid orients its sides by name and stays away otherwise", {
+  # Column order reversed: the names, not the order, pick left and right.
+  swapped <- data.frame(band = c("0-19", "20-39", "40-64"),
+                        female = c(12, 28, 27), male = c(10, 30, 25))
+  code <- suggest_code(pv_suggest(swapped, n = 10), "pv_pyramid")
+  expect_match(code, 'left = "male", right = "female"', fixed = TRUE)
+  # Two same-scale numerics with neutral names stay a dumbbell/scatter.
+  neutral <- data.frame(name = letters[1:8], a = 1:8, b = 8:1)
+  expect_false("pv_pyramid" %in%
+                 suggest_charts(pv_suggest(neutral, n = 10)))
+  # A negative value has no side to sit on, whatever the names say.
+  signed <- data.frame(name = letters[1:4], inflow = c(1, 2, -3, 4),
+                       outflow = c(4, 3, 2, 1))
+  expect_false("pv_pyramid" %in%
+                 suggest_charts(pv_suggest(signed, n = 10)))
+  # The pole word must stand alone in the name - "internal"/"proteins"
+  # carry "in"/"out" only as substrings, which is no signal at all.
+  substrings <- data.frame(name = letters[1:4], internal = 1:4,
+                           outermost = 4:1)
+  expect_false("pv_pyramid" %in%
+                 suggest_charts(pv_suggest(substrings, n = 10)))
+})
+
 test_that("a signed measure with a minority of losses earns a waterfall guess", {
   budget <- data.frame(
     item = c("Wages", "Goods", "Fees", "Transfers", "Interest", "Rents"),
@@ -517,6 +561,14 @@ test_that("every printed suggestion for the new-shape frames builds a widget", {
     shares = data.frame(party = c("A", "B", "C", "D"), n = c(6, 3, 2, 1)),
     nested = pv_city_landuse[pv_city_landuse$city %in%
                                c("Luzern", "Zug", "Emmen"), ],
+    mirrored = local({
+      latest <- pv_commuters[pv_commuters$period == "2022-2024", ]
+      merge(latest[latest$direction == "to Zug",
+                   c("region", "commuters")],
+            latest[latest$direction == "from Zug",
+                   c("region", "commuters")],
+            by = "region", suffixes = c("_in", "_out"))
+    }),
     spaghetti = aggregate(arrivals ~ year + canton, pv_tourism, sum),
     od_flows = data.frame(
       from = c("Aargau", "Luzern", "Schwyz", "Z\u00fcrich"),
@@ -524,8 +576,8 @@ test_that("every printed suggestion for the new-shape frames builds a widget", {
       commuters = c(4905, 11251, 4576, 8000)))
   triggers <- list(two_moments = "pv_slope", paired_wide = "pv_dumbbell",
                    contributions = "pv_waterfall", shares = "pv_waffle",
-                   nested = "pv_sunburst", spaghetti = "pv_horizon",
-                   od_flows = "pv_flow_map")
+                   nested = "pv_sunburst", mirrored = "pv_pyramid",
+                   spaghetti = "pv_horizon", od_flows = "pv_flow_map")
   for (nm in names(frames)) {
     assign(nm, frames[[nm]])
     s <- eval(call("pv_suggest", as.name(nm), n = 10L))

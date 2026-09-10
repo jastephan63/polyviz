@@ -15,7 +15,7 @@ test_that("every chart type has a render check", {
     "bar", "line", "scatter", "force", "chord", "arc", "sunburst",
     "histogram", "boxplot", "violin", "ridgeline",
     "donut", "waffle", "treemap", "icicle", "lollipop",
-    "slope", "dumbbell", "waterfall", "bullet",
+    "slope", "dumbbell", "pyramid", "waterfall", "bullet",
     "area", "heatmap", "calendar", "horizon",
     "sankey", "parallel",
     "pack", "dendrogram",
@@ -98,6 +98,10 @@ test_that("slope renders without JavaScript errors", {
 
 test_that("dumbbell renders without JavaScript errors", {
   expect_chart_renders("dumbbell")
+})
+
+test_that("pyramid renders without JavaScript errors", {
+  expect_chart_renders("pyramid")
 })
 
 test_that("waterfall renders without JavaScript errors", {

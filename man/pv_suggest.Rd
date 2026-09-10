@@ -36,7 +36,9 @@ grouping holds more series than the palette has colours, the point
 where a line chart turns to spaghetti), pairs of numeric columns
 (scatter, with \code{density = TRUE} past a few thousand rows and the
 reason naming \code{density = "hex"} as the countable alternative; a
-dumbbell when exactly two share a scale with one row per category),
+dumbbell when exactly two share a scale with one row per category; a
+pyramid when exactly two are non-negative and named as opposing
+flows - in and out, male and female, imports and exports),
 many numeric columns (a pairs matrix), longitude/latitude pairs (a
 bubble map), id columns matching the bundled Swiss map layers (a
 choropleth), two place-name columns whose values are feature names on

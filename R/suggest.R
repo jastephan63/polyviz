@@ -807,6 +807,84 @@ suggest_dumbbell <- function(p, nm) {
        score = 73)
 }
 
+# The pyramid's naming signal: do these two column names read as the
+# two poles of one opposing flow? Each entry pairs the words for one
+# pole with the words for its opposite; a name carries a pole when one
+# of its separator-split tokens is on that pole's word list, so
+# "commuters_in" reads as inbound but "internal" never does. Returns
+# the two names ordered left/right (first pole left, matching the
+# population-pyramid convention of male-left/female-right), or NULL.
+suggest_pyramid_sides <- function(a, b) {
+  poles <- list(
+    c("in inbound inflow incoming arrivals immigration einpendler zuzug",
+      "out outbound outflow outgoing departures emigration auspendler wegzug"),
+    c("male males men maenner hommes uomini",
+      "female females women frauen femmes donne"),
+    c("import imports importe importations",
+      "export exports exporte exportations"),
+    c("from origin source von herkunft",
+      "to dest destination target nach ziel"))
+  words_of <- function(s) strsplit(s, " ", fixed = TRUE)[[1]]
+  tokens <- function(nm) strsplit(tolower(nm), "[^a-z]+")[[1]]
+  ta <- tokens(a)
+  tb <- tokens(b)
+  for (pair in poles) {
+    first <- words_of(pair[[1]])
+    second <- words_of(pair[[2]])
+    if (any(ta %in% first) && any(tb %in% second)) {
+      return(list(left = a, right = b))
+    }
+    if (any(ta %in% second) && any(tb %in% first)) {
+      return(list(left = b, right = a))
+    }
+  }
+  NULL
+}
+
+# Exactly two non-negative numeric columns whose names read as opposing
+# flows, one row per category: the pyramid's home ground. The same wide
+# shape the dumbbell reads as before/after, but the naming signal says
+# the two columns are two directions of one thing - so the pyramid is
+# the more specific read and edges ahead of it.
+suggest_pyramid <- function(p, nm) {
+  nums <- Filter(function(m) m$kind == "numeric", p$measures)
+  if (length(nums) != 2) {
+    return(NULL)
+  }
+  a <- nums[[1]]
+  b <- nums[[2]]
+  # Mirrored bars grow outward from the spine; a negative value has no
+  # side to sit on.
+  if (a$min < 0 || b$min < 0 || (a$max <= 0 && b$max <= 0)) {
+    return(NULL)
+  }
+  sides <- suggest_pyramid_sides(a$name, b$name)
+  if (is.null(sides)) {
+    return(NULL)
+  }
+  g <- NULL
+  for (cc in p$cats) {
+    keep <- suggest_complete(p$data, c(cc$name, a$name, b$name))
+    k <- sum(keep)
+    if (k < 2 || k > 40) next
+    if (anyDuplicated(p$data[[cc$name]][keep]) > 0) next
+    if (is.null(g) || cc$distinct > g$distinct) {
+      g <- cc
+    }
+  }
+  if (is.null(g)) {
+    return(NULL)
+  }
+  list(chart = "pv_pyramid",
+       code = sprintf("pv_pyramid(%s, y = %s, left = %s, right = %s)",
+                      nm, suggest_q(g$name), suggest_q(sides$left),
+                      suggest_q(sides$right)),
+       reason = sprintf(
+         "`%s` and `%s` name opposing flows, so each `%s` mirrors as a left/right pair from one centre spine",
+         sides$left, sides$right, g$name),
+       score = 75)
+}
+
 # A summable measure that mixes gains and losses over a handful of
 # categories reads like contributions building toward a total. That is a
 # guess - only the author knows whether the rows are steps of one story
@@ -1400,7 +1478,9 @@ suggest_runs <- function(code, nm, data) {
 #' where a line chart turns to spaghetti), pairs of numeric columns
 #' (scatter, with `density = TRUE` past a few thousand rows and the
 #' reason naming `density = "hex"` as the countable alternative; a
-#' dumbbell when exactly two share a scale with one row per category),
+#' dumbbell when exactly two share a scale with one row per category; a
+#' pyramid when exactly two are non-negative and named as opposing
+#' flows - in and out, male and female, imports and exports),
 #' many numeric columns (a pairs matrix), longitude/latitude pairs (a
 #' bubble map), id columns matching the bundled Swiss map layers (a
 #' choropleth), two place-name columns whose values are feature names on
@@ -1472,7 +1552,8 @@ pv_suggest <- function(data, n = 4) {
   builders <- list(
     suggest_choropleth, suggest_bubble_map, suggest_flow_map,
     suggest_calendar, suggest_slope, suggest_horizon, suggest_line,
-    suggest_pairs, suggest_heatmap, suggest_dumbbell, suggest_scatter,
+    suggest_pairs, suggest_heatmap, suggest_pyramid, suggest_dumbbell,
+    suggest_scatter,
     suggest_area, suggest_sunburst, suggest_category,
     suggest_distribution, suggest_waterfall, suggest_parallel,
     suggest_spark_table, suggest_histogram, suggest_donut,

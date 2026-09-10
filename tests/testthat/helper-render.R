@@ -124,6 +124,17 @@ render_charts <- list(
                 x2 = "resource_index_2027", labels = c("2020", "2027"),
                 title = "Whose tax base moved most")
   },
+  pyramid = function() {
+    latest <- pv_commuters[pv_commuters$period ==
+                             max(pv_commuters$period), ]
+    inb <- latest[latest$direction == "to Zug", c("region", "commuters")]
+    outb <- latest[latest$direction == "from Zug",
+                   c("region", "commuters")]
+    both <- merge(inb, outb, by = "region", suffixes = c("_in", "_out"))
+    pv_pyramid(both, y = "region", left = "commuters_in",
+               right = "commuters_out", labels = c("to Zug", "from Zug"),
+               sort = "total", title = "Commuters in and out of Zug")
+  },
   waterfall = function() {
     e20 <- aggregate(gwh ~ source,
                      pv_electricity[pv_electricity$year == 2020, ], sum)

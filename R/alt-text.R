@@ -748,6 +748,35 @@ alt_dumbbell <- function(x) {
             alt_num(df$x2[hi]), labs[[2]]))
 }
 
+# The pyramid: what the two mirrored sides are, the category with the
+# most in total, and how the two sides balance overall - the shape a
+# reader takes from the form at a glance, said in numbers.
+alt_pyramid <- function(x) {
+  df <- x$data
+  labs <- x$labels
+  hi <- which.max(df$left + df$right)
+  lt <- sum(df$left)
+  rt <- sum(df$right)
+  balance <- if (lt == rt) {
+    sprintf("Across all categories the two sides balance exactly, at %s each.",
+            alt_num(lt))
+  } else {
+    big <- if (lt > rt) 1 else 2
+    sprintf("Across all categories, %s outweighs %s, %s to %s.",
+            labs[[big]], labs[[3 - big]],
+            alt_num(max(lt, rt)), alt_num(min(lt, rt)))
+  }
+  paste(
+    alt_lead(x, "A pyramid chart",
+             sprintf("mirroring %s (left) against %s (right) across %s",
+                     labs[[1]], labs[[2]],
+                     alt_count(nrow(df), "category", "categories"))),
+    sprintf("The largest category is %s, with %s %s and %s %s.",
+            df$y[hi], alt_num(df$left[hi]), labs[[1]],
+            alt_num(df$right[hi]), labs[[2]]),
+    balance)
+}
+
 # The waterfall: how many contributions build the total, the largest
 # single one (signed by its verb), and where the running total ends.
 alt_waterfall <- function(x) {
@@ -963,6 +992,7 @@ alt_describe <- function(x) {
     beeswarm = alt_beeswarm(x),
     slope = alt_slope(x),
     dumbbell = alt_dumbbell(x),
+    pyramid = alt_pyramid(x),
     waterfall = alt_waterfall(x),
     bullet = alt_bullet(x),
     waffle = alt_waffle(x),

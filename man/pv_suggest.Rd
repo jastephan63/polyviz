@@ -41,7 +41,9 @@ pyramid when exactly two are non-negative and named as opposing
 flows - in and out, male and female, imports and exports),
 many numeric columns (a pairs matrix), longitude/latitude pairs (a
 bubble map), id columns matching the bundled Swiss map layers (a
-choropleth), two place-name columns whose values are feature names on
+choropleth), a column of two-letter canton codes with one row per
+canton (a hex cartogram), two place-name columns whose values are
+feature names on
 one bundled layer plus a non-negative measure (a flow map), grouped
 numeric columns (boxplot, violin, or ridgeline, by group count), a
 signed measure whose losses are a real minority (a waterfall, offered

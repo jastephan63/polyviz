@@ -1,6 +1,6 @@
-# Geographic charts: the choropleth and the bubble map. Like every chart
-# file, this one only shapes the payload - the drawing lives in
-# inst/htmlwidgets/lib/pv-renderers/geo.js.
+# Geographic charts: the choropleth, the hex cartogram, the bubble map,
+# and the flow map. Like every chart file, this one only shapes the
+# payload - the drawing lives in inst/htmlwidgets/lib/pv-renderers/geo.js.
 
 # ---- map plumbing shared by the geo charts ---------------------------------
 
@@ -814,6 +814,184 @@ pv_flow_map <- function(data, from, to, value, map = "cantons",
   pv_widget("flowmap", c(list(
     data = df[, c("from", "to", "value")], places = places, map = geo,
     lakes = lakes, vlab = value
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+# ---- hex cartogram ---------------------------------------------------------
+
+# The hexmap's grid: one pointy-top hexagon per canton, on axial
+# coordinates - q counts east along a row, r counts south, and each row
+# down shifts half a hex east (a cell's centre x follows q + r/2). This
+# table is a curated design artifact, not derived data: the cells were
+# placed by hand and checked against the real map so the grid keeps
+# Switzerland's neighbourhoods - Basel-Stadt in the northwest corner,
+# Schaffhausen on the northern rim above Zurich, the two Appenzells
+# tucked east against St. Gallen, Ticino hanging south of the Gotthard
+# between Uri and Graubunden, and Geneva at the far southwestern tip.
+# One equal hexagon per canton cannot keep every real border; where the
+# grid had to choose, the long borders won (Zurich and Schwyz keep all
+# six of their real neighbours; Valais touches Bern but loses Vaud).
+# Edit it only with a real map open beside you.
+pv_hexmap_layout <- data.frame(
+  bfs = 1:26,
+  code = c("ZH", "BE", "LU", "UR", "SZ", "OW", "NW", "GL", "ZG", "FR",
+           "SO", "BS", "BL", "SH", "AR", "AI", "SG", "GR", "AG", "TG",
+           "TI", "VD", "VS", "NE", "GE", "JU"),
+  name = c("Z\u00fcrich", "Bern", "Luzern", "Uri", "Schwyz", "Obwalden",
+           "Nidwalden", "Glarus", "Zug", "Fribourg", "Solothurn",
+           "Basel-Stadt", "Basel-Landschaft", "Schaffhausen",
+           "Appenzell Ausserrhoden", "Appenzell Innerrhoden",
+           "St. Gallen", "Graub\u00fcnden", "Aargau", "Thurgau",
+           "Ticino", "Vaud", "Valais", "Neuch\u00e2tel", "Gen\u00e8ve",
+           "Jura"),
+  q = c(2, -1, 0, 2, 2, 0, 1, 3, 1, -2,
+        -1, 0, 0, 2, 4, 4, 3, 3, 1, 3,
+        2, -3, -2, -2, -4, -1),
+  r = c(1, 3, 2, 3, 2, 3, 3, 2, 2, 3,
+        2, 0, 1, 0, 1, 2, 1, 3, 1, 0,
+        4, 3, 4, 2, 4, 1)
+)
+
+#' Interactive D3 hex cartogram of Switzerland
+#'
+#' The 26 cantons as equal-sized hexagons, coloured by a numeric value —
+#' the map for when every canton's number matters equally. On a real
+#' choropleth the geography does the weighting: Graubünden and Valais
+#' dominate the picture while the dense little cantons — Basel-Stadt,
+#' Zug, Geneva — all but vanish, exactly the places where much of the
+#' story usually lives. The hexmap trades faithful shapes for equal
+#' visual weight: one hexagon per canton, arranged on a hand-curated
+#' grid that keeps the country's neighbourhoods (Basel-Stadt in the
+#' northwest corner, Schaffhausen on the northern rim, Ticino south of
+#' the Gotthard, Geneva at the far southwestern tip), so the map still
+#' reads as Switzerland at a glance.
+#'
+#' `data` joins onto the grid through `id`, which may hold either the
+#' two-letter canton codes (`"ZH"`, `"BE"`, ..., `"JU"`, matched
+#' case-insensitively) or the BFS canton numbers 1–26 (the same numbers
+#' [pv_swiss_cantons] joins on, as numbers or digit strings) — the two
+#' forms can even mix. An id matching no canton is an error, not a
+#' silent gap: an unmatched canton would simply vanish from a map whose
+#' whole point is that no canton vanishes.
+#'
+#' `palette` and `center` work exactly as in [pv_choropleth()]:
+#' `"sequential"` maps magnitude onto the theme's single-hue ramp,
+#' `"diverging"` pins the neutral midpoint colour to the reference value
+#' in `center` and makes the colour domain symmetric around it. Cantons
+#' without a data row keep a neutral fill and a dashed outline, so
+#' absence stays visible. Each hexagon wears its canton's two-letter
+#' code (switch that off with `labels = FALSE`); hovering shows the full
+#' canton name and the exact value, and the choropleth's colour-scale
+#' legend sits in the header. The hexagons size themselves to the
+#' container and re-fit on resize.
+#'
+#' @param data A data frame with at most one row per canton.
+#' @param id Name of the column identifying each canton: two-letter
+#'   codes or BFS numbers 1–26 (mixing the two forms is fine). Missing
+#'   ids are dropped with a warning; an id that matches no canton is an
+#'   error listing the offenders.
+#' @param value Name of the numeric column mapped to colour. Rows with a
+#'   missing value are dropped with a warning — their cantons read as
+#'   "no data".
+#' @param palette `"sequential"` (default, for magnitudes) or
+#'   `"diverging"` (for values around a reference point, which needs
+#'   `center`).
+#' @param center The reference value the diverging palette's neutral
+#'   midpoint stands for (e.g. `100` for an index, `0` for a change).
+#'   Required — and only allowed — when `palette = "diverging"`.
+#' @param labels Draw each canton's two-letter code in its hexagon?
+#'   `TRUE` (default) or `FALSE`.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' nights24 <- aggregate(nights ~ canton_id,
+#'                       subset(pv_tourism, year == 2024), sum)
+#' pv_hexmap(nights24, id = "canton_id", value = "nights",
+#'           title = "Where Switzerland's guests sleep")
+#' # Two-letter codes join too, and a diverging palette takes a center:
+#' idx <- data.frame(canton = c("ZH", "BE", "LU", "BS", "GE"),
+#'                   index = c(112, 95, 101, 124, 118))
+#' pv_hexmap(idx, id = "canton", value = "index",
+#'           palette = "diverging", center = 100)
+#' @export
+pv_hexmap <- function(data, id, value,
+                      palette = c("sequential", "diverging"),
+                      center = NULL, labels = TRUE, title = NULL,
+                      subtitle = NULL, mode = "auto", duration = 500,
+                      source = NULL, width = NULL, height = NULL,
+                      elementId = NULL) {
+  check_columns(data, list(id, value))
+  check_nonempty(data)
+  check_value_column(data, value)
+  palette <- match.arg(palette)
+  if (!isTRUE(labels) && !isFALSE(labels)) {
+    rlang::abort("`labels` must be TRUE or FALSE.")
+  }
+
+  df <- data.frame(key = trimws(as.character(data[[id]])),
+                   value = as.numeric(data[[value]]))
+  df <- drop_missing(df, is.na(df$key) | !nzchar(df$key), id)
+  df <- drop_missing(df, is.na(df$value), value)
+
+  # Resolve each id to its grid cell: the two-letter codes first
+  # (case-insensitively), the BFS canton numbers 1-26 second - "9" and
+  # 9 and "ZG" all name Zug. Anything left over is an error, not a
+  # warning: an unmatched canton would silently vanish from a map whose
+  # whole point is that no canton vanishes.
+  idx <- match(toupper(df$key), pv_hexmap_layout$code)
+  miss <- is.na(idx)
+  idx[miss] <- match(suppressWarnings(as.numeric(df$key[miss])),
+                     pv_hexmap_layout$bfs)
+  if (anyNA(idx)) {
+    unmatched <- unique(df$key[is.na(idx)])
+    shown <- utils::head(unmatched, 5)
+    extra <- length(unmatched) - length(shown)
+    rlang::abort(sprintf(paste(
+      "%d id(s) in `%s` match no canton: %s%s. Expected two-letter",
+      "canton codes (\"ZH\", \"BE\", ..., \"JU\") or BFS canton",
+      "numbers 1-26."),
+      length(unmatched), id, paste(shown, collapse = ", "),
+      if (extra > 0) sprintf(" and %d more", extra) else ""))
+  }
+  df$code <- pv_hexmap_layout$code[idx]
+
+  # One row per canton, or two values would fight over one hexagon. The
+  # check runs on the resolved codes, so "ZG" and 9 count as the same
+  # canton, exactly as they should.
+  if (anyDuplicated(df$code)) {
+    dups <- unique(df$code[duplicated(df$code)])
+    rlang::abort(sprintf(
+      "`data` has more than one row per canton (%s); aggregate it first.",
+      paste(utils::head(dups, 5), collapse = ", ")))
+  }
+
+  # The colour domain follows the choropleth's rules: the data range for
+  # sequential, symmetric around `center` for diverging so the midpoint
+  # colour always means exactly the reference value.
+  if (palette == "diverging") {
+    if (!is.numeric(center) || length(center) != 1 || is.na(center)) {
+      rlang::abort(paste(
+        '`palette = "diverging"` needs a numeric `center` - the value the',
+        "neutral midpoint colour stands for (e.g. 100 for an index)."))
+    }
+    center <- as.numeric(center)
+    m <- max(abs(range(df$value) - center))
+    domain <- center + c(-m, m)
+  } else {
+    if (!is.null(center)) {
+      rlang::abort('`center` only applies to `palette = "diverging"`.')
+    }
+    domain <- range(df$value)
+  }
+  # All-equal values would collapse the scale; give it a token width.
+  if (domain[1] >= domain[2]) domain <- domain[1] + c(-1, 1)
+
+  pv_widget("hexmap", c(list(
+    data = df[, c("code", "value")], layout = pv_hexmap_layout,
+    palette = palette, domain = domain, obs = range(df$value),
+    center = if (palette == "diverging") center,
+    labels = labels, vlab = value
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

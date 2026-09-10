@@ -76,7 +76,7 @@ var pvDataKeys = {
   table: "data", pairs: "data",
   slope: "data", dumbbell: "data", pyramid: "data",
   waterfall: "data", bullet: "data",
-  waffle: "data", horizon: "data", flowmap: "data",
+  waffle: "data", horizon: "data", flowmap: "data", hexmap: "data",
   force: "nodes", sankey: "nodes", arc: "nodes",
   chord: "matrix",
   sunburst: "root", pack: "root", treemap: "root", icicle: "root",
@@ -160,8 +160,16 @@ function pvRender(el, x, width, height, mq) {
   }
   /* pv_static: the finished chart, inert. Blocking pointer events at
      the container silences every renderer's hover, tooltip, brush, and
-     click wiring in one move, without touching how the chart draws. */
+     click wiring in one move, without touching how the chart draws.
+     The keyboard access goes with it: no tabindex, so the chart never
+     lands in the tab order, and no dangling describedby - the hidden
+     description node is not rebuilt for a static render. Interactive
+     charts get both back from pv.keyboardNav on this same render. */
   el.style.pointerEvents = x.static ? "none" : "";
+  if (x.static) {
+    el.removeAttribute("tabindex");
+    el.removeAttribute("aria-describedby");
+  }
   /* Whatever goes wrong below - a broken payload, a renderer bug -
      becomes a visible message in the widget itself; a silently blank
      box would look like the data's fault. The console keeps the
@@ -311,4 +319,17 @@ function pvRenderChart(el, x, width, height, mq) {
     return;
   }
   renderer(ctx);
+
+  /* Keyboard access, wired centrally so no renderer has to know about
+     it: the marks are the elements already carrying tooltip handlers
+     (pv.a11yMarks), and pv.keyboardNav makes the container focusable,
+     walks them with the arrow keys, shows each mark's own tooltip, and
+     echoes its text into an aria-live region. A chart whose hover
+     binds some other way simply has no marks to walk - the container
+     still focuses and describes itself. Static charts shed this along
+     with every other interaction, and nothing here ever focuses on its
+     own, so headless captures stay untouched. */
+  if (!ctx.static) {
+    pv.keyboardNav(ctx, pv.a11yMarks(el));
+  }
 }

@@ -19,8 +19,8 @@ test_that("every chart type has a render check", {
     "area", "heatmap", "calendar", "horizon",
     "sankey", "parallel",
     "pack", "dendrogram",
-    "choropleth", "bubblemap", "flowmap", "race", "bump", "beeswarm",
-    "pairs", "table"))
+    "choropleth", "hexmap", "bubblemap", "flowmap", "race", "bump",
+    "beeswarm", "pairs", "table"))
   for (id in names(render_charts)) {
     w <- render_charts[[id]]()
     expect_s3_class(w, "pvchart")
@@ -146,6 +146,10 @@ test_that("dendrogram renders without JavaScript errors", {
 
 test_that("choropleth renders without JavaScript errors", {
   expect_chart_renders("choropleth")
+})
+
+test_that("hexmap renders without JavaScript errors", {
+  expect_chart_renders("hexmap")
 })
 
 test_that("bubblemap renders without JavaScript errors", {

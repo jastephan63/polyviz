@@ -874,3 +874,306 @@ test_that("hovering a flow lights it, dims the rest, and names both ends", {
   expect_equal(got$lit, 1)
   expect_equal(got$dimmed, 7)
 })
+
+# ---- hex cartogram ---------------------------------------------------------
+
+# One value per canton, keyed by the BFS number - the render helper's
+# canonical shape.
+canton_nights <- function() {
+  aggregate(nights ~ canton_id, pv_tourism[pv_tourism$year == 2024, ], sum)
+}
+
+hex_layout <- function() polyviz:::pv_hexmap_layout
+
+test_that("hexmap builds its payload and ships the curated layout", {
+  n24 <- canton_nights()
+  w <- expect_pvchart(
+    pv_hexmap(n24, id = "canton_id", value = "nights"),
+    "hexmap")
+  # The grid travels in the payload exactly as curated.
+  expect_identical(w$x$layout, hex_layout())
+  # Every id resolved to its two-letter code, in data order.
+  expect_equal(w$x$data$code,
+               hex_layout()$code[match(n24$canton_id, hex_layout()$bfs)])
+  expect_equal(w$x$data$value, n24$nights)
+  expect_equal(w$x$vlab, "nights")
+  # Sequential is the default, its domain the plain data range, the
+  # codes drawn unless asked otherwise.
+  expect_equal(w$x$palette, "sequential")
+  expect_equal(w$x$domain, range(n24$nights))
+  expect_equal(w$x$obs, range(n24$nights))
+  expect_null(w$x$center)
+  expect_true(w$x$labels)
+  expect_false(pv_hexmap(n24, id = "canton_id", value = "nights",
+                         labels = FALSE)$x$labels)
+})
+
+test_that("hexmap joins on codes and BFS numbers alike, even mixed", {
+  # Codes are matched case-insensitively and trimmed.
+  codes <- data.frame(k = c("zh", "BE", " lu "), v = 1:3)
+  w <- pv_hexmap(codes, id = "k", value = "v")
+  expect_equal(w$x$data$code, c("ZH", "BE", "LU"))
+  # BFS numbers work as numbers and as digit strings.
+  nums <- data.frame(k = c(1, 2, 3), v = 1:3)
+  expect_equal(pv_hexmap(nums, id = "k", value = "v")$x$data$code,
+               c("ZH", "BE", "LU"))
+  chr <- data.frame(k = c("1", "2", "3"), v = 1:3)
+  expect_equal(pv_hexmap(chr, id = "k", value = "v")$x$data$code,
+               c("ZH", "BE", "LU"))
+  # And the two forms mix freely.
+  mixed <- data.frame(k = c("ZH", "2", "GE"), v = 1:3)
+  expect_equal(pv_hexmap(mixed, id = "k", value = "v")$x$data$code,
+               c("ZH", "BE", "GE"))
+})
+
+test_that("hexmap errors loudly on unmatched ids and duplicate cantons", {
+  # Unmatched ids are an error, not a silent gap, and the message says
+  # what would have matched.
+  bad <- data.frame(k = c("ZH", "XX", "27"), v = 1:3)
+  expect_error(
+    pv_hexmap(bad, id = "k", value = "v"),
+    '2 id\\(s\\) in `k` match no canton: XX, 27.*two-letter.*1-26')
+  # More than five offenders are counted, not all spelled out.
+  many <- data.frame(k = c(paste0("X", 1:7), "ZH"), v = 1:8)
+  expect_error(
+    pv_hexmap(many, id = "k", value = "v"),
+    "7 id\\(s\\).*and 2 more")
+  # Duplicates are checked on the resolved canton, so "ZG" and 9 clash.
+  dup <- data.frame(k = c("ZG", "9"), v = 1:2)
+  expect_error(
+    pv_hexmap(dup, id = "k", value = "v"),
+    "more than one row per canton \\(ZG\\); aggregate it first")
+})
+
+test_that("hexmap validates its columns, values, and flags", {
+  n24 <- canton_nights()
+  expect_error(pv_hexmap(n24, id = "nope", value = "nights"),
+               "not in `data`")
+  expect_error(pv_hexmap(n24, id = "canton_id", value = "nope"),
+               "not in `data`")
+  expect_error(pv_hexmap(n24[0, ], id = "canton_id", value = "nights"),
+               "no rows")
+  chr <- data.frame(k = "ZH", v = "many")
+  expect_error(pv_hexmap(chr, id = "k", value = "v"), "not numeric")
+  expect_error(
+    pv_hexmap(n24, id = "canton_id", value = "nights", labels = "yes"),
+    "`labels` must be TRUE or FALSE")
+})
+
+test_that("hexmap drops missing rows with warnings and refuses all-missing", {
+  n24 <- canton_nights()
+  n24$nights[3] <- NA
+  expect_warning(
+    w <- pv_hexmap(n24, id = "canton_id", value = "nights"),
+    "Dropped 1 row\\(s\\) with missing `nights` values")
+  expect_equal(nrow(w$x$data), 25)
+  # The NA row's domain influence goes with it.
+  expect_equal(w$x$domain, range(n24$nights, na.rm = TRUE))
+  # A missing id has nothing to join; the row goes, with a warning.
+  nai <- data.frame(k = c("ZH", NA, "BE"), v = 1:3)
+  expect_warning(w2 <- pv_hexmap(nai, id = "k", value = "v"),
+                 "missing `k`")
+  expect_equal(w2$x$data$code, c("ZH", "BE"))
+  allna <- canton_nights()
+  allna$nights <- NA
+  expect_error(pv_hexmap(allna, id = "canton_id", value = "nights"),
+               "non-missing")
+})
+
+test_that("hexmap diverging needs a center and sends a symmetric domain", {
+  n24 <- canton_nights()
+  expect_error(
+    pv_hexmap(n24, id = "canton_id", value = "nights",
+              palette = "diverging"),
+    "center")
+  w <- pv_hexmap(data.frame(k = c("ZH", "BE"), v = c(90, 130)),
+                 id = "k", value = "v",
+                 palette = "diverging", center = 100)
+  expect_equal(w$x$center, 100)
+  expect_equal(w$x$domain, c(70, 130))
+  expect_equal(w$x$obs, c(90, 130))
+  # A center without the diverging palette is refused, not ignored.
+  expect_error(
+    pv_hexmap(n24, id = "canton_id", value = "nights", center = 100),
+    "diverging")
+  # All-equal values get a token domain width instead of a collapsed scale.
+  flat <- data.frame(k = c("ZH", "BE"), v = c(5, 5))
+  expect_equal(pv_hexmap(flat, id = "k", value = "v")$x$domain, c(4, 6))
+})
+
+test_that("the curated hex layout keeps Switzerland's geography", {
+  lay <- hex_layout()
+  # One cell per canton: 26 unique codes, the BFS numbers 1-26, and no
+  # two cantons sharing a grid cell.
+  expect_equal(nrow(lay), 26)
+  expect_equal(sort(lay$bfs), 1:26)
+  expect_false(anyDuplicated(lay$code) > 0)
+  expect_false(anyDuplicated(paste(lay$q, lay$r)) > 0)
+  # The names match the bundled canton layer's, BFS number for number.
+  cant <- data.frame(
+    id = vapply(pv_swiss_cantons$features,
+                function(f) as.numeric(f$properties$id), numeric(1)),
+    name = vapply(pv_swiss_cantons$features,
+                  function(f) as.character(f$properties$name),
+                  character(1)))
+  expect_equal(lay$name, cant$name[match(lay$bfs, cant$id)])
+
+  # The compass facts a Swiss reader checks first. Centre x on a
+  # pointy-top grid follows q + r/2; r counts south.
+  px <- function(code) {
+    i <- match(code, lay$code)
+    lay$q[i] + lay$r[i] / 2
+  }
+  r_of <- function(code) lay$r[match(code, lay$code)]
+  # Schaffhausen sits on the northern rim, Basel-Stadt in its northwest
+  # corner, and nothing sits further north than that top row.
+  expect_equal(r_of("SH"), min(lay$r))
+  expect_equal(r_of("BS"), min(lay$r))
+  expect_equal(px("BS"), min((lay$q + lay$r / 2)[lay$r == min(lay$r)]))
+  # Geneva holds the far southwestern tip; Ticino hangs off the
+  # southern rim.
+  expect_equal(px("GE"), min(lay$q + lay$r / 2))
+  expect_equal(r_of("GE"), max(lay$r))
+  expect_equal(r_of("TI"), max(lay$r))
+
+  # Adjacency on axial coordinates: the six neighbours of (q, r).
+  touches <- function(a, b) {
+    i <- match(a, lay$code)
+    j <- match(b, lay$code)
+    d <- paste(lay$q[j] - lay$q[i], lay$r[j] - lay$r[i])
+    d %in% c("1 0", "-1 0", "0 1", "0 -1", "1 -1", "-1 1")
+  }
+  # Ticino south of the Gotthard: between Uri and Graubunden.
+  expect_true(touches("TI", "UR"))
+  expect_true(touches("TI", "GR"))
+  # Zurich keeps all six of its real neighbours.
+  for (nb in c("AG", "SH", "TG", "SG", "ZG", "SZ")) {
+    expect_true(touches("ZH", nb), label = paste("ZH touches", nb))
+  }
+  # The two Appenzells stay tucked against St. Gallen, AR north of AI.
+  expect_true(touches("AR", "SG"))
+  expect_true(touches("AR", "AI"))
+  expect_lt(r_of("AR"), r_of("AI"))
+  # And a handful of long borders that anchor the rest of the country.
+  expect_true(touches("BS", "BL"))
+  expect_true(touches("BE", "VS"))
+  expect_true(touches("BE", "FR"))
+  expect_true(touches("VD", "GE"))
+  expect_true(touches("LU", "BE"))
+})
+
+test_that("hexmap alt text counts cantons, names the extremes, and flags gaps", {
+  n24 <- canton_nights()
+  w <- pv_hexmap(n24, id = "canton_id", value = "nights",
+                 title = "Where the guests sleep")
+  a <- w$x$alt
+  expect_match(a,
+               "^A hex cartogram of Switzerland titled \u201cWhere the guests sleep\u201d")
+  expect_match(a, "each of 26 cantons an equal-sized hexagon coloured by nights",
+               fixed = TRUE)
+  lay <- hex_layout()
+  lo <- which.min(n24$nights)
+  hi <- which.max(n24$nights)
+  expect_match(a, sprintf(
+    "Values range from %s (%s) to %s (%s).",
+    format(round(n24$nights[lo]), big.mark = ","),
+    lay$name[match(n24$canton_id[lo], lay$bfs)],
+    format(round(n24$nights[hi]), big.mark = ","),
+    lay$name[match(n24$canton_id[hi], lay$bfs)]), fixed = TRUE)
+  # Full coverage says nothing about gaps; missing cantons are counted.
+  expect_false(grepl("no data", a, fixed = TRUE))
+  few <- pv_hexmap(data.frame(k = c("ZH", "GE"), v = 1:2),
+                   id = "k", value = "v")
+  expect_match(few$x$alt, "24 cantons have no data.", fixed = TRUE)
+  one <- pv_hexmap(data.frame(k = 1:25, v = 1:25), id = "k", value = "v")
+  expect_match(one$x$alt, "1 canton has no data.", fixed = TRUE)
+  # The diverging scale note names its reference value.
+  div <- pv_hexmap(data.frame(k = c("ZH", "BE"), v = c(90, 130)),
+                   id = "k", value = "v",
+                   palette = "diverging", center = 100)
+  expect_match(div$x$alt, "on a colour scale diverging around 100",
+               fixed = TRUE)
+  expect_identical(pv_alt_text(w), a)
+})
+
+test_that("a canton-code column with one row per canton suggests the hexmap", {
+  lay <- hex_layout()
+  guests <- data.frame(canton = tolower(lay$code),
+                       nights = seq(100, 2600, by = 100))
+  s <- pv_suggest(guests, n = 10)
+  charts <- vapply(s$suggestions, function(r) r$chart, character(1))
+  expect_true("pv_hexmap" %in% charts)
+  # The full-country join is the most specific read here.
+  expect_identical(charts[[1]], "pv_hexmap")
+  rec <- s$suggestions[[match("pv_hexmap", charts)]]
+  expect_match(rec$code, 'id = "canton"', fixed = TRUE)
+  expect_match(rec$code, 'value = "nights"', fixed = TRUE)
+  expect_match(rec$reason, "two-letter canton codes")
+  # The printed call runs as printed.
+  env <- new.env(parent = asNamespace("polyviz"))
+  assign("guests", guests, envir = env)
+  expect_s3_class(eval(parse(text = rec$code), env), "pvchart")
+
+  # Duplicated cantons, a stray non-code value, or thin coverage all
+  # break the shape, and no hexmap is offered.
+  no_hex <- function(df) {
+    got <- vapply(pv_suggest(df, n = 10)$suggestions,
+                  function(r) r$chart, character(1))
+    expect_false("pv_hexmap" %in% got)
+  }
+  no_hex(rbind(guests, guests[1, ]))
+  stray <- guests
+  stray$canton[1] <- "XX"
+  no_hex(stray)
+  no_hex(guests[1:10, ])
+})
+
+test_that("a diverging hexmap with empty cantons renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  lay <- hex_layout()
+  idx <- data.frame(code = lay$code[-(1:3)],
+                    index = seq(60, 170, length.out = 23))
+  w <- pv_hexmap(idx, id = "code", value = "index",
+                 palette = "diverging", center = 100, labels = FALSE,
+                 title = "Diverging, with three empty hexagons")
+  path <- file.path(render_out_dir(), "hexmap_diverging.png")
+  expect_no_warning(pv_save(w, path, quiet = TRUE))
+  expect_true(file.exists(path))
+  expect_gt(file.size(path), 20000)
+  render_publish(path)
+})
+
+test_that("hovering a hexagon names the canton and gives the exact value", {
+  render_skip_if_no_chrome()
+  s <- geo_page_session(
+    pv_hexmap(canton_nights(), id = "canton_id", value = "nights",
+              title = "Where the guests sleep"))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      /* The layout ships in BFS order, so the first hexagon is Zurich;
+         poke the pointer at its centre and read the tooltip. */
+      var hexes = document.querySelectorAll('polygon.hex');
+      if (!hexes.length) return 'no hexes';
+      var r = hexes[0].getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      hexes[0].dispatchEvent(new PointerEvent('pointerenter',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      hexes[0].dispatchEvent(new PointerEvent('pointermove',
+        { clientX: cx, clientY: cy, bubbles: true }));
+      var tip = document.querySelector('.pv-tooltip');
+      return JSON.stringify({
+        hexes: hexes.length,
+        labels: document.querySelectorAll('text.hex').length,
+        opacity: tip.style.opacity, html: tip.innerHTML });
+    })()", returnByValue = TRUE)$result$value
+  got <- jsonlite::fromJSON(res)
+  # All 26 hexagons and all 26 code labels made it to the page.
+  expect_equal(got$hexes, 26)
+  expect_equal(got$labels, 26)
+  expect_equal(got$opacity, "1")
+  expect_match(got$html, "Z\u00fcrich")
+  expect_match(got$html, "(ZH)", fixed = TRUE)
+  expect_match(got$html, "nights: <b>")
+})

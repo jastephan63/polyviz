@@ -114,3 +114,36 @@ local({
               subtitle = "Average daily commuters exchanged with the neighbour cantons, 2022–2024",
               source = "Source: Fachstelle Statistik Kanton Zug; boundaries © BFS, ThemaKart")
 })
+
+## hexmap
+# explain: The hex cartogram answers the choropleth's oldest complaint:
+#   on a real map the geography does the weighting, so vast thinly-settled
+#   Graubünden dominates the picture while Basel-Stadt, Zug, and Geneva -
+#   the dense little cantons where much of the story usually lives -
+#   shrink to slivers. pv_hexmap() gives every canton the same hexagon on
+#   a hand-curated grid that keeps the country's neighbourhoods (Basel in
+#   the northwest corner, Ticino hanging south of the Gotthard, Geneva on
+#   the far southwestern tip), joins on two-letter codes or BFS numbers
+#   alike, and writes each canton's code in its hexagon; hover for the
+#   full name and exact value. Who fills Swiss hotel beds splits the
+#   country cleanly in two: in the gateway cantons the guests are
+#   foreign - Genève at 73%, Zürich 63%, Basel-Stadt 63%, Luzern 62% -
+#   while the quiet east and northwest sleep Swiss, with the foreign
+#   share down at 13% in Jura, 15% in Glarus, and about one guest in
+#   five in the two Appenzells. On a real map you would never see it:
+#   three of the four most international cantons are among the smallest
+#   on the ground.
+local({
+  n24 <- subset(pv_tourism, year == 2024)
+  tot <- aggregate(nights ~ canton_id, n24, sum)
+  frn <- aggregate(nights ~ canton_id, subset(n24, origin != "Switzerland"),
+                   sum)
+  share <- merge(tot, frn, by = "canton_id", suffixes = c("", "_foreign"))
+  share$pct <- round(100 * share$nights_foreign / share$nights, 1)
+  pv_hexmap(share, id = "canton_id", value = "pct",
+            palette = "diverging",
+            center = round(100 * sum(share$nights_foreign) / sum(share$nights)),
+            title = "Geneva sleeps international, the Jura sleeps Swiss",
+            subtitle = "Foreign share of hotel nights by canton, 2024 – Switzerland overall: 51%",
+            source = "Source: Bundesamt für Statistik – HESTA")
+})

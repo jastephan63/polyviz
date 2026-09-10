@@ -899,6 +899,36 @@ alt_horizon <- function(x) {
             top, alt_num(top_val)))
 }
 
+# The hex cartogram: how many cantons carry a value, where the computed
+# extremes sit (named by canton, since equal hexagons exist to make
+# every canton nameable), and how many hexagons sit empty.
+alt_hexmap <- function(x) {
+  df <- x$data
+  nms <- x$layout$name[match(df$code, x$layout$code)]
+  lo <- which.min(df$value)
+  hi <- which.max(df$value)
+  scale_note <- if (identical(x$palette, "diverging")) {
+    sprintf(", on a colour scale diverging around %s", alt_pos(x$center))
+  } else {
+    ""
+  }
+  out <- paste(
+    alt_lead(x, "A hex cartogram of Switzerland",
+             sprintf("giving each of %s an equal-sized hexagon coloured by %s",
+                     alt_count(nrow(df), "canton", "cantons"),
+                     alt_lab(x$vlab))),
+    sprintf("Values range from %s (%s) to %s (%s)%s.",
+            alt_num(df$value[lo]), nms[lo],
+            alt_num(df$value[hi]), nms[hi], scale_note))
+  blank <- nrow(x$layout) - nrow(df)
+  if (blank > 0) {
+    out <- paste(out, sprintf("%s %s no data.",
+                              alt_count(blank, "canton", "cantons"),
+                              if (blank == 1) "has" else "have"))
+  }
+  out
+}
+
 # The flow map: how many flows among how many places, and the largest
 # flow named end to end - the band a reader would trace first.
 alt_flowmap <- function(x) {
@@ -986,6 +1016,7 @@ alt_describe <- function(x) {
     pack = alt_pack(x),
     dendrogram = alt_dendrogram(x),
     choropleth = alt_choropleth(x),
+    hexmap = alt_hexmap(x),
     bubblemap = alt_bubblemap(x),
     race = alt_race(x),
     bump = alt_bump(x),

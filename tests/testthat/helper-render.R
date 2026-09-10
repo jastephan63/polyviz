@@ -243,6 +243,12 @@ render_charts <- list(
     pv_flow_map(flows, from = "from", to = "to", value = "commuters",
                 title = "Commuter exchange with Canton Zug")
   },
+  hexmap = function() {
+    nights24 <- aggregate(nights ~ canton_id,
+                          pv_tourism[pv_tourism$year == 2024, ], sum)
+    pv_hexmap(nights24, id = "canton_id", value = "nights",
+              title = "Where Switzerland's guests sleep")
+  },
   race = function() {
     pv_race(pv_city_population, time = "year", id = "city",
             value = "population", top_n = 12,

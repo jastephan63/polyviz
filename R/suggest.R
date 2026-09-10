@@ -342,6 +342,50 @@ suggest_choropleth <- function(p, nm) {
        score = 95)
 }
 
+# A category column holding the two-letter canton codes with one row
+# per canton, plus a measure: pv_hexmap's home ground. The bar mirrors
+# the choropleth's: full precision (every value must be a real code, so
+# a country-code column with a stray "DE" never qualifies) and near-full
+# coverage of the 26 - the equal-hexagon grid only earns its keep when
+# (nearly) the whole country is there.
+suggest_hexmap <- function(p, nm) {
+  if (!length(p$measures)) {
+    return(NULL)
+  }
+  m <- p$measures[[1]]
+  codes <- pv_hexmap_layout$code
+  # The code column is hunted among the raw category columns, not
+  # p$cats: a join key is exactly the kind of id-named column ("code",
+  # "canton_code") the grouping pool screens out.
+  nms <- names(p$data)
+  col <- NULL
+  for (i in seq_along(nms)) {
+    if (p$kind[[i]] != "category" || suggest_calendar_name(nms[[i]])) next
+    v <- toupper(trimws(as.character(p$data[[nms[[i]]]])))
+    vals <- unique(v[!is.na(v)])
+    if (!length(vals) || !all(vals %in% codes)) next
+    if (length(vals) < 0.9 * length(codes)) next
+    col <- nms[[i]]
+    break
+  }
+  if (is.null(col)) {
+    return(NULL)
+  }
+  # One row per canton, as the chart itself demands - a messier frame
+  # falls through to the other builders rather than guessing a fold.
+  keep <- suggest_complete(p$data, c(col, m$name))
+  if (!any(keep) || anyDuplicated(p$data[[col]][keep]) > 0) {
+    return(NULL)
+  }
+  list(chart = "pv_hexmap",
+       code = sprintf("pv_hexmap(%s, id = %s, value = %s)",
+                      nm, suggest_q(col), suggest_q(m$name)),
+       reason = sprintf(
+         "`%s` holds the two-letter canton codes with one row per canton, so `%s` reads as a hex cartogram - every canton the same size, the small dense ones no longer invisible",
+         col, m$name),
+       score = 95)
+}
+
 suggest_bubble_map <- function(p, nm) {
   if (is.null(p$coords) || !isTRUE(p$coords$swiss)) {
     return(NULL)
@@ -1483,7 +1527,9 @@ suggest_runs <- function(code, nm, data) {
 #' flows - in and out, male and female, imports and exports),
 #' many numeric columns (a pairs matrix), longitude/latitude pairs (a
 #' bubble map), id columns matching the bundled Swiss map layers (a
-#' choropleth), two place-name columns whose values are feature names on
+#' choropleth), a column of two-letter canton codes with one row per
+#' canton (a hex cartogram), two place-name columns whose values are
+#' feature names on
 #' one bundled layer plus a non-negative measure (a flow map), grouped
 #' numeric columns (boxplot, violin, or ridgeline, by group count), a
 #' signed measure whose losses are a real minority (a waterfall, offered
@@ -1550,7 +1596,8 @@ pv_suggest <- function(data, n = 4) {
 
   p <- suggest_profile(data)
   builders <- list(
-    suggest_choropleth, suggest_bubble_map, suggest_flow_map,
+    suggest_choropleth, suggest_hexmap, suggest_bubble_map,
+    suggest_flow_map,
     suggest_calendar, suggest_slope, suggest_horizon, suggest_line,
     suggest_pairs, suggest_heatmap, suggest_pyramid, suggest_dumbbell,
     suggest_scatter,

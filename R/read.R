@@ -8,6 +8,11 @@
 #' | `.rds` | base R |
 #' | `.sas7bdat`, `.xpt` | SAS via `haven` |
 #' | `.sqlite`, `.db`, `.s3db` | SQL via `DBI`/`RSQLite` |
+#' | `.duckdb`, `.ddb` | SQL via `DBI`/`duckdb` |
+#' | `.parquet` | DuckDB via `duckdb` |
+#'
+#' Parquet files are read in place by DuckDB, which needs the `duckdb`
+#' package (a Suggests dependency) installed.
 #'
 #' @param path Path to a data file.
 #' @param table For database files: the table to read. Defaults to the
@@ -34,14 +39,19 @@ pv_read <- function(path, table = NULL, ...) {
     "xpt" = pv_read_sas(path),
     "sqlite" = ,
     "db" = ,
-    "s3db" = read_sqlite_table(path, table),
+    "s3db" = ,
+    "duckdb" = ,
+    "ddb" = read_db_table(path, table),
+    "parquet" = read_parquet_file(path),
     rlang::abort(sprintf("Unsupported file extension '.%s'.", ext))
   )
 }
 
 # Opens the database just long enough to pull one table out. The
 # connection is always closed on the way out, even if something fails.
-read_sqlite_table <- function(path, table) {
+# pv_db_connect() picks the engine from the file extension, so the same
+# path serves SQLite and DuckDB files alike.
+read_db_table <- function(path, table) {
   con <- pv_db_connect(path)
   on.exit(pv_db_disconnect(con), add = TRUE)
   tables <- pv_db_tables(con)
@@ -58,4 +68,16 @@ read_sqlite_table <- function(path, table) {
       "No table '%s'. Available: %s", table, paste(tables, collapse = ", ")))
   }
   DBI::dbReadTable(con, table)
+}
+
+# DuckDB reads the parquet file where it sits - nothing is imported into
+# a database first. A throwaway in-memory connection does the work and is
+# closed on the way out.
+read_parquet_file <- function(path) {
+  sql_need_duckdb("Reading .parquet files")
+  con <- pv_db_connect(driver = "duckdb")
+  on.exit(pv_db_disconnect(con), add = TRUE)
+  sql <- sprintf("SELECT * FROM read_parquet(%s)",
+                 DBI::dbQuoteString(con, path))
+  pv_query(con, sql)
 }

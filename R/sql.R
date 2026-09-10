@@ -1,16 +1,57 @@
-#' Connect to a SQLite database
+# Thin wrapper so tests can pretend duckdb is not installed.
+sql_has_duckdb <- function() {
+  requireNamespace("duckdb", quietly = TRUE)
+}
+
+# DuckDB is optional; fail before any work with a message that says what
+# to install. `what` names the task so the error reads naturally from
+# every caller.
+sql_need_duckdb <- function(what) {
+  if (!sql_has_duckdb()) {
+    rlang::abort(sprintf(paste(
+      "%s needs the duckdb package.",
+      'Install it with install.packages("duckdb").'), what))
+  }
+}
+
+#' Connect to a SQLite or DuckDB database
 #'
-#' @param path Path to a SQLite file, or `":memory:"` for an in-memory
+#' @param path Path to a database file, or `":memory:"` for an in-memory
 #'   database.
+#' @param driver Database engine. The default `"auto"` picks DuckDB for
+#'   `.duckdb` and `.ddb` files and SQLite for everything else,
+#'   `":memory:"` included, so existing code keeps its SQLite behaviour.
+#'   Pass `"duckdb"` explicitly for an in-memory DuckDB database or a
+#'   DuckDB file with an unusual extension.
 #' @return A `DBIConnection`. Close it with [pv_db_disconnect()].
+#' @details
+#' Both engines drive the same functions — [pv_query()], [pv_db_write()],
+#' [pv_db_tables()], [pv_run_sql_file()] — through DBI. DuckDB (a
+#' Suggests dependency) earns its place on analytics that outgrow memory:
+#' its queries can read Parquet and CSV files straight from disk, so
+#' nothing is imported first. See [pv_query()] for an example.
 #' @examples
 #' con <- pv_db_connect()
 #' pv_db_write(con, "cars", mtcars)
 #' pv_query(con, "SELECT COUNT(*) AS n FROM cars")
 #' pv_db_disconnect(con)
 #' @export
-pv_db_connect <- function(path = ":memory:") {
-  DBI::dbConnect(RSQLite::SQLite(), path)
+pv_db_connect <- function(path = ":memory:",
+                          driver = c("auto", "sqlite", "duckdb")) {
+  driver <- match.arg(driver)
+  if (driver == "auto") {
+    # The file extension decides: DuckDB's own extensions go to DuckDB,
+    # everything else - ":memory:" included - stays SQLite, which keeps
+    # code written against earlier versions of the package working.
+    ext <- tolower(tools::file_ext(path))
+    driver <- if (ext %in% c("duckdb", "ddb")) "duckdb" else "sqlite"
+  }
+  if (driver == "duckdb") {
+    sql_need_duckdb("Connecting to DuckDB databases")
+    DBI::dbConnect(duckdb::duckdb(), dbdir = path)
+  } else {
+    DBI::dbConnect(RSQLite::SQLite(), path)
+  }
 }
 
 #' Disconnect from a database
@@ -19,7 +60,13 @@ pv_db_connect <- function(path = ":memory:") {
 #' @return `TRUE`, invisibly.
 #' @export
 pv_db_disconnect <- function(con) {
-  invisible(DBI::dbDisconnect(con))
+  if (inherits(con, "duckdb_connection")) {
+    # Shutting the driver down releases the database file immediately
+    # instead of waiting for the garbage collector to get round to it.
+    invisible(DBI::dbDisconnect(con, shutdown = TRUE))
+  } else {
+    invisible(DBI::dbDisconnect(con))
+  }
 }
 
 #' Write a data frame to a database table
@@ -51,11 +98,28 @@ pv_db_tables <- function(con) {
 #'   for values — never paste user input into the SQL string.
 #' @param params Optional list of values bound to `?` placeholders.
 #' @return A data frame.
+#' @details
+#' On a DuckDB connection the `FROM` clause can name a Parquet or CSV
+#' file directly — `SELECT ... FROM 'sales.parquet'` — and DuckDB streams
+#' the file through the query instead of loading it, so aggregations over
+#' files far larger than memory return a small data frame without the
+#' data ever passing through R.
 #' @examples
 #' con <- pv_db_connect()
 #' pv_db_write(con, "cars", mtcars)
 #' pv_query(con, "SELECT cyl, AVG(mpg) AS mpg FROM cars GROUP BY cyl")
 #' pv_query(con, "SELECT * FROM cars WHERE cyl = ?", params = list(6))
+#' pv_db_disconnect(con)
+#'
+#' @examplesIf requireNamespace("duckdb", quietly = TRUE)
+#' # DuckDB queries Parquet files in place - no import step, and files
+#' # larger than memory stream through the aggregation just fine.
+#' con <- pv_db_connect(driver = "duckdb")
+#' parquet <- tempfile(fileext = ".parquet")
+#' pv_db_write(con, "cars", mtcars)
+#' DBI::dbExecute(con, sprintf("COPY cars TO '%s' (FORMAT PARQUET)", parquet))
+#' pv_query(con, sprintf(
+#'   "SELECT cyl, AVG(mpg) AS mpg FROM '%s' GROUP BY cyl", parquet))
 #' pv_db_disconnect(con)
 #' @export
 pv_query <- function(con, sql, params = NULL) {

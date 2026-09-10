@@ -29,7 +29,13 @@ One entry point that dispatches on file extension:
    \code{.rds} \tab base R \cr
    \code{.sas7bdat}, \code{.xpt} \tab SAS via \code{haven} \cr
    \code{.sqlite}, \code{.db}, \code{.s3db} \tab SQL via \code{DBI}/\code{RSQLite} \cr
+   \code{.duckdb}, \code{.ddb} \tab SQL via \code{DBI}/\code{duckdb} \cr
+   \code{.parquet} \tab DuckDB via \code{duckdb} \cr
 }
+
+
+Parquet files are read in place by DuckDB, which needs the \code{duckdb}
+package (a Suggests dependency) installed.
 }
 \examples{
 db <- system.file("extdata", "demo.sqlite", package = "polyviz")

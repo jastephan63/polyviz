@@ -2,19 +2,32 @@
 % Please edit documentation in R/sql.R
 \name{pv_db_connect}
 \alias{pv_db_connect}
-\title{Connect to a SQLite database}
+\title{Connect to a SQLite or DuckDB database}
 \usage{
-pv_db_connect(path = ":memory:")
+pv_db_connect(path = ":memory:", driver = c("auto", "sqlite", "duckdb"))
 }
 \arguments{
-\item{path}{Path to a SQLite file, or \code{":memory:"} for an in-memory
+\item{path}{Path to a database file, or \code{":memory:"} for an in-memory
 database.}
+
+\item{driver}{Database engine. The default \code{"auto"} picks DuckDB for
+\code{.duckdb} and \code{.ddb} files and SQLite for everything else,
+\code{":memory:"} included, so existing code keeps its SQLite behaviour.
+Pass \code{"duckdb"} explicitly for an in-memory DuckDB database or a
+DuckDB file with an unusual extension.}
 }
 \value{
 A \code{DBIConnection}. Close it with \code{\link[=pv_db_disconnect]{pv_db_disconnect()}}.
 }
 \description{
-Connect to a SQLite database
+Connect to a SQLite or DuckDB database
+}
+\details{
+Both engines drive the same functions — \code{\link[=pv_query]{pv_query()}}, \code{\link[=pv_db_write]{pv_db_write()}},
+\code{\link[=pv_db_tables]{pv_db_tables()}}, \code{\link[=pv_run_sql_file]{pv_run_sql_file()}} — through DBI. DuckDB (a
+Suggests dependency) earns its place on analytics that outgrow memory:
+its queries can read Parquet and CSV files straight from disk, so
+nothing is imported first. See \code{\link[=pv_query]{pv_query()}} for an example.
 }
 \examples{
 con <- pv_db_connect()

@@ -20,10 +20,29 @@ A data frame.
 \description{
 Run a SQL query and return the result
 }
+\details{
+On a DuckDB connection the \code{FROM} clause can name a Parquet or CSV
+file directly — \verb{SELECT ... FROM 'sales.parquet'} — and DuckDB streams
+the file through the query instead of loading it, so aggregations over
+files far larger than memory return a small data frame without the
+data ever passing through R.
+}
 \examples{
 con <- pv_db_connect()
 pv_db_write(con, "cars", mtcars)
 pv_query(con, "SELECT cyl, AVG(mpg) AS mpg FROM cars GROUP BY cyl")
 pv_query(con, "SELECT * FROM cars WHERE cyl = ?", params = list(6))
 pv_db_disconnect(con)
+
+\dontshow{if (requireNamespace("duckdb", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
+# DuckDB queries Parquet files in place - no import step, and files
+# larger than memory stream through the aggregation just fine.
+con <- pv_db_connect(driver = "duckdb")
+parquet <- tempfile(fileext = ".parquet")
+pv_db_write(con, "cars", mtcars)
+DBI::dbExecute(con, sprintf("COPY cars TO '\%s' (FORMAT PARQUET)", parquet))
+pv_query(con, sprintf(
+  "SELECT cyl, AVG(mpg) AS mpg FROM '\%s' GROUP BY cyl", parquet))
+pv_db_disconnect(con)
+\dontshow{\}) # examplesIf}
 }

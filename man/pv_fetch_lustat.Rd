@@ -37,5 +37,6 @@ str(fiscal)
 }
 }
 \seealso{
-\code{\link[=pv_fetch_bfs]{pv_fetch_bfs()}}, \code{\link[=pv_search_opendata]{pv_search_opendata()}}, \code{\link[=pv_cache_status]{pv_cache_status()}}
+\code{\link[=pv_fetch_bfs]{pv_fetch_bfs()}}, \code{\link[=pv_fetch_eurostat]{pv_fetch_eurostat()}}, \code{\link[=pv_search_opendata]{pv_search_opendata()}},
+\code{\link[=pv_cache_status]{pv_cache_status()}}
 }

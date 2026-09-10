@@ -16,8 +16,8 @@ cache is empty. \code{pv_cache_clear()}: the number of entries removed,
 invisibly.
 }
 \description{
-Downloads made by \code{\link[=pv_fetch_bfs]{pv_fetch_bfs()}}, \code{\link[=pv_fetch_lustat]{pv_fetch_lustat()}}, and
-\code{\link[=pv_fetch_opendata]{pv_fetch_opendata()}} are kept under
+Downloads made by \code{\link[=pv_fetch_bfs]{pv_fetch_bfs()}}, \code{\link[=pv_fetch_lustat]{pv_fetch_lustat()}},
+\code{\link[=pv_fetch_eurostat]{pv_fetch_eurostat()}}, and \code{\link[=pv_fetch_opendata]{pv_fetch_opendata()}} are kept under
 \code{tools::R_user_dir("polyviz", "cache")} and reused on repeat calls (pass
 \code{refresh = TRUE} to a fetcher to force a fresh download).
 \code{pv_cache_status()} lists what is currently cached; \code{pv_cache_clear()}

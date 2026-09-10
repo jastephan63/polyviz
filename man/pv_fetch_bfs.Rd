@@ -25,9 +25,11 @@ Defaults to \code{"CH1.<theme>"} derived from \code{id}.}
 \item{filter}{A single SDMX data key restricting the download to a
 slice of the dataflow, e.g. \code{"LU...."} - dimension values in the
 dataflow's dimension order, separated by dots, where an empty segment
-keeps all values of a dimension and \code{+} combines several. The default
-\code{NULL} downloads the complete flow. See Details for how to find the
-dimension order.}
+keeps all values of a dimension and \code{+} combines several. Or a named
+list mapping dimension ids to the values to keep, e.g.
+\code{list(GR_KT_GDE = c("LU", "ZH"))}, from which the key is built after
+a lookup of the dataflow's dimension order. The default \code{NULL}
+downloads the complete flow. See Details.}
 
 \item{start, end}{First / last period to download, a single year or
 period such as \code{"2015"} (sent as the \code{startPeriod} / \code{endPeriod}
@@ -77,6 +79,17 @@ Because the download cache keys on the full request URL, differently
 filtered pulls of one dataflow cache independently of each other and of
 the complete flow.
 
+Keeping that dimension order straight by hand is fiddly, so \code{filter}
+also takes a named list: \code{list(GR_KT_GDE = c("LU", "ZH"), MEASURE_DIMENSION = "PC")} names the dimensions to pin (several values
+become a \code{+} alternative) and leaves every unnamed dimension open.
+polyviz then fetches the dataflow's data structure once (cached like
+any download), reads the dimension order from it, and builds the dot
+key itself - misspell a dimension and the error lists the dataflow's
+real dimension ids in order, which doubles as the discovery step.
+Should the structure lookup itself fail (no connection, a throttling
+portal), fall back to the dot-separated character key, which needs no
+lookup.
+
 One quirk of filtered exports: the server names their time column
 \code{TIME_PERIOD} where the complete \verb{/all} exports say \code{PERIOD}, so a
 filtered result carries a \code{time_period} column where an unfiltered one
@@ -98,8 +111,18 @@ cities <- pop[startsWith(pop$ssv_pop_1930_code, "pop_ref_period") &
 # to hundreds of megabytes, this slice is a few kilobytes
 lwz <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU._T._T.PC.A",
                     start = "2015")
+
+# the same slice without memorising the dimension order: name the
+# dimensions, polyviz builds the "LU._T._T.PC.A" key from the
+# dataflow's structure (and a misspelt name lists the real ones)
+lwz <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1",
+                    filter = list(GR_KT_GDE = "LU", WOHN_ANZAHL = "_T",
+                                  LEERWOHN_TYP = "_T",
+                                  MEASURE_DIMENSION = "PC", FREQ = "A"),
+                    start = "2015")
 }
 }
 \seealso{
-\code{\link[=pv_fetch_lustat]{pv_fetch_lustat()}}, \code{\link[=pv_search_opendata]{pv_search_opendata()}}, \code{\link[=pv_cache_status]{pv_cache_status()}}
+\code{\link[=pv_fetch_lustat]{pv_fetch_lustat()}}, \code{\link[=pv_fetch_eurostat]{pv_fetch_eurostat()}},
+\code{\link[=pv_search_opendata]{pv_search_opendata()}}, \code{\link[=pv_cache_status]{pv_cache_status()}}
 }

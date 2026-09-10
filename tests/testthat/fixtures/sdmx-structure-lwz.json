@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "contentLanguages": ["de"]
+  },
+  "data": {
+    "dataflows": [
+      {
+        "id": "DF_LWZ_1",
+        "agencyID": "CH1.LWZ",
+        "version": "1.0",
+        "name": "Leerwohnungen"
+      }
+    ],
+    "dataStructures": [
+      {
+        "id": "DSD_LWZ_1",
+        "agencyID": "CH1.LWZ",
+        "version": "1.0",
+        "dataStructureComponents": {
+          "attributeList": {
+            "id": "AttributeDescriptor",
+            "attributes": [
+              {"id": "OBS_STATUS"}
+            ]
+          },
+          "dimensionList": {
+            "id": "DimensionDescriptor",
+            "dimensions": [
+              {"id": "WOHN_ANZAHL", "position": 1},
+              {"id": "GR_KT_GDE", "position": 0},
+              {"id": "LEERWOHN_TYP", "position": 2},
+              {"id": "MEASURE_DIMENSION", "position": 3},
+              {"id": "FREQ", "position": 4}
+            ],
+            "timeDimensions": [
+              {"id": "TIME_PERIOD", "position": 5}
+            ]
+          },
+          "measureList": {
+            "id": "MeasureDescriptor",
+            "primaryMeasure": {"id": "OBS_VALUE"}
+          }
+        }
+      }
+    ]
+  }
+}

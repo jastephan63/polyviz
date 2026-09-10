@@ -1,8 +1,10 @@
 /*
- * Geographic renderers: the choropleth and the bubble map.
- * See basic.js for the ctx contract. Projection and path drawing come
- * from the d3-geo functions bundled with d3 v7; the map itself travels
- * in the payload as a GeoJSON FeatureCollection.
+ * Geographic renderers: the choropleth, the hex cartogram, the bubble
+ * map, and the flow map. See basic.js for the ctx contract. Projection
+ * and path drawing come from the d3-geo functions bundled with d3 v7;
+ * the map itself travels in the payload as a GeoJSON FeatureCollection
+ * (the hex cartogram instead carries its hand-curated grid of axial
+ * coordinates).
  */
 (function () {
 
@@ -67,6 +69,78 @@
       d3.format(".3~s")(v) : d3.format(",.2~f")(v);
   }
 
+  /* The colour of a region's value, shared by the choropleth and the
+     hex cartogram. Sequential glides through the theme's ramp over the
+     data range; diverging pins its neutral midpoint to the reference
+     value (the R side made the domain symmetric around it, so the
+     poles carry equal weight). */
+  function regionColour(theme, palette, domain, center) {
+    if (palette === "diverging") {
+      var dv = theme.diverging;
+      return d3.scaleDiverging(
+        d3.piecewise(d3.interpolateRgb, [dv.low, dv.mid, dv.high]))
+        .domain([domain[0], center, domain[1]]).clamp(true);
+    }
+    var ramp = d3.interpolateRgbBasis(theme.sequential);
+    var t = d3.scaleLinear().domain(domain).range([0, 1]).clamp(true);
+    return function (v) { return ramp(t(v)); };
+  }
+
+  /* The region charts' legend is their colour scale: a small gradient
+     bar in the header with the domain ends labelled - and, for
+     diverging, a tick marking where the reference value sits, since
+     that midpoint is what the whole palette pivots on. The legend shows
+     the slice of the scale the data actually spans (ctx.x.obs) - a
+     symmetric diverging domain can reach far beyond the observed
+     values, and labelling those phantom endpoints would put numbers on
+     the legend that exist nowhere on the map. Steals its own height
+     from ctx.height, like every header row. */
+  function scaleLegend(ctx, colorOf, diverging, center) {
+    var scaleRow = document.createElement("div");
+    scaleRow.style.cssText =
+      "display:flex;align-items:flex-start;gap:7px;margin-top:7px;" +
+      "font-size:11px;line-height:12px;font-variant-numeric:tabular-nums;" +
+      "color:" + ctx.theme.ink.muted + ";";
+    var leg = ctx.x.obs || ctx.x.domain;
+    var stops = [];
+    for (var i = 0; i <= 10; i++) {
+      stops.push(colorOf(leg[0] + (leg[1] - leg[0]) * i / 10) +
+        " " + (i * 10) + "%");
+    }
+    var barWrap = document.createElement("span");
+    barWrap.style.cssText = "position:relative;width:140px;" +
+      "height:" + (diverging ? 26 : 10) + "px;flex:none;";
+    var bar = document.createElement("span");
+    bar.style.cssText = "position:absolute;left:0;top:2px;width:140px;" +
+      "height:8px;border-radius:4px;" +
+      "background:linear-gradient(90deg," + stops.join(",") + ");";
+    barWrap.appendChild(bar);
+    if (diverging && center >= leg[0] && center <= leg[1]) {
+      /* The reference tick sits where the centre value falls within the
+         observed range, not at a fixed midpoint. */
+      var pct = 100 * (center - leg[0]) / (leg[1] - leg[0] || 1);
+      var tick = document.createElement("span");
+      tick.style.cssText = "position:absolute;left:" + pct + "%;top:0;" +
+        "width:1px;height:12px;background:" + ctx.theme.ink.baseline + ";";
+      var mid = document.createElement("span");
+      mid.textContent = legFmt(center);
+      mid.style.cssText = "position:absolute;left:" +
+        Math.max(8, Math.min(92, pct)) + "%;top:14px;" +
+        "transform:translateX(-50%);white-space:nowrap;";
+      barWrap.appendChild(tick);
+      barWrap.appendChild(mid);
+    }
+    var lo = document.createElement("span");
+    lo.textContent = legFmt(leg[0]);
+    var hi = document.createElement("span");
+    hi.textContent = legFmt(leg[1]);
+    scaleRow.appendChild(lo);
+    scaleRow.appendChild(barWrap);
+    scaleRow.appendChild(hi);
+    ctx.header.appendChild(scaleRow);
+    ctx.height = Math.max(120, ctx.height - scaleRow.offsetHeight - 7);
+  }
+
   /* The water tone: the theme's surface nudged toward the sequential
      ramp's low-mid blue - quiet enough to read as geography, desaturated
      enough not to pass for a data colour on the blue sequential ramp.
@@ -121,73 +195,11 @@
       return id === null ? undefined : valueById[String(id)];
     }
 
-    /* The colour of a region. Sequential glides through the theme's
-       11-step ramp over the data range; diverging pins its neutral
-       midpoint to the reference value (the R side made the domain
-       symmetric around it, so the poles carry equal weight). */
-    var colorOf;
-    if (diverging) {
-      var dv = ctx.theme.diverging;
-      colorOf = d3.scaleDiverging(
-        d3.piecewise(d3.interpolateRgb, [dv.low, dv.mid, dv.high]))
-        .domain([domain[0], center, domain[1]]).clamp(true);
-    } else {
-      var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
-      var t = d3.scaleLinear().domain(domain).range([0, 1]).clamp(true);
-      colorOf = function (v) { return ramp(t(v)); };
-    }
-
-    /* The map's legend is its colour scale: a small gradient bar in the
-       header with the domain ends labelled - and, for diverging, a tick
-       marking where the reference value sits, since that midpoint is
-       what the whole palette pivots on. */
-    var scaleRow = document.createElement("div");
-    scaleRow.style.cssText =
-      "display:flex;align-items:flex-start;gap:7px;margin-top:7px;" +
-      "font-size:11px;line-height:12px;font-variant-numeric:tabular-nums;" +
-      "color:" + ctx.theme.ink.muted + ";";
-    /* The legend shows the slice of the scale the data actually spans -
-       a symmetric diverging domain can reach far beyond the observed
-       values, and labelling those phantom endpoints would put numbers on
-       the legend that exist nowhere on the map. */
-    var leg = ctx.x.obs || domain;
-    var stops = [];
-    for (var i = 0; i <= 10; i++) {
-      stops.push(colorOf(leg[0] + (leg[1] - leg[0]) * i / 10) +
-        " " + (i * 10) + "%");
-    }
-    var barWrap = document.createElement("span");
-    barWrap.style.cssText = "position:relative;width:140px;" +
-      "height:" + (diverging ? 26 : 10) + "px;flex:none;";
-    var bar = document.createElement("span");
-    bar.style.cssText = "position:absolute;left:0;top:2px;width:140px;" +
-      "height:8px;border-radius:4px;" +
-      "background:linear-gradient(90deg," + stops.join(",") + ");";
-    barWrap.appendChild(bar);
-    if (diverging && center >= leg[0] && center <= leg[1]) {
-      /* The reference tick sits where the centre value falls within the
-         observed range, not at a fixed midpoint. */
-      var pct = 100 * (center - leg[0]) / (leg[1] - leg[0] || 1);
-      var tick = document.createElement("span");
-      tick.style.cssText = "position:absolute;left:" + pct + "%;top:0;" +
-        "width:1px;height:12px;background:" + ctx.theme.ink.baseline + ";";
-      var mid = document.createElement("span");
-      mid.textContent = legFmt(center);
-      mid.style.cssText = "position:absolute;left:" +
-        Math.max(8, Math.min(92, pct)) + "%;top:14px;" +
-        "transform:translateX(-50%);white-space:nowrap;";
-      barWrap.appendChild(tick);
-      barWrap.appendChild(mid);
-    }
-    var lo = document.createElement("span");
-    lo.textContent = legFmt(leg[0]);
-    var hi = document.createElement("span");
-    hi.textContent = legFmt(leg[1]);
-    scaleRow.appendChild(lo);
-    scaleRow.appendChild(barWrap);
-    scaleRow.appendChild(hi);
-    ctx.header.appendChild(scaleRow);
-    ctx.height = Math.max(120, ctx.height - scaleRow.offsetHeight - 7);
+    /* The shared region-colour scale, and the gradient-bar legend it
+       feeds - both live above, since the hex cartogram wears the same
+       pair. */
+    var colorOf = regionColour(ctx.theme, ctx.x.palette, domain, center);
+    scaleLegend(ctx, colorOf, diverging, center);
 
     /* No axes, so the margins are just breathing room around the shape. */
     var m = { top: 8, right: 16, bottom: 10, left: 16 };
@@ -330,6 +342,191 @@
       .on("pointerleave", function () {
         d3.select(this).call(restStroke);
         pv.hideTip(ctx);
+      });
+  };
+
+  /* ---------- hex cartogram ---------- */
+
+  /* The corner points of one pointy-top hexagon, as an SVG polygon
+     points string: six corners at 60-degree steps starting from the
+     top-right, so a flat edge faces east and west and a point faces
+     north - the orientation whose rows read left to right, the way
+     Switzerland is wide. */
+  function hexPoints(cx, cy, rad) {
+    var pts = [];
+    for (var k = 0; k < 6; k++) {
+      var a = Math.PI * (60 * k - 30) / 180;
+      pts.push((cx + rad * Math.cos(a)) + "," + (cy + rad * Math.sin(a)));
+    }
+    return pts.join(" ");
+  }
+
+  pvRenderers.hexmap = function (ctx) {
+    var layout = ctx.x.layout;
+    var domain = ctx.x.domain;
+    var diverging = ctx.x.palette === "diverging";
+    var center = typeof ctx.x.center === "number" ? ctx.x.center : null;
+
+    /* The join table: canton code -> value. The R side already resolved
+       every id to its two-letter code, so the join here is exact. */
+    var valueByCode = {};
+    ctx.x.data.forEach(function (d) { valueByCode[d.code] = d.value; });
+
+    /* The choropleth's colour scale and gradient-bar legend, shared. */
+    var colorOf = regionColour(ctx.theme, ctx.x.palette, domain, center);
+    scaleLegend(ctx, colorOf, diverging, center);
+
+    /* No axes - the margins are breathing room, as on the map siblings. */
+    var m = { top: 8, right: 16, bottom: 10, left: 16 };
+    var iw = Math.max(50, ctx.width - m.left - m.right),
+        ih = Math.max(80, ctx.height - m.top - m.bottom);
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    /* Axial coordinates to unit centres (hex radius 1): a cell's x
+       follows q + r/2, rows sit 1.5 radii apart. The grid then scales
+       to whatever fits the plot box and centres itself, so the hexagons
+       size themselves from the container - a resize re-renders and
+       re-fits, like every chart. */
+    var SQ3 = Math.sqrt(3);
+    layout.forEach(function (c) {
+      c.ux = SQ3 * (c.q + c.r / 2);
+      c.uy = 1.5 * c.r;
+    });
+    var xmin = d3.min(layout, function (c) { return c.ux; });
+    var ymin = d3.min(layout, function (c) { return c.uy; });
+    var xspan = d3.max(layout, function (c) { return c.ux; }) - xmin;
+    var yspan = d3.max(layout, function (c) { return c.uy; }) - ymin;
+    /* One hex width (sqrt(3) units) and one hex height (2 units) of
+       padding turn centre spans into edge-to-edge extents. */
+    var s = Math.min(iw / (xspan + SQ3), ih / (yspan + 2));
+    var ox = (iw - s * (xspan + SQ3)) / 2 + s * (SQ3 / 2 - xmin);
+    var oy = (ih - s * (yspan + 2)) / 2 + s * (1 - ymin);
+    layout.forEach(function (c) {
+      c.px = ox + s * c.ux;
+      c.py = oy + s * c.uy;
+    });
+
+    /* Each cell's resting stroke - the choropleth's rule: hairline
+       surface-coloured seams between coloured hexagons, a quiet dashed
+       outline in the muted grey on cantons without data, so absence
+       stays visible rather than passing itself off as a low value. */
+    function restStroke(sel) {
+      sel.attr("stroke", function (c) {
+        return valueByCode[c.code] === undefined ?
+          ctx.theme.ink.muted : ctx.theme.ink.surface;
+      })
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", function (c) {
+        return valueByCode[c.code] === undefined ? "3,2" : null;
+      });
+    }
+
+    var hexes = g.append("g")
+      .selectAll("polygon.hex").data(layout).enter()
+      .append("polygon")
+      .attr("class", "hex")
+      .attr("points", function (c) { return hexPoints(c.px, c.py, s); })
+      .attr("fill", function (c) {
+        var v = valueByCode[c.code];
+        return v === undefined ? ctx.theme.ink.grid : colorOf(v);
+      })
+      .attr("stroke-linejoin", "round")
+      .call(restStroke);
+
+    /* The two-letter codes, one per hexagon, unless the R side turned
+       them off. Each label wears whichever theme ink sits further from
+       its hexagon's fill in lightness, so codes stay readable on the
+       deep end of the ramp in light mode and on the pale end in dark
+       mode alike. Labels take no pointer events - hovers belong to the
+       hexagons under them. */
+    var labels = null;
+    if (ctx.x.labels !== false) {
+      var inkA = ctx.theme.ink.primary;
+      var inkB = ctx.theme.ink.surface;
+      var la = d3.lab(inkA).l;
+      var lb = d3.lab(inkB).l;
+      labels = g.append("g").attr("pointer-events", "none")
+        .selectAll("text.hex").data(layout).enter()
+        .append("text")
+        .attr("class", "hex")
+        .attr("x", function (c) { return c.px; })
+        .attr("y", function (c) { return c.py; })
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "central")
+        .attr("fill", function (c) {
+          var v = valueByCode[c.code];
+          if (v === undefined) return ctx.theme.ink.muted;
+          var lf = d3.lab(colorOf(v)).l;
+          return Math.abs(la - lf) >= Math.abs(lb - lf) ? inkA : inkB;
+        })
+        .style("font-size",
+          Math.max(9, Math.min(14, 0.55 * s)) + "px")
+        .style("font-weight", 600)
+        .style("letter-spacing", "0.02em")
+        .text(function (c) { return c.code; });
+    }
+
+    /* Entrance: hexagons fade in swept west to east across the grid -
+       the choropleth's sweep - and the codes follow. Skipped entirely
+       at duration 0, where the final state must exist synchronously. */
+    if (ctx.duration > 0) {
+      var pxs = layout.map(function (c) { return c.px; });
+      var pxMin = d3.min(pxs);
+      var pxSpan = Math.max(1, d3.max(pxs) - pxMin);
+      var fade = Math.min(200, ctx.duration);
+      var sweep = Math.min(400, Math.max(0, ctx.duration - fade));
+      var delayOf = function (c) {
+        return (c.px - pxMin) / pxSpan * sweep;
+      };
+      hexes.attr("opacity", 0)
+        .transition().duration(fade).delay(delayOf)
+        .ease(d3.easeCubicOut)
+        .attr("opacity", 1);
+      if (labels) {
+        labels.attr("opacity", 0)
+          .transition().duration(fade).delay(delayOf)
+          .ease(d3.easeCubicOut)
+          .attr("opacity", 1);
+      }
+    }
+
+    /* Hovering a hexagon raises it (so its outline isn't buried under
+       the neighbours' seams) and outlines it in primary ink; the
+       tooltip gives the full canton name with the code, and the exact
+       value - or says "no data" plainly. The labels live in a later
+       group, so a raised hexagon never covers its own code. */
+    hexes
+      .style("cursor", "pointer")
+      .on("pointerenter pointermove", function (event, c) {
+        d3.select(this).raise()
+          .attr("stroke", ctx.theme.ink.primary)
+          .attr("stroke-width", 1.5)
+          .attr("stroke-dasharray", null);
+        var v = valueByCode[c.code];
+        var body = v === undefined ? "no data" :
+          pv.esc(ctx.x.vlab || "value") + ": <b>" + ctx.fmt(v) + "</b>";
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", {
+            code: c.code, name: c.name,
+            value: v === undefined ? null : v
+          });
+        }
+        pv.showTip(ctx, event,
+          "<b>" + pv.esc(c.name) + "</b> (" + pv.esc(c.code) + ")<br>" +
+          body);
+      })
+      .on("pointerleave", function () {
+        d3.select(this).call(restStroke);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, c) {
+        var v = valueByCode[c.code];
+        ctx.emit("click", {
+          code: c.code, name: c.name,
+          value: v === undefined ? null : v
+        });
       });
   };
 

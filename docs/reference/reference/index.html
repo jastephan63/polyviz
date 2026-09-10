@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -267,6 +267,12 @@
         <dd>Interactive D3 flow map</dd>
       </dl><dl><dt>
 
+          <code><a href="pv_hexmap.html">pv_hexmap()</a></code>
+
+        </dt>
+        <dd>Interactive D3 hex cartogram of Switzerland</dd>
+      </dl><dl><dt>
+
           <code><a href="pv_race.html">pv_race()</a></code>
 
         </dt>
@@ -327,7 +333,7 @@
       </dl></div><div class="section level2">
       <h2 id="composition-time-series">Composition &amp; time series<a class="anchor" aria-label="anchor" href="#composition-time-series"></a></h2>
 
-      <div class="section-desc"><p>Several finished charts composed into one page, and the three time-series tools - seasonal decomposition, forecast fans, and changepoint marks - computed entirely in base R’s stats and drawn by the chart machinery that already exists.</p></div>
+      <div class="section-desc"><p>Several finished charts composed into one page or one scrollytelling story, and the three time-series tools - seasonal decomposition, forecast fans, and changepoint marks - computed entirely in base R’s stats and drawn by the chart machinery that already exists.</p></div>
 
 
     </div><div class="section level2">
@@ -341,6 +347,24 @@
 
         </dt>
         <dd>Compose charts into one board</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_story.html">pv_story()</a></code>
+
+        </dt>
+        <dd>Compose charts and prose into a scrollytelling story</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_story_step.html">pv_story_step()</a></code>
+
+        </dt>
+        <dd>One step of a scrollytelling story</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_story_break.html">pv_story_break()</a></code>
+
+        </dt>
+        <dd>A full-width break between story scenes</dd>
       </dl><dl><dt>
 
           <code><a href="pv_decompose.html">pv_decompose()</a></code>
@@ -463,7 +487,7 @@
           <code><a href="pv_db_connect.html">pv_db_connect()</a></code>
 
         </dt>
-        <dd>Connect to a SQLite database</dd>
+        <dd>Connect to a SQLite or DuckDB database</dd>
       </dl><dl><dt>
 
           <code><a href="pv_db_disconnect.html">pv_db_disconnect()</a></code>
@@ -495,9 +519,9 @@
         </dt>
         <dd>Execute a SQL script file</dd>
       </dl></div><div class="section level2">
-      <h2 id="swiss-open-data">Swiss open data<a class="anchor" aria-label="anchor" href="#swiss-open-data"></a></h2>
+      <h2 id="swiss-and-european-open-data">Swiss and European open data<a class="anchor" aria-label="anchor" href="#swiss-and-european-open-data"></a></h2>
 
-      <div class="section-desc"><p>Live access to the portals the bundled datasets come from - search the opendata.swiss catalogue, fetch from the BFS and LUSTAT, pull the country-wide boundary layers, and manage the shared download cache. Every fetch states its source and licence terms.</p></div>
+      <div class="section-desc"><p>Live access to the open-data portals - search the opendata.swiss catalogue, fetch from the BFS, LUSTAT, and Eurostat, pull the country-wide boundary layers, and manage the shared download cache. Every fetch states its source and licence terms.</p></div>
 
 
     </div><div class="section level2">
@@ -529,6 +553,12 @@
 
         </dt>
         <dd>Fetch a dataset from LUSTAT Statistik Luzern</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_fetch_eurostat.html">pv_fetch_eurostat()</a></code>
+
+        </dt>
+        <dd>Fetch a dataset from Eurostat</dd>
       </dl><dl><dt>
 
           <code><a href="pv_fetch_map.html">pv_fetch_map()</a></code>

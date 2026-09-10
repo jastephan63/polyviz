@@ -141,12 +141,18 @@ window.pv = (function () {
        it out of exported charts, wherever in the widget it currently
        lives (the facet renderer moves it between panels). */
     tip.className = "pv-tooltip";
+    /* Readers who asked for reduced motion get the tooltip instantly -
+       the fade is the one piece of motion the tooltip owns, and keyboard
+       focus moves (which show this same tooltip) must never animate. */
+    var reduced = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     tip.style.cssText =
       "position:absolute;pointer-events:none;opacity:0;z-index:10;" +
       "background:" + theme.ink.tooltipBg + ";color:" + theme.ink.tooltipText + ";" +
       "border:1px solid " + theme.ink.tooltipBorder + ";border-radius:8px;" +
       "padding:7px 10px;font-size:12px;line-height:1.55;max-width:280px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,0.16);transition:opacity 130ms ease;";
+      "box-shadow:0 4px 16px rgba(0,0,0,0.16);" +
+      (reduced ? "" : "transition:opacity 130ms ease;");
     el.appendChild(tip);
     return tip;
   };
@@ -377,6 +383,274 @@ window.pv = (function () {
     if (!ctx.selected) return base;
     return ctx.selected.indexOf(String(key)) >= 0 ? base :
       (dim == null ? 0.12 : dim);
+  };
+
+  /* ---------- keyboard navigation & live announcements ----------
+     A pointer reaches the marks through the tooltip handlers every
+     renderer binds on them. The helpers below give the keyboard the
+     same access without any renderer changing: after a render,
+     pvchart.js collects the mark nodes (pv.a11yMarks - d3's
+     selection.on keeps each handler on the node itself, so "carries a
+     tooltip handler" is a property the marks already wear) and
+     pv.keyboardNav makes the container focusable and walks that list
+     with the arrow keys. Each step fires the mark's own pointer
+     handlers - the real tooltip appears, hover highlighting included -
+     and the tooltip's text is echoed into a visually hidden aria-live
+     region for screen readers. Everything here is HTML laid over the
+     plot: nothing touches SVG geometry, and every helper node wears
+     the pv-a11y class the exporter walk skips, so a saved chart stays
+     exactly what it was. */
+
+  /* Visually hidden but still read by assistive tech: the classic
+     clipped one-pixel box. Never display:none - screen readers skip
+     that entirely. */
+  var A11Y_HIDDEN =
+    "position:absolute;width:1px;height:1px;margin:-1px;padding:0;" +
+    "border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);" +
+    "white-space:nowrap;";
+
+  /* The chart's marks, in drawing order: every element inside a plot
+     svg carrying a pointerenter or pointermove handler - exactly the
+     set the tooltip responds to, read off d3's own listener store. The
+     zoom strip is ruled out explicitly (its brush listens for drags,
+     not hovers, but belt and braces). A chart wiring its hover some
+     other way - the table's HTML cells - contributes nothing, and the
+     arrow keys then simply have nothing to walk. */
+  pv.a11yMarks = function (el) {
+    var out = [];
+    var nodes = el.querySelectorAll ? el.querySelectorAll("svg *") : [];
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i], on = n.__on;
+      if (!on || !on.length) continue;
+      var hovers = false;
+      for (var j = 0; j < on.length; j++) {
+        if (on[j].type === "pointerenter" ||
+            on[j].type === "pointermove") { hovers = true; break; }
+      }
+      if (!hovers) continue;
+      if (n.closest && n.closest(".pv-zoom")) continue;
+      out.push(n);
+    }
+    return out;
+  };
+
+  /* Fires one of a mark's own pointer handlers synthetically, at the
+     given point (the mark's centre) - the renderer's hover code runs
+     exactly as it would for a real pointer, tooltip placement included.
+     Dispatched without bubbling on purpose: the handler sits on this
+     very node, and bubbling could wake an ancestor's overlay handler
+     on top of it. */
+  function a11yFire(node, type, cx, cy) {
+    var Ctor = window.PointerEvent || window.MouseEvent;
+    try {
+      node.dispatchEvent(new Ctor(type, {
+        bubbles: false, cancelable: true, clientX: cx, clientY: cy
+      }));
+    } catch (e) { /* no synthetic events, no keyboard hover - fine */ }
+  }
+
+  function a11yCentre(node) {
+    var r = node.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, rect: r };
+  }
+
+  /* The tooltip's text flattened for the live region: each <br> becomes
+     a comma pause, the rest is what a sighted reader sees. */
+  function a11yTipText(tip) {
+    if (!tip || tip.style.opacity === "0") return "";
+    var out = "";
+    (function walk(n) {
+      for (var c = n.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 3) { out += c.nodeValue; }
+        else if (c.nodeType === 1) {
+          if (c.tagName === "BR") { out += ", "; }
+          else { walk(c); }
+        }
+      }
+    })(tip);
+    return out.replace(/\s+/g, " ").trim();
+  }
+
+  /* The container's focus ring: primary ink with a grid-toned casing,
+     drawn inset with box-shadow so it changes no layout and no export
+     ever sees it. */
+  function a11yContainerRing(nav, on) {
+    var ink = nav.ctx.theme.ink;
+    nav.ctx.el.style.boxShadow = on ?
+      "inset 0 0 0 1px " + ink.grid +
+      ", inset 0 0 0 3px " + ink.primary : "";
+  }
+
+  /* The focused mark's indicator: a 2px primary-ink ring cased in the
+     surface colour so it reads on any fill, positioned as an HTML box
+     over the mark. Outside the SVG on purpose - focus must never change
+     what an export contains - and moved, never animated, so a focus
+     change is instant whatever the motion preference. */
+  function a11yMarkRing(nav, node, r) {
+    var el = nav.ctx.el;
+    if (!nav.ring || !nav.ring.parentNode) {
+      nav.ring = document.createElement("div");
+      nav.ring.className = "pv-a11y pv-focus-ring";
+      nav.ring.setAttribute("aria-hidden", "true");
+      nav.ring.style.cssText =
+        "position:absolute;pointer-events:none;z-index:8;" +
+        "border:2px solid " + nav.ctx.theme.ink.primary + ";" +
+        "box-shadow:0 0 0 1px " + nav.ctx.theme.ink.surface +
+        ",inset 0 0 0 1px " + nav.ctx.theme.ink.surface + ";";
+      el.appendChild(nav.ring);
+    }
+    var base = el.getBoundingClientRect();
+    /* 2px of breathing room, then the 2px border sits outside that. */
+    nav.ring.style.display = "block";
+    nav.ring.style.left = (r.left - base.left - 4) + "px";
+    nav.ring.style.top = (r.top - base.top - 4) + "px";
+    nav.ring.style.width = (r.width + 4) + "px";
+    nav.ring.style.height = (r.height + 4) + "px";
+    nav.ring.style.borderRadius =
+      node.tagName && node.tagName.toLowerCase() === "circle" ?
+        "50%" : "4px";
+  }
+
+  /* Speak the focused mark: the caller-supplied describe() when there
+     is one, the tooltip's own text otherwise. A live region only
+     announces changes, so a repeat of the same text gets an invisible
+     trailing space toggled on to force it through. */
+  function a11yAnnounce(nav, node, i) {
+    var text = nav.describe ?
+      String(nav.describe(node, node.__data__, i) || "") :
+      a11yTipText(nav.ctx.tip);
+    if (!text) { nav.live.textContent = ""; nav.said = ""; return; }
+    if (text === nav.said) { text += " "; }
+    nav.live.textContent = text;
+    nav.said = text;
+  }
+
+  function a11yFocusMark(nav, i) {
+    var node = nav.marks[i];
+    if (!node || !node.isConnected) return;
+    var old = nav.index >= 0 ? nav.marks[nav.index] : null;
+    if (old && old !== node && old.isConnected) {
+      var oc = a11yCentre(old);
+      a11yFire(old, "pointerleave", oc.x, oc.y);
+    }
+    nav.index = i;
+    var c = a11yCentre(node);
+    /* The mark's own handlers do the real work: highlight and tooltip.
+       Both event types go out because renderers bind either. */
+    a11yFire(node, "pointerenter", c.x, c.y);
+    a11yFire(node, "pointermove", c.x, c.y);
+    a11yMarkRing(nav, node, c.rect);
+    a11yAnnounce(nav, node, i);
+  }
+
+  function a11yClearMark(nav) {
+    if (nav.index >= 0) {
+      var node = nav.marks[nav.index];
+      if (node && node.isConnected) {
+        var c = a11yCentre(node);
+        a11yFire(node, "pointerleave", c.x, c.y);
+      }
+    }
+    nav.index = -1;
+    if (nav.ring) { nav.ring.style.display = "none"; }
+    pv.hideTip(nav.ctx);
+    nav.live.textContent = "";
+    nav.said = "";
+  }
+
+  /* Makes one rendered chart keyboard-navigable. `marks` is the node
+     list to walk (pv.a11yMarks for the central wiring; a renderer could
+     hand its own, better-ordered list) and `describe` optionally maps
+     (node, datum, index) to the announcement text, replacing the
+     tooltip-derived default. Called after every render: the helper
+     nodes and the mark list are fresh each time, while the listeners
+     sit on the container - which survives re-renders - and are wired
+     once, reading the current state through el.__pvNav. */
+  pv.keyboardNav = function (ctx, marks, describe) {
+    var el = ctx.el;
+    el.setAttribute("tabindex", "0");
+    /* The browser's own outline is replaced by the themed ring. */
+    el.style.outline = "none";
+
+    /* The generated alt text doubles as the chart's long description,
+       reachable through aria-describedby - the aria-label stays for
+       the short announcement, this carries the full sentence. */
+    if (ctx.x.alt) {
+      if (!el.id) { el.id = "pv-" + Math.floor(Math.random() * 1e9); }
+      var desc = document.createElement("div");
+      desc.className = "pv-a11y";
+      desc.id = el.id + "-desc";
+      desc.style.cssText = A11Y_HIDDEN;
+      desc.textContent = ctx.x.alt;
+      el.appendChild(desc);
+      el.setAttribute("aria-describedby", desc.id);
+    }
+
+    /* One polite live region per chart. Announcements land here as
+       plain text; "polite" queues them behind whatever the screen
+       reader is already saying. Empty until a key moves the focus. */
+    var live = document.createElement("div");
+    live.className = "pv-a11y pv-live";
+    live.setAttribute("aria-live", "polite");
+    live.style.cssText = A11Y_HIDDEN;
+    el.appendChild(live);
+
+    var nav = {
+      marks: marks || [], index: -1, ctx: ctx,
+      describe: describe || null, live: live, ring: null, said: ""
+    };
+    el.__pvNav = nav;
+
+    /* A re-render while focused (theme flip, resize) repaints the
+       container ring in the fresh theme's ink. */
+    if (document.activeElement === el) { a11yContainerRing(nav, true); }
+    if (el.__pvNavWired) return;
+    el.__pvNavWired = true;
+
+    el.addEventListener("focus", function () {
+      var n = el.__pvNav;
+      if (!n) return;
+      /* Ring for keyboard focus only; a pointer click that happens to
+         land focus here keeps the chart quiet, as :focus-visible
+         would. The first arrow key draws it regardless. */
+      var kb = true;
+      try { kb = el.matches(":focus-visible"); } catch (e) {}
+      if (kb) { a11yContainerRing(n, true); }
+    });
+    el.addEventListener("blur", function () {
+      var n = el.__pvNav;
+      if (!n) return;
+      a11yContainerRing(n, false);
+      a11yClearMark(n);
+    });
+    el.addEventListener("keydown", function (ev) {
+      var n = el.__pvNav;
+      /* Keys pressed inside the download control belong to it. */
+      if (!n || ev.target !== el) return;
+      if (ev.key === "Escape") {
+        if (n.index >= 0) { a11yClearMark(n); ev.preventDefault(); }
+        return;
+      }
+      var count = n.marks.length;
+      if (!count) return;
+      /* Right/Down step forward, Left/Up back - one pairing covers
+         horizontal and vertical forms alike. Entering from the left
+         edge starts at the first mark, from the right at the last. */
+      var next = null;
+      if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+        next = n.index < 0 ? 0 : Math.min(n.index + 1, count - 1);
+      } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+        next = n.index < 0 ? count - 1 : Math.max(n.index - 1, 0);
+      } else if (ev.key === "Home") {
+        next = 0;
+      } else if (ev.key === "End") {
+        next = count - 1;
+      }
+      if (next == null) return;
+      ev.preventDefault();
+      a11yContainerRing(n, true);
+      a11yFocusMark(n, next);
+    });
   };
 
   /* ---------- standalone svg export ----------
@@ -641,10 +915,13 @@ window.pv = (function () {
     var tag = node.tagName.toLowerCase();
     if (tag === "svg") { exportPlotSvg(state, node); return; }
     /* Interactive controls make no sense in a static file, and the
-       tooltip is chrome for the pointer, not part of the chart. */
+       tooltip is chrome for the pointer, not part of the chart - as
+       the pv-a11y nodes (live region, alt-text description, focus
+       ring) are chrome for the keyboard and the screen reader. */
     if (tag === "button" || tag === "input" || tag === "select" ||
         tag === "canvas" || tag === "script" || tag === "style") return;
-    if (node.classList && node.classList.contains("pv-tooltip")) return;
+    if (node.classList && (node.classList.contains("pv-tooltip") ||
+        node.classList.contains("pv-a11y"))) return;
     var cs = getComputedStyle(node);
     if (cs.display === "none" || cs.visibility === "hidden" ||
         parseFloat(cs.opacity) === 0) return;

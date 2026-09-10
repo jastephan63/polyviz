@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,6 +45,22 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.5.0" id="polyviz-150">polyviz 1.5.0<a class="anchor" aria-label="anchor" href="#polyviz-150"></a></h2>
+<p>The storytelling release: charts learn to narrate, the gallery learns to run R in your browser, and the backends grow up.</p>
+<ul><li>
+<code><a href="../reference/pv_story.html">pv_story()</a></code> — scrollytelling: prose cards scroll past a pinned chart pane that crossfades to each step’s chart as the reader arrives (<code><a href="../reference/pv_story_step.html">pv_story_step()</a></code>), with full-width interludes (<code><a href="../reference/pv_story_break.html">pv_story_break()</a></code>) for headings, tables, and standalone charts. Sticky two-column on desktop, stacked on narrow screens; honest fallbacks for reduced motion and missing IntersectionObserver; saves self-contained via <code>pv_save("story.html")</code>.</li>
+<li>The gallery runs its own code: every snippet on the live gallery is now editable and executable in the browser through webR — no server, no installation; the built site carries its own wasm package repository.</li>
+<li>
+<code><a href="../reference/pv_hexmap.html">pv_hexmap()</a></code> — chart type 38: an equal-area hex cartogram of Switzerland, one hexagon per canton on a curated layout that keeps the neighbourhoods honest, so Basel-Stadt reads as large as Graubünden. Joins on canton codes or BFS numbers.</li>
+<li>Keyboard-navigable charts: every chart container is focusable; arrow keys walk the marks with the real tooltip following, Home/End jump, Escape clears, and a screen-reader live region announces each focused value. No pointer, no problem.</li>
+<li>
+<code>pv_fetch_bfs(filter = list(...))</code> — name the dimensions instead of memorising the key order; the dataflow’s structure is fetched and the key built for you, and an unknown dimension name errors with the real dimension ids in order.</li>
+<li>
+<code><a href="../reference/pv_fetch_eurostat.html">pv_fetch_eurostat()</a></code> — the same fetch-print-licence discipline against Eurostat’s SDMX API (codes-only SDMX-CSV, CC BY 4.0), with <code>filter</code>/<code>start</code>/<code>end</code> like the BFS fetcher.</li>
+<li>DuckDB joins the SQL backend: <code>pv_db_connect(driver = "duckdb")</code> (auto-detected for <code>.duckdb</code>/<code>.ddb</code>), every downstream helper working identically on both engines, Parquet and CSV files queryable in place — larger than memory — and <code>pv_read("data.parquet")</code> dispatching through it.</li>
+<li>“Anatomy of a Swiss canton” is rebuilt on <code><a href="../reference/pv_story.html">pv_story()</a></code>: the same eight chapters and every verified number, now told as scenes — charts gaining their changepoints, bands, and forecasts step by step as the prose walks through them.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.4.0" id="polyviz-140">polyviz 1.4.0<a class="anchor" aria-label="anchor" href="#polyviz-140"></a></h2>
 <p>Housing and mobility: the fetcher learns to ask for less, the pyramid chart arrives, and the data story grows two chapters.</p>

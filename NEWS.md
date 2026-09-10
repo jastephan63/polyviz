@@ -1,3 +1,31 @@
+# polyviz 1.4.0
+
+Housing and mobility: the fetcher learns to ask for less, the
+pyramid chart arrives, and the data story grows two chapters.
+
+* `pv_fetch_bfs()` gains `filter`, `start`, and `end` — server-side
+  SDMX key filtering against stats.swiss. A data key names dimension
+  values in the dataflow's dimension order (empty segment = all,
+  `+` = or); `start`/`end` bound the period. Registers that run to
+  hundreds of megabytes whole — vacancy by municipality, vehicles by
+  fuel — now arrive as sub-megabyte slices, cached per URL like any
+  other fetch. The docs walk one worked example end to end.
+* `pv_pyramid()` — chart type 37: mirrored horizontal bars for
+  opposed pairs (in/out commuters, age pyramids, imports/exports).
+  Absolute-value ticks on both sides of a shared symmetric scale,
+  optional sorting by either side or the total, the full design
+  system, alt text, and `pv_suggest()` support.
+* "Anatomy of a Swiss canton" gains chapters 7 (Vier Wände — the
+  housing market) and 8 (Unterwegs — how the canton moves): eleven
+  new charts on thirty years of vacancy counts, municipal vacancy on
+  the cantonal map, rents against scarcity, tenure, heat pumps
+  against the construction calendar, commuter flows (the pyramid's
+  debut), modal split against motorisation, and twenty years of new
+  car registrations by drive with the page's one carefully fenced
+  forecast. Every number in the prose is computed from the fetched
+  data at build time, and every statistical claim was independently
+  re-derived before release.
+
 # polyviz 1.3.0
 
 The composition release: the charts learn to work together, and the

@@ -4,7 +4,14 @@
 \alias{pv_fetch_bfs}
 \title{Fetch a dataset from the Swiss Federal Statistical Office (stats.swiss)}
 \usage{
-pv_fetch_bfs(id, agency = NULL, refresh = FALSE)
+pv_fetch_bfs(
+  id,
+  agency = NULL,
+  filter = NULL,
+  start = NULL,
+  end = NULL,
+  refresh = FALSE
+)
 }
 \arguments{
 \item{id}{Dataflow id, e.g. \code{"DF_SSV_POP_1930"}. The owning agency is
@@ -14,6 +21,17 @@ derived from the theme code in the id (\verb{DF_SSV_*} belongs to
 
 \item{agency}{SDMX agency id owning the dataflow, e.g. \code{"CH1.SSV"}.
 Defaults to \code{"CH1.<theme>"} derived from \code{id}.}
+
+\item{filter}{A single SDMX data key restricting the download to a
+slice of the dataflow, e.g. \code{"LU...."} - dimension values in the
+dataflow's dimension order, separated by dots, where an empty segment
+keeps all values of a dimension and \code{+} combines several. The default
+\code{NULL} downloads the complete flow. See Details for how to find the
+dimension order.}
+
+\item{start, end}{First / last period to download, a single year or
+period such as \code{"2015"} (sent as the \code{startPeriod} / \code{endPeriod}
+query parameters). The default \code{NULL} places no bound.}
 
 \item{refresh}{Set to TRUE to bypass the cache and download again.}
 }
@@ -43,6 +61,27 @@ plus density and percent-change variants. Rows whose indicator code
 starts with \code{"pop_ref_period"} and whose label is a bare four-digit year
 are the population counts.
 
+Some dataflows are enormous when pulled whole - the vacancy dataflow
+\code{DF_LWZ_1} and the dwelling register \code{DF_GWS_REG5}, for instance, run to
+hundreds of megabytes unfiltered. \code{filter} narrows the download on the
+server with an SDMX data key: one value per dimension, separated by
+dots, in the dataflow's dimension order, where an empty segment keeps
+every value of that dimension and \code{+} combines alternatives within one.
+The dimension order comes from the dataflow's data structure - request
+\verb{https://disseminate.stats.swiss/rest/dataflow/<agency>/<id>/latest?references=all}
+to discover it. For \code{"CH1.LWZ,DF_LWZ_1"} the order is
+\code{GR_KT_GDE.WOHN_ANZAHL.LEERWOHN_TYP.MEASURE_DIMENSION.FREQ}, so the key
+\code{"LU...."} fixes the region to canton Lucerne and leaves the other four
+dimensions open. \code{start} and \code{end} bound the time axis the same way.
+Because the download cache keys on the full request URL, differently
+filtered pulls of one dataflow cache independently of each other and of
+the complete flow.
+
+One quirk of filtered exports: the server names their time column
+\code{TIME_PERIOD} where the complete \verb{/all} exports say \code{PERIOD}, so a
+filtered result carries a \code{time_period} column where an unfiltered one
+has \code{period}. Everything else parses identically.
+
 BFS publishes stats.swiss data under the opendata.swiss "OPEN BY" terms:
 free use with source citation ("Quelle: Bundesamt für Statistik").
 Check the dataset page on stats.swiss should a dataflow state different
@@ -54,6 +93,11 @@ pop <- pv_fetch_bfs("DF_SSV_POP_1930")
 cities <- pop[startsWith(pop$ssv_pop_1930_code, "pop_ref_period") &
                 grepl("^\\\\d{4}$", pop$ssv_pop_1930) &
                 pop$ssv_swiss_city_code != "_ST", ]
+
+# canton Lucerne's vacancy rate only - the complete DF_LWZ_1 flow runs
+# to hundreds of megabytes, this slice is a few kilobytes
+lwz <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU._T._T.PC.A",
+                    start = "2015")
 }
 }
 \seealso{

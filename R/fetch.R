@@ -221,6 +221,40 @@ pv_licence_lustat <- paste0(
 
 # ---- the fetchers ----------------------------------------------------------
 
+# Builds the data URL for one stats.swiss dataflow reference. Without a
+# filter the whole flow comes down through the /all path; with one, the
+# SDMX data key takes that spot, and start/end bound the time axis via
+# the startPeriod/endPeriod query parameters.
+pv_bfs_url <- function(ref, filter = NULL, start = NULL, end = NULL) {
+  url <- sprintf(
+    "https://disseminate.stats.swiss/rest/data/%s/%s?format=csvfilewithlabels",
+    ref, if (is.null(filter)) "all" else filter)
+  if (!is.null(start)) {
+    url <- paste0(url, "&startPeriod=", start)
+  }
+  if (!is.null(end)) {
+    url <- paste0(url, "&endPeriod=", end)
+  }
+  url
+}
+
+# start/end name a year or period; plain numbers are as natural as
+# strings for years, so both are accepted and numbers are formatted.
+pv_bfs_period <- function(x, arg) {
+  if (is.null(x)) {
+    return(NULL)
+  }
+  if (is.numeric(x) && length(x) == 1 && !is.na(x)) {
+    x <- format(x, scientific = FALSE, trim = TRUE)
+  }
+  if (!is.character(x) || length(x) != 1 || is.na(x) || !nzchar(x) ||
+      grepl("[[:space:]/?&=]", x)) {
+    rlang::abort(sprintf(
+      "`%s` must be a single year or period, e.g. \"2015\".", arg))
+  }
+  x
+}
+
 #' Fetch a dataset from the Swiss Federal Statistical Office (stats.swiss)
 #'
 #' Downloads an SDMX dataflow from the Bundesamt für Statistik's
@@ -243,6 +277,27 @@ pv_licence_lustat <- paste0(
 #' starts with `"pop_ref_period"` and whose label is a bare four-digit year
 #' are the population counts.
 #'
+#' Some dataflows are enormous when pulled whole - the vacancy dataflow
+#' `DF_LWZ_1` and the dwelling register `DF_GWS_REG5`, for instance, run to
+#' hundreds of megabytes unfiltered. `filter` narrows the download on the
+#' server with an SDMX data key: one value per dimension, separated by
+#' dots, in the dataflow's dimension order, where an empty segment keeps
+#' every value of that dimension and `+` combines alternatives within one.
+#' The dimension order comes from the dataflow's data structure - request
+#' `https://disseminate.stats.swiss/rest/dataflow/<agency>/<id>/latest?references=all`
+#' to discover it. For `"CH1.LWZ,DF_LWZ_1"` the order is
+#' `GR_KT_GDE.WOHN_ANZAHL.LEERWOHN_TYP.MEASURE_DIMENSION.FREQ`, so the key
+#' `"LU...."` fixes the region to canton Lucerne and leaves the other four
+#' dimensions open. `start` and `end` bound the time axis the same way.
+#' Because the download cache keys on the full request URL, differently
+#' filtered pulls of one dataflow cache independently of each other and of
+#' the complete flow.
+#'
+#' One quirk of filtered exports: the server names their time column
+#' `TIME_PERIOD` where the complete `/all` exports say `PERIOD`, so a
+#' filtered result carries a `time_period` column where an unfiltered one
+#' has `period`. Everything else parses identically.
+#'
 #' BFS publishes stats.swiss data under the opendata.swiss "OPEN BY" terms:
 #' free use with source citation ("Quelle: Bundesamt für Statistik").
 #' Check the dataset page on stats.swiss should a dataflow state different
@@ -254,6 +309,15 @@ pv_licence_lustat <- paste0(
 #'   `"CH1.SSV,DF_SSV_POP_1930"`, when that guess is wrong.
 #' @param agency SDMX agency id owning the dataflow, e.g. `"CH1.SSV"`.
 #'   Defaults to `"CH1.<theme>"` derived from `id`.
+#' @param filter A single SDMX data key restricting the download to a
+#'   slice of the dataflow, e.g. `"LU...."` - dimension values in the
+#'   dataflow's dimension order, separated by dots, where an empty segment
+#'   keeps all values of a dimension and `+` combines several. The default
+#'   `NULL` downloads the complete flow. See Details for how to find the
+#'   dimension order.
+#' @param start,end First / last period to download, a single year or
+#'   period such as `"2015"` (sent as the `startPeriod` / `endPeriod`
+#'   query parameters). The default `NULL` places no bound.
 #' @param refresh Set to TRUE to bypass the cache and download again.
 #' @return A data frame; source and licence are attached as attributes and
 #'   printed on every fetch.
@@ -264,12 +328,34 @@ pv_licence_lustat <- paste0(
 #' cities <- pop[startsWith(pop$ssv_pop_1930_code, "pop_ref_period") &
 #'                 grepl("^\\d{4}$", pop$ssv_pop_1930) &
 #'                 pop$ssv_swiss_city_code != "_ST", ]
+#'
+#' # canton Lucerne's vacancy rate only - the complete DF_LWZ_1 flow runs
+#' # to hundreds of megabytes, this slice is a few kilobytes
+#' lwz <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU._T._T.PC.A",
+#'                     start = "2015")
 #' }
 #' @export
-pv_fetch_bfs <- function(id, agency = NULL, refresh = FALSE) {
+pv_fetch_bfs <- function(id, agency = NULL, filter = NULL, start = NULL,
+                         end = NULL, refresh = FALSE) {
   if (!is.character(id) || length(id) != 1 || is.na(id) || !nzchar(id)) {
     rlang::abort("`id` must be a single dataflow id, e.g. \"DF_SSV_POP_1930\".")
   }
+  if (!is.null(filter)) {
+    if (!is.character(filter) || length(filter) != 1 || is.na(filter) ||
+        !nzchar(filter) || grepl("[[:space:]]", filter)) {
+      rlang::abort(paste0(
+        "`filter` must be a single SDMX data key without whitespace, ",
+        "e.g. \"LU....\" (dimension values in the dataflow's dimension ",
+        "order, separated by dots)."))
+    }
+    if (grepl("[/?]", filter)) {
+      rlang::abort(paste0(
+        "`filter` must not contain \"/\" or \"?\" - pass just the ",
+        "dot-separated data key, not a URL."))
+    }
+  }
+  start <- pv_bfs_period(start, "start")
+  end <- pv_bfs_period(end, "end")
   if (!isTRUE(refresh) && !isFALSE(refresh)) {
     rlang::abort("`refresh` must be TRUE or FALSE.")
   }
@@ -286,9 +372,7 @@ pv_fetch_bfs <- function(id, agency = NULL, refresh = FALSE) {
     }
     ref <- paste(agency, ref, sep = ",")
   }
-  url <- sprintf(
-    "https://disseminate.stats.swiss/rest/data/%s/all?format=csvfilewithlabels",
-    ref)
+  url <- pv_bfs_url(ref, filter = filter, start = start, end = end)
   dl <- pv_download(url, refresh = refresh)
   d <- pv_parse_sdmx_labels(dl$path, url = url)
   pv_deliver(

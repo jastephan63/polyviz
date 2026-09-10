@@ -141,6 +141,41 @@ test_that("uncached downloads never write to the cache", {
   expect_length(list.files(polyviz:::pv_cache_dir()), 0)
 })
 
+test_that("pv_bfs_url builds the stats.swiss data URL", {
+  base <- "https://disseminate.stats.swiss/rest/data/"
+
+  # no filter = the whole flow via /all, exactly what pv_fetch_bfs always did
+  expect_equal(
+    polyviz:::pv_bfs_url("CH1.SSV,DF_SSV_BUILD_LWZ"),
+    paste0(base, "CH1.SSV,DF_SSV_BUILD_LWZ/all?format=csvfilewithlabels"))
+
+  # a data key replaces /all; empty segments and '+' pass through untouched
+  expect_equal(
+    polyviz:::pv_bfs_url("CH1.LWZ,DF_LWZ_1", filter = "LU...."),
+    paste0(base, "CH1.LWZ,DF_LWZ_1/LU....?format=csvfilewithlabels"))
+  expect_equal(
+    polyviz:::pv_bfs_url("CH1.MFZ_IVS,DF_IVS_2",
+                         filter = "3+_T.N._T._T._T._T..A",
+                         start = "2015", end = "2020"),
+    paste0(base, "CH1.MFZ_IVS,DF_IVS_2/3+_T.N._T._T._T._T..A",
+           "?format=csvfilewithlabels&startPeriod=2015&endPeriod=2020"))
+
+  # start/end also narrow an unfiltered pull
+  expect_equal(
+    polyviz:::pv_bfs_url("CH1.SSV,DF_SSV_MOB_CAR", start = "2024"),
+    paste0(base, "CH1.SSV,DF_SSV_MOB_CAR/all",
+           "?format=csvfilewithlabels&startPeriod=2024"))
+  expect_equal(
+    polyviz:::pv_bfs_url("CH1.SSV,DF_SSV_MOB_CAR", end = "2020"),
+    paste0(base, "CH1.SSV,DF_SSV_MOB_CAR/all",
+           "?format=csvfilewithlabels&endPeriod=2020"))
+
+  # years are handed around as strings, but a plain number works too
+  expect_equal(polyviz:::pv_bfs_period(2015, "start"), "2015")
+  expect_equal(polyviz:::pv_bfs_period("2015-Q2", "start"), "2015-Q2")
+  expect_null(polyviz:::pv_bfs_period(NULL, "start"))
+})
+
 test_that("fetcher arguments are validated", {
   expect_error(pv_fetch_bfs(1), "single dataflow id")
   expect_error(pv_fetch_bfs("DF_SSV_POP_1930", refresh = "yes"),
@@ -149,6 +184,31 @@ test_that("fetcher arguments are validated", {
   expect_error(pv_fetch_bfs("NOPE"), "agency")
   expect_error(pv_fetch_lustat(c("a", "b")), "single dataset")
   expect_error(pv_fetch_lustat("fa-lu-ra", refresh = NA), "TRUE or FALSE")
+
+  # the filter is one data key: a single string, no whitespace, and no
+  # URL punctuation that would smuggle in a different endpoint
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = 1),
+               "single SDMX data key")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = c("LU", "ZH")),
+               "single SDMX data key")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = ""),
+               "single SDMX data key")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = "LU. ._T"),
+               "whitespace")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = "LU..../all"),
+               "must not contain")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", filter = "LU....?x=1"),
+               "must not contain")
+
+  # start/end are one year or period each
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", start = c(2019, 2020)),
+               "single year or period")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", start = "20 20"),
+               "single year or period")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", end = TRUE),
+               "single year or period")
+  expect_error(pv_fetch_bfs("DF_SSV_POP_1930", end = "2020&x=1"),
+               "single year or period")
 })
 
 test_that("pv_fetch_bfs downloads and tidies a live dataflow", {
@@ -170,6 +230,34 @@ test_that("pv_fetch_bfs downloads and tidies a live dataflow", {
   expect_message(d2 <- pv_fetch_bfs("DF_SSV_POP_1930"), "stats.swiss")
   expect_equal(dim(d2), dim(d))
   expect_equal(file.mtime(entry$file), before)
+})
+
+test_that("pv_fetch_bfs pulls a filtered slice of a big dataflow", {
+  fetch_skip_if_offline()
+  local_fetch_cache()
+
+  # DF_LWZ_1 is hundreds of MB whole; this key is canton Lucerne's
+  # vacancy rate (all rooms, all types, annual) - a few kilobytes
+  expect_message(
+    d <- pv_fetch_bfs("CH1.LWZ,DF_LWZ_1", filter = "LU._T._T.PC.A",
+                      start = "2020"),
+    "OPEN BY")
+  expect_s3_class(d, "data.frame")
+  expect_gt(nrow(d), 3)
+  expect_true(all(d$gr_kt_gde_code == "LU"))
+
+  # filtered exports say TIME_PERIOD where /all exports say PERIOD
+  expect_true("time_period" %in% names(d))
+  expect_false("period" %in% names(d))
+  expect_true(all(d$time_period >= 2020))
+
+  # the PC measure is the vacancy rate in percent
+  expect_true(all(d$measure_dimension_code == "PC"))
+  expect_type(d$obs_value, "double")
+  expect_true(all(d$obs_value > 0 & d$obs_value < 100))
+  expect_match(attr(d, "pv_dataflow"), "DF_LWZ_1")
+  expect_match(attr(d, "pv_url"), "LU._T._T.PC.A", fixed = TRUE)
+  expect_match(attr(d, "pv_url"), "startPeriod=2020", fixed = TRUE)
 })
 
 test_that("pv_fetch_lustat downloads live data and states the terms", {

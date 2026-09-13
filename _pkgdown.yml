@@ -64,6 +64,7 @@ reference:
   - pv_bubble_map
   - pv_flow_map
   - pv_hexmap
+  - pv_isochrone
   - pv_race
   - pv_table
 
@@ -138,14 +139,18 @@ reference:
   desc: >
     Live access to the open-data portals - search the opendata.swiss
     catalogue, fetch from the BFS, LUSTAT, and Eurostat, pull the
-    country-wide boundary layers, and manage the shared download
-    cache. Every fetch states its source and licence terms.
+    country-wide boundary layers, open the national public-transport
+    timetable and compute travel times over it, and manage the shared
+    download cache. Every fetch states its source and licence terms.
   contents:
   - pv_search_opendata
   - pv_fetch_opendata
   - pv_fetch_bfs
   - pv_fetch_lustat
   - pv_fetch_eurostat
+  - pv_fetch_gtfs
+  - pv_transit_times
+  - pv_gtfs_close
   - pv_fetch_map
   - pv_cache_status
 

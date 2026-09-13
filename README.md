@@ -8,14 +8,16 @@ polyviz was born from loving [d3.js](https://d3js.org) visualisations but not wa
 
 **→ [Anatomy of a Swiss canton](https://jastephan63.github.io/polyviz/story.html)** — an eight-chapter data story built with polyviz on live-fetched Swiss open data: convergence that isn't happening, rising inequality and the transfers that compress it, four statistical families of municipalities, an ageing no scenario escapes, a housing market read through thirty years of vacancy counts, and a fleet caught mid-electrification — every number computed from the data.
 
-**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 38 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
+**→ [Sechzig Minuten](https://jastephan63.github.io/polyviz/motion.html)** — the second story: Switzerland measured in travel time from Lucerne's platforms, on the full national timetable (35 million stop events, read in place by DuckDB) — the sixty-minute country, what Sunday costs, every train to Zürich as a line, and an honest regression of minutes on kilometres.
+
+**→ [Live demo gallery](https://jastephan63.github.io/polyviz/)** — all 39 chart types, interactive, each explained and running on real Swiss open government data, with the R code that made it.
 
 **Getting started:** `vignette("polyviz")` is the five-minute tour, `pv_demo()` launches the live gallery as a Shiny app, `pv_suggest(data)` prints runnable chart calls that fit your data frame, and the [cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) fits the whole package on a desk-side sheet.
 
 ## Contents
 
 - [Installation](#installation) · [A first chart](#a-first-chart)
-- [The charts — all 38](#the-charts) · [Layers: annotate, trend, facet, link](#layers-annotate-trend-facet-link)
+- [The charts — all 39](#the-charts) · [Layers: annotate, trend, facet, link](#layers-annotate-trend-facet-link)
 - [Time-series statistics](#time-series-statistics) · [Boards and decks](#boards-and-decks) · [Scrollytelling stories](#scrollytelling-stories)
 - [Charts in papers and documents](#charts-in-papers-and-documents)
 - [Design](#design) · [Accessibility](#accessibility)
@@ -26,7 +28,7 @@ Behind the R interface, the package deliberately spans four backend languages:
 
 | Language | Where it lives | What it does |
 |---|---|---|
-| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 38 interactive chart types |
+| **JavaScript (D3 v7)** | `inst/htmlwidgets/` | Renders all 39 interactive chart types |
 | **SQL** | `R/sql.R`, `inst/sql/` | SQLite and DuckDB querying, parameterised queries, runnable `.sql` script files, Parquet files read in place |
 | **Python** | `inst/python/polyviz.py` | Numeric profiling and outlier detection (stdlib only — no pandas needed), with an identical pure-R fallback |
 | **SAS** | `R/sas.R` | Reads/writes `sas7bdat` and `xpt` datasets with variable labels, no SAS licence required |
@@ -131,6 +133,7 @@ Every chart is an htmlwidget: it animates in, responds to hover with tooltips, f
 | `pv_bubble_map()` | Sized circles at coordinates on the Swiss layers |
 | `pv_flow_map()` | Tapered movement arcs between places |
 | `pv_hexmap()` | The equal-area canton cartogram: one hexagon per canton, so Basel-Stadt reads as large as Graubünden |
+| `pv_isochrone()` | Travel-time bands over the country — the "how far can I get" map; `pv_transit_times()` computes the minutes from the national timetable |
 
 **Read exact values**
 
@@ -278,6 +281,18 @@ pv_fetch_eurostat("demo_pjan", filter = "A.NR.TOTAL.T.CH+LU",
 
 Every fetch prints the data's source and licence terms and attaches them to the result; resources without an open licence are refused rather than delivered. Downloads are cached under the URL's hash — `pv_cache_status()` lists the cache, `pv_cache_clear()` empties it, and a cached build re-runs offline. Portals, keys, and obligations: `vignette("swiss-open-data")`.
 
+### Public transport as data
+
+The complete Swiss timetable is a fetch away too — with fair warning: the weekly GTFS export from opentransportdata.swiss is a 236 MB ZIP that unpacks to roughly 4 GB of text, by far the package's largest download, and querying it needs the duckdb package (a Suggests dependency). Nothing is loaded into R wholesale — DuckDB reads the extracted files in place — and both the ZIP and the extract sit in the same cache as every other fetch, so only the first call downloads anything.
+
+```r
+gtfs <- pv_fetch_gtfs()                                  # 236 MB, once
+reach <- pv_transit_times(gtfs, "Luzern", "2026-09-15")  # every station's minutes
+pv_isochrone(reach, lat = "lat", lon = "lon", minutes = "minutes")
+```
+
+`pv_transit_times()` computes the earliest arrival at every station in the country for one departure — a Connection Scan over the day's ~3 million connections, honouring the feed's minimum transfer times — and `pv_isochrone()` melts those station minutes into travel-time bands over the Swiss map. Close the handle with `pv_gtfs_close()` when done. The feed is published by SBB on behalf of the Federal Office of Transport under the opentransportdata.swiss open-data terms: free use, source citation required ("Quelle: opentransportdata.swiss") — printed and attached on every fetch, like the rest.
+
 ## Analysing it
 
 ```r
@@ -329,7 +344,7 @@ All are openly licensed with source citation required (see each dataset's help p
 | `vignette("polyglot-backend")` | How the SQL, Python, and SAS backends work and when they engage |
 | [Function reference](https://jastephan63.github.io/polyviz/reference/) | Every exported function, rendered |
 | [Cheatsheet (PDF)](https://jastephan63.github.io/polyviz/polyviz-cheatsheet.pdf) | The whole package on one A4 sheet |
-| [Gallery](https://jastephan63.github.io/polyviz/) · [Story](https://jastephan63.github.io/polyviz/story.html) · [Board demo](https://jastephan63.github.io/polyviz/board.html) | Everything live |
+| [Gallery](https://jastephan63.github.io/polyviz/) · [Story](https://jastephan63.github.io/polyviz/story.html) · [Sechzig Minuten](https://jastephan63.github.io/polyviz/motion.html) · [Board demo](https://jastephan63.github.io/polyviz/board.html) | Everything live |
 | [NEWS](NEWS.md) · [Releases](https://github.com/jastephan63/polyviz/releases) | What changed, with checked tarballs |
 
 ## Licence

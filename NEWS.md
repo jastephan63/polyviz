@@ -1,3 +1,30 @@
+# polyviz 1.6.0
+
+The motion release: the national timetable becomes a dataset, travel
+time becomes a chart, and the package meets its first
+larger-than-memory data.
+
+* `pv_fetch_gtfs()` — the complete Swiss public-transport timetable
+  from opentransportdata.swiss (the ~236 MB weekly GTFS export,
+  cached), opened as DuckDB views over its 35 million stop times: the
+  DuckDB backend's first headline act. Free use, source citation
+  required; the fetcher states the terms like every other.
+* `pv_transit_times()` — earliest arrival at every Swiss station from
+  any origin, on any service day, by a Connection Scan over the day's
+  ~3 million connections: built in DuckDB, cached as Parquet, swept in
+  vectorised R. Around 25 seconds for a date's first origin, seconds
+  for every origin after. Honours real transfer minimums, platform-to-
+  station grouping, and after-midnight departures.
+* `pv_isochrone()` — chart type 39: travel-time bands over Swiss
+  geography. A principled nearest-service rasterisation in R,
+  contoured by d3, clipped to the border, lakes on top, origin
+  marked — how far one place reaches, drawn honestly (areas beyond a
+  30-minute walk from any measured point stay uncoloured).
+* **Sechzig Minuten** — the third data story: Switzerland measured in
+  travel time from Lucerne's platforms, weekday against Sunday,
+  morning against night, told as a scrollytelling pv_story() with
+  every number computed from the timetable at build time.
+
 # polyviz 1.5.0
 
 The storytelling release: charts learn to narrate, the gallery learns

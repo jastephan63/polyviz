@@ -15,10 +15,12 @@ Emmen
 Energie
 Eurostat
 Fachstelle
+Fahrplan
 FeatureCollection
 Finanzausgleich
 GFMAMGLASOND
 GG
+GTFS
 Gemeindegrenzen
 Gemeinderatswahlen
 Generalisierte
@@ -42,6 +44,7 @@ Monatswerte
 NOGA
 NYT
 Napf
+ODMCH
 OFL
 OKLCH
 OKLab
@@ -52,6 +55,7 @@ READMEs
 RSQLite
 RStudio
 Romoos
+SBB
 SDMX
 SIL
 SQLite
@@ -125,8 +129,10 @@ der
 desaturated
 deuteranopia
 donut
+duckdb
 epub
 et
+feed's
 flavoured
 fuer
 für
@@ -145,6 +151,7 @@ htmltools
 htmlwidget
 htmlwidgets
 inlined
+isochrone
 js
 keyframes
 knitr
@@ -168,6 +175,7 @@ normalised
 normalises
 northwest
 opendata
+opentransportdata
 organisation's
 pandoc
 parameterised
@@ -216,6 +224,7 @@ tooltips
 treemap
 treemaps
 ungrouped
+unreached
 unselected
 validator
 visualisation

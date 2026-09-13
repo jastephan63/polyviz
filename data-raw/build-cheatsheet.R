@@ -1,5 +1,5 @@
 # Builds the printable cheatsheet: one A4 landscape page that groups all
-# 38 chart constructors by intent, states the shared grammar, and lists
+# 39 chart constructors by intent, states the shared grammar, and lists
 # the ways in (data) and out (paper). The page is laid out as HTML in the
 # package's own light-mode design tokens (pv_colors), set in the bundled
 # Inter, and printed to a true vector PDF by headless Chrome - the same
@@ -60,8 +60,8 @@ chooser <- list(
     entries = list(
       c("pv_donut()", "a few shares of one whole"),
       c("pv_waffle()", "shares as countable unit squares"),
-      c("pv_treemap()", "many parts sized by value, one or two levels"),
-      c("pv_sunburst()", "a hierarchy in rings from the root; zoomable"),
+      c("pv_treemap()", "many parts sized by value"),
+      c("pv_sunburst()", "a hierarchy in rings; zoomable"),
       c("pv_icicle()", "the same hierarchy as columns, labels legible"),
       c("pv_pack()", "a hierarchy as nested circles; zoomable"))),
   list(
@@ -80,7 +80,8 @@ chooser <- list(
       c("pv_choropleth()", "a value per region, shaded on its map"),
       c("pv_bubble_map()", "sized points at real coordinates"),
       c("pv_flow_map()", "movement between places, as tapered bands"),
-      c("pv_hexmap()", "the cantons as equal hexagons, shaded by value"))),
+      c("pv_hexmap()", "the cantons as equal hexagons, shaded by value"),
+      c("pv_isochrone()", "travel-time bands from one origin"))),
   list(
     label = "Special",
     entries = list(
@@ -89,7 +90,7 @@ chooser <- list(
       c("pv_dendrogram()", "an hclust tree, cut into k groups"))))
 
 n_charts <- sum(vapply(chooser, function(g) length(g$entries), integer(1)))
-stopifnot(n_charts == 38L)
+stopifnot(n_charts == 39L)
 
 # ---------------------------------------------------------------------
 # Small builders, so the markup below reads like the sheet.
@@ -231,6 +232,9 @@ col4 <- tag$div(class = "col",
     def("pv_fetch_lustat(id)",
         list("a LUSTAT table; ", fn("pv_fetch_eurostat(id)"),
              " the same for Europe")),
+    def("pv_fetch_gtfs()",
+        list("the national timetable via DuckDB; ",
+             fn("pv_transit_times()"), " minutes to every station")),
     def('pv_fetch_map("municipalities")',
         "the one boundary layer too big to bundle"),
     tag$p(class = "note",
@@ -304,7 +308,7 @@ html, body { width: 297mm; height: 210mm; }
 body {
   font-family: "InterVariable", "Inter", system-ui, sans-serif;
   background: ', ink$surface, '; color: ', ink$primary, ';
-  font-size: 7.2pt; line-height: 1.32;
+  font-size: 7pt; line-height: 1.32;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 code, pre {
@@ -371,8 +375,8 @@ header h1 { font-size: 19pt; font-weight: 760; letter-spacing: -0.022em;
 .exts .fn, .exts .when { padding: 0.35mm 0; }
 
 footer { display: flex; flex-wrap: wrap; gap: 0 4.5mm;
-  border-top: 0.5pt solid ', ink$baseline, '; padding-top: 1.5mm;
-  margin-top: 1.6mm; color: ', ink$muted, '; font-size: 7pt; }
+  border-top: 0.5pt solid ', ink$baseline, '; padding-top: 1.2mm;
+  margin-top: 1.2mm; color: ', ink$muted, '; font-size: 7pt; }
 footer b { font-weight: 640; color: ', ink$secondary, '; }
 ')
 
@@ -412,7 +416,7 @@ if (length(missing)) {
 constructors <- unlist(lapply(chooser, function(g) {
   vapply(g$entries, function(e) sub("\\(\\)$", "", e[[1]]), character(1))
 }))
-stopifnot(length(constructors) == 38L,
+stopifnot(length(constructors) == 39L,
           !anyDuplicated(constructors),
           all(vapply(constructors, function(f) {
             is.function(get0(f, envir = asNamespace("polyviz")))

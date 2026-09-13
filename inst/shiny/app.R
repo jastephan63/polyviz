@@ -88,6 +88,29 @@ city_bubbles <- merge(pv_city_coords,
                       pv_city_population[pv_city_population$year == 2024, ],
                       by = "city")
 
+# Travel times for the isochrone card: twenty-five cities with hand-set
+# illustrative minutes from Lucerne - the shape pv_transit_times()
+# returns, without asking a demo app to download the 236 MB national
+# timetable. Sparse input like this gives each city a small walkable
+# halo; a real station table fills the map in.
+reach_lucerne <- data.frame(
+  city = c("Luzern", "Zug", "Z\u00fcrich", "Olten", "Bern", "Aarau",
+           "Basel", "Thun", "Interlaken", "Sarnen", "Engelberg",
+           "Altdorf", "Schwyz", "Winterthur", "St. Gallen", "Chur",
+           "Fribourg", "Lausanne", "Gen\u00e8ve", "Sion",
+           "Neuch\u00e2tel", "Solothurn", "Biel", "Lugano",
+           "Bellinzona"),
+  lat = c(47.05, 47.17, 47.38, 47.35, 46.95, 47.39, 47.56, 46.76,
+          46.69, 46.90, 46.82, 46.88, 47.02, 47.50, 47.42, 46.85,
+          46.80, 46.52, 46.20, 46.23, 46.99, 47.21, 47.14, 46.00,
+          46.19),
+  lon = c(8.31, 8.52, 8.54, 7.90, 7.45, 8.05, 7.59, 7.63, 7.87,
+          8.25, 8.40, 8.64, 8.65, 8.72, 9.37, 9.53, 7.15, 6.63,
+          6.14, 7.36, 6.93, 7.53, 7.25, 8.95, 9.02),
+  minutes = c(0, 21, 41, 33, 62, 45, 61, 82, 105, 26, 43, 38, 40,
+              68, 105, 120, 87, 122, 158, 150, 95, 65, 80, 115,
+              100))
+
 # Hotel nights per canton for the hexmap: the total for the sequential
 # ramp, and the foreign-guest share for the diverging one.
 canton_nights <- local({
@@ -272,6 +295,7 @@ demo_chart_ids <- c(
   "comp_donut", "comp_treemap", "comp_sunburst",
   "rel_scatter", "rel_force", "rel_arc", "rel_sankey",
   "geo_lucerne", "geo_cantons", "geo_hexmap", "geo_bubbles",
+  "geo_isochrone",
   "mot_race", "mot_bump",
   "tab_table", "tab_heatmap", "tab_pairs")
 
@@ -385,7 +409,11 @@ ui <- fluidPage(
                                  c("sequential", "diverging"),
                                  selected = "diverging"),
                       wide = TRUE, height = "460px"),
-            demo_card("geo_bubbles", wide = TRUE, height = "460px"))),
+            demo_card("geo_bubbles", wide = TRUE, height = "460px"),
+            demo_card("geo_isochrone",
+                      demo_radio("geo_iso_breaks", "breaks",
+                                 c("30/60/90/120", "60/120")),
+                      wide = TRUE, height = "460px"))),
       tabPanel(
         "Motion",
         div(class = "pv-grid",
@@ -655,6 +683,18 @@ server <- function(input, output, session) {
                   title = "Every Swiss city is a circle",
                   subtitle = "Sized by 2024 population; hover to read out",
                   source = bfs, mode = mode())
+  }))
+
+  output$geo_isochrone <- renderPvchart(demo_widget(function() {
+    coarse <- identical(input$geo_iso_breaks %||% "30/60/90/120",
+                        "60/120")
+    pv_isochrone(reach_lucerne, lat = "lat", lon = "lon",
+                 minutes = "minutes", origin = c(47.05, 8.31),
+                 breaks = if (coarse) c(60, 120) else c(30, 60, 90, 120),
+                 title = "How far Lucerne reaches",
+                 subtitle = "Illustrative rail travel times from Lucerne, banded in minutes",
+                 source = "Illustrative demo times; boundaries \u00a9 BFS, ThemaKart",
+                 mode = mode())
   }))
 
   # --- motion ----------------------------------------------------------

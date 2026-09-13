@@ -1,0 +1,8 @@
+route_id,service_id,trip_id
+R1,S_DAILY,T1
+R2,S_DAILY,T2
+R2,S_DAILY,T3
+R3,S_DAILY,T4
+R5,S_EXC,T5
+R4,S_ADD,T6
+R6,S_DAILY,T7

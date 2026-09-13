@@ -1,0 +1,7 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+R1,X,M1,Alpdorf - Casteln,109
+R2,X,M2,Brugghausen - Escherwil,109
+R3,X,N1,Casteln - Grat,109
+R4,X,M4,Casteln - Dorfli,109
+R5,X,M5,Alpdorf - Furtal,109
+R6,X,MT,Alpdorf - Furtal Taxi,715

@@ -2354,6 +2354,7 @@ story_blocks <- c(list(
     tags$a(href = "#wohnen", "7 · Vier Wände"),
     tags$a(href = "#unterwegs", "8 · Unterwegs"),
     tags$a(href = "#methoden", "Appendix"),
+    tags$a(href = "motion.html", "Sechzig Minuten →"),
     tags$a(href = "index.html", "← polyviz gallery")
   )),
 

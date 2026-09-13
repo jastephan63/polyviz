@@ -33,7 +33,7 @@ display_names <- c(
   dendrogram = "Dendrogram", choropleth = "Choropleth map",
   `choropleth-cantons` = "Country-wide choropleth",
   `bubble-map` = "Bubble map", `flow-map` = "Flow map",
-  hexmap = "Hex cartogram",
+  hexmap = "Hex cartogram", isochrone = "Isochrone map",
   race = "Bar-chart race", bump = "Bump chart", beeswarm = "Beeswarm",
   pairs = "Scatterplot matrix", table = "Data table",
   violin = "Violin plot", calendar = "Calendar heatmap",
@@ -344,6 +344,8 @@ page <- tags$html(lang = "en", tags$head(
       'devtools::install_github("jastephan63/polyviz").')),
     tags$p(tags$a(href = "story.html",
       "Anatomy of a Swiss canton — a data investigation built with polyviz")),
+    tags$p(tags$a(href = "motion.html",
+      "Sechzig Minuten — Switzerland measured in travel time, on the national timetable")),
     tags$p(tags$a(href = "board.html",
       "A chart board — several finished charts composed into one page with pv_board()"))
   ),

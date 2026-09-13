@@ -1177,3 +1177,327 @@ test_that("hovering a hexagon names the canton and gives the exact value", {
   expect_match(got$html, "(ZH)", fixed = TRUE)
   expect_match(got$html, "nights: <b>")
 })
+
+# ---- isochrone -------------------------------------------------------------
+
+# A handful of stations with hand-set travel times - the last one
+# unreached, exactly how pv_transit_times() marks a stop the network
+# never gets to.
+iso_stations <- function() {
+  data.frame(
+    stop = c("Luzern", "Zug", "Z\u00fcrich", "Bern", "Chur"),
+    lat = c(47.05, 47.17, 47.38, 46.95, 46.85),
+    lon = c(8.31, 8.52, 8.54, 7.45, 9.53),
+    minutes = c(0, 21, 41, 62, NA))
+}
+
+# A denser set for the real-Chrome checks: enough cities that every
+# band up to "over 120 min" owns some ground. Hand-set demo times from
+# Lucerne - demo geometry, not a timetable claim.
+iso_reach <- function() {
+  data.frame(
+    lat = c(47.05, 47.17, 47.38, 46.95, 47.56, 46.52, 46.20, 47.42,
+            46.85, 46.00, 47.35, 46.90, 46.23, 47.50),
+    lon = c(8.31, 8.52, 8.54, 7.45, 7.59, 6.63, 6.14, 9.37,
+            9.53, 8.95, 7.90, 8.25, 7.36, 8.72),
+    minutes = c(0, 21, 41, 62, 61, 122, 158, 105, 120, 115, 33, 26,
+                150, 68))
+}
+
+# The great-circle leg of the interpolation, replicated independently so
+# the grid tests can predict exact cell values.
+iso_hav_km <- function(lat1, lon1, lat2, lon2) {
+  rad <- pi / 180
+  a <- sin((lat2 - lat1) * rad / 2)^2 +
+    cos(lat1 * rad) * cos(lat2 * rad) * sin((lon2 - lon1) * rad / 2)^2
+  2 * 6371 * asin(pmin(1, sqrt(a)))
+}
+
+# The flat (row-major, row 0 north) index of the cell holding a point,
+# and that cell's centre - the raster layout the payload documents.
+iso_cell <- function(bb, lat, lon, nx = 160, ny = 100) {
+  j <- floor((lon - bb[1]) / (bb[2] - bb[1]) * nx)
+  i <- floor((bb[4] - lat) / (bb[4] - bb[3]) * ny)
+  list(idx = i * nx + j + 1,
+       lat = bb[4] - (i + 0.5) * (bb[4] - bb[3]) / ny,
+       lon = bb[1] + (j + 0.5) * (bb[2] - bb[1]) / nx)
+}
+
+test_that("isochrone builds its payload and rasterises the map box", {
+  w <- expect_pvchart(
+    pv_isochrone(iso_stations(), lat = "lat", lon = "lon",
+                 minutes = "minutes"),
+    "isochrone")
+  x <- w$x
+  # The raster: 160 x 100 over the cantons layer's bounding box, flat.
+  expect_equal(x$nx, 160L)
+  expect_equal(x$ny, 100L)
+  expect_length(x$grid, 160 * 100)
+  expect_equal(x$bbox, polyviz:::pv_map_bbox(pv_swiss_cantons))
+  # Minutes travel rounded to one decimal - the payload stays compact.
+  g <- x$grid[!is.na(x$grid)]
+  expect_true(all(abs(g * 10 - round(g * 10)) < 1e-8))
+  # The base layers ride along untouched, like every country-wide map.
+  expect_identical(x$map, pv_swiss_cantons)
+  expect_identical(x$lakes, pv_swiss_lakes)
+  # Defaults: the four canonical breaks, sequential, no origin marker.
+  expect_equal(x$breaks, c(30, 60, 90, 120))
+  expect_equal(x$palette, "sequential")
+  expect_null(x$origin)
+  expect_equal(x$vlab, "minutes")
+  expect_equal(x$walk_cutoff, 30)
+  # Chur's NA marks it unreached: it sits out quietly, with no warning.
+  expect_no_warning(
+    pv_isochrone(iso_stations(), lat = "lat", lon = "lon",
+                 minutes = "minutes"))
+  expect_equal(x$n_stations, 4)
+})
+
+test_that("isochrone interpolates nearest service and blanks beyond the walk cutoff", {
+  one <- data.frame(lat = 47.05, lon = 8.31, minutes = 10)
+  w <- pv_isochrone(one, lat = "lat", lon = "lon", minutes = "minutes")
+  bb <- w$x$bbox
+  # The station's own cell: its minutes plus the walk from the cell
+  # centre at 5 km/h - exactly reproducible from the raster layout.
+  cell <- iso_cell(bb, 47.05, 8.31)
+  expected <- 10 + 12 * iso_hav_km(47.05, 8.31, cell$lat, cell$lon)
+  expect_equal(w$x$grid[cell$idx], round(expected, 1))
+  # Every painted cell lies within the 30-minute walk cutoff, so no
+  # value exceeds minutes + cutoff, and distant ground stays NA.
+  reached <- w$x$grid[!is.na(w$x$grid)]
+  expect_true(all(reached <= 10 + 30 + 0.1))
+  geneva <- iso_cell(bb, 46.20, 6.14)
+  expect_true(is.na(w$x$grid[geneva$idx]))
+
+  # Two stations in one place: the minimum wins, as "nearest service"
+  # promises.
+  two <- data.frame(lat = c(47.05, 47.05), lon = c(8.31, 8.31),
+                    minutes = c(50, 7))
+  w2 <- pv_isochrone(two, lat = "lat", lon = "lon", minutes = "minutes")
+  expect_equal(w2$x$grid[cell$idx],
+               round(7 + 12 * iso_hav_km(47.05, 8.31, cell$lat, cell$lon),
+                     1))
+
+  # An unreached station contributes nothing - not even proximity: with
+  # Luzern itself NA, its cell is far beyond a walk from Zug and blanks.
+  gap <- data.frame(lat = c(47.05, 47.17), lon = c(8.31, 8.52),
+                    minutes = c(NA, 5))
+  wg <- pv_isochrone(gap, lat = "lat", lon = "lon", minutes = "minutes")
+  expect_true(is.na(wg$x$grid[cell$idx]))
+  zug <- iso_cell(bb, 47.17, 8.52)
+  expect_false(is.na(wg$x$grid[zug$idx]))
+})
+
+test_that("isochrone validates its columns, times, breaks, and palette", {
+  st <- iso_stations()
+  expect_error(pv_isochrone(st, lat = "nope", lon = "lon",
+                            minutes = "minutes"),
+               "not in `data`")
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon", minutes = "stop"),
+               "not numeric")
+  neg <- st
+  neg$minutes[2] <- -4
+  expect_error(pv_isochrone(neg, lat = "lat", lon = "lon",
+                            minutes = "minutes"),
+               "cannot be negative")
+  # Swiss coordinates stay inside the world's legal ranges even when
+  # swapped, so the swap shows up as every point missing the map - and
+  # the error says exactly that.
+  expect_error(pv_isochrone(st, lat = "lon", lon = "lat",
+                            minutes = "minutes"),
+               "swapped")
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", breaks = c(30, 30)),
+               "strictly increasing")
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", breaks = c(0, 60)),
+               "positive")
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", breaks = "an hour"),
+               "numeric")
+  # Travel time has no reference point, so diverging is refused.
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", palette = "diverging"),
+               "sequential")
+  expect_error(pv_isochrone(st[0, ], lat = "lat", lon = "lon",
+                            minutes = "minutes"),
+               "no rows")
+})
+
+test_that("isochrone drops bad coordinates and off-map points loudly", {
+  st <- iso_stations()
+  st$lat[2] <- NA
+  expect_warning(
+    w <- pv_isochrone(st, lat = "lat", lon = "lon", minutes = "minutes"),
+    "Dropped 1 row\\(s\\) with missing `lat` values")
+  expect_equal(w$x$n_stations, 3)
+
+  # A point far outside Switzerland is named and left out.
+  berlin <- rbind(iso_stations(),
+                  data.frame(stop = "Berlin", lat = 52.52, lon = 13.4,
+                             minutes = 480))
+  expect_warning(
+    wb <- pv_isochrone(berlin, lat = "lat", lon = "lon",
+                       minutes = "minutes"),
+    "outside the Swiss map")
+  expect_equal(wb$x$n_stations, 4)
+
+  # Nowhere on the map at all reads as not-WGS84, and stops.
+  lv95 <- data.frame(lat = c(1211000, 1220000), lon = c(2666000, 2680000),
+                     minutes = c(0, 15))
+  expect_error(pv_isochrone(lv95, lat = "lat", lon = "lon",
+                            minutes = "minutes"),
+               "swapped|Swiss map")
+
+  # Every station unreached leaves nothing to interpolate.
+  allna <- iso_stations()
+  allna$minutes <- NA
+  expect_error(pv_isochrone(allna, lat = "lat", lon = "lon",
+                            minutes = "minutes"),
+               "unreached")
+})
+
+test_that("the origin marker is validated and travels as lon/lat", {
+  st <- iso_stations()
+  w <- pv_isochrone(st, lat = "lat", lon = "lon", minutes = "minutes",
+                    origin = c(47.05, 8.31))
+  expect_equal(w$x$origin, list(lon = 8.31, lat = 47.05))
+  # Names win over position, whichever way round they arrive.
+  wn <- pv_isochrone(st, lat = "lat", lon = "lon", minutes = "minutes",
+                     origin = c(lon = 8.31, lat = 47.05))
+  expect_equal(wn$x$origin, list(lon = 8.31, lat = 47.05))
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", origin = 8.31),
+               "length-2")
+  # A lon-first pair lands off the map, and the message says why.
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", origin = c(8.31, 47.05)),
+               "swapped")
+  expect_error(pv_isochrone(st, lat = "lat", lon = "lon",
+                            minutes = "minutes", origin = c(52.52, 13.4)),
+               "outside the Swiss map")
+})
+
+test_that("isochrone alt text counts points, reads coverage, and places the origin", {
+  w <- pv_isochrone(iso_stations(), lat = "lat", lon = "lon",
+                    minutes = "minutes", origin = c(47.05, 8.31),
+                    title = "How far Lucerne reaches")
+  a <- w$x$alt
+  expect_match(a,
+               "^An isochrone map of Switzerland titled \u201cHow far Lucerne reaches\u201d")
+  expect_match(a, "banding the country by minutes from 4 points",
+               fixed = TRUE)
+  # Coverage is computed from the raster itself.
+  g <- w$x$grid[!is.na(w$x$grid)]
+  expect_match(a, sprintf("Of the reached area, %d%% lies within 30 minutes",
+                          round(100 * mean(g <= 30))))
+  # Nothing here travels past the last break, and the text says so.
+  expect_match(a, "nothing reached lies beyond 120 minutes", fixed = TRUE)
+  expect_match(a, "The origin marker sits at 47.05\u00b0N, 8.31\u00b0E.",
+               fixed = TRUE)
+  # No origin, no origin sentence.
+  wo <- pv_isochrone(iso_stations(), lat = "lat", lon = "lon",
+                     minutes = "minutes")
+  expect_false(grepl("origin marker", wo$x$alt))
+  expect_identical(pv_alt_text(w), a)
+})
+
+test_that("swiss coordinates with a minutes column suggest the isochrone", {
+  reach <- data.frame(
+    lat = c(47.05, 47.17, 47.38, 46.95, 47.56, 46.52),
+    lon = c(8.31, 8.52, 8.54, 7.45, 7.59, 6.63),
+    minutes = c(5, 21, 41, 62, 61, 122))
+  s <- pv_suggest(reach, n = 10)
+  charts <- vapply(s$suggestions, function(r) r$chart, character(1))
+  expect_true("pv_isochrone" %in% charts)
+  # The named minutes column is the more specific read than the bubble
+  # map the same coordinates would otherwise earn.
+  expect_identical(charts[[1]], "pv_isochrone")
+  rec <- s$suggestions[[match("pv_isochrone", charts)]]
+  expect_match(rec$code, 'minutes = "minutes"', fixed = TRUE)
+  expect_match(rec$reason, "travel time in minutes")
+  # The printed call runs as printed.
+  env <- new.env(parent = asNamespace("polyviz"))
+  assign("reach", reach, envir = env)
+  expect_s3_class(eval(parse(text = rec$code), env), "pvchart")
+
+  # A "temp_min"-style suffix, a signed measure, or non-Swiss points
+  # all break the shape, and no isochrone is offered.
+  no_iso <- function(df) {
+    got <- vapply(pv_suggest(df, n = 10)$suggestions,
+                  function(r) r$chart, character(1))
+    expect_false("pv_isochrone" %in% got)
+  }
+  temps <- reach
+  names(temps)[3] <- "temp_min"
+  no_iso(temps)
+  signed <- reach
+  signed$minutes[1] <- -3
+  no_iso(signed)
+  abroad <- reach
+  abroad$lat <- abroad$lat + 10
+  no_iso(abroad)
+})
+
+test_that("the isochrone renders without JavaScript errors", {
+  render_skip_if_no_chrome()
+  # Dark mode walks the ramp's other end (pv_save pins the mode at
+  # capture time), and a single break exercises the payload path where
+  # htmlwidgets unboxes `breaks` to a bare number.
+  w <- pv_isochrone(iso_reach(), lat = "lat", lon = "lon",
+                    minutes = "minutes", origin = c(47.05, 8.31),
+                    breaks = 45,
+                    title = "One break, after dark")
+  path <- file.path(render_out_dir(), "isochrone_dark.png")
+  expect_no_warning(pv_save(w, path, mode = "dark", quiet = TRUE))
+  expect_true(file.exists(path))
+  expect_gt(file.size(path), 20000)
+  render_publish(path)
+})
+
+test_that("hovering a band reads its range, and the bands stay clipped", {
+  render_skip_if_no_chrome()
+  s <- geo_page_session(
+    pv_isochrone(iso_reach(), lat = "lat", lon = "lon",
+                 minutes = "minutes", origin = c(47.05, 8.31),
+                 title = "How far Lucerne reaches"))
+  withr::defer(try(s$b$close(), silent = TRUE))
+  expect_identical(s$errors$msgs, character())
+  res <- s$b$Runtime$evaluate("
+    (function () {
+      /* Bands paint near-to-far, so the last one is the farthest band
+         on the page; poke the pointer at it and read the tooltip. */
+      var bands = document.querySelectorAll('path.band');
+      if (!bands.length) return 'no bands';
+      var far = bands[bands.length - 1];
+      far.dispatchEvent(new PointerEvent('pointerenter',
+        { clientX: 200, clientY: 200, bubbles: true }));
+      far.dispatchEvent(new PointerEvent('pointermove',
+        { clientX: 200, clientY: 200, bubbles: true }));
+      var tip = document.querySelector('.pv-tooltip');
+      var wrap = bands[0].parentNode;
+      var clip = wrap.getAttribute('clip-path') || '';
+      var clipped = /^url\\(/.test(clip) &&
+        document.querySelectorAll(
+          '#' + clip.slice(5, -1).replace(/[\"']/g, '') + ' path').length;
+      return JSON.stringify({
+        bands: bands.length,
+        borders: document.querySelectorAll('path.border').length,
+        lakes: document.querySelectorAll('path.lake').length,
+        clipPaths: clipped,
+        legend: document.body.textContent.indexOf('120 min') >= 0,
+        opacity: tip.style.opacity, html: tip.innerHTML });
+    })()", returnByValue = TRUE)$result$value
+  got <- jsonlite::fromJSON(res)
+  # All five bands drew, the country clip holds all 26 canton shapes,
+  # the lakes sit on top, and the borders are there as hairlines.
+  expect_equal(got$bands, 5)
+  expect_equal(got$borders, 26)
+  expect_equal(got$clipPaths, 26)
+  expect_gt(got$lakes, 0)
+  # The header legend reads in minutes.
+  expect_true(got$legend)
+  expect_equal(got$opacity, "1")
+  expect_match(got$html, "over 120 min")
+  expect_match(got$html, "travel time (minutes)", fixed = TRUE)
+})

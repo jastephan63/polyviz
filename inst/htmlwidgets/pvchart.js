@@ -77,6 +77,7 @@ var pvDataKeys = {
   slope: "data", dumbbell: "data", pyramid: "data",
   waterfall: "data", bullet: "data",
   waffle: "data", horizon: "data", flowmap: "data", hexmap: "data",
+  isochrone: "grid",
   force: "nodes", sankey: "nodes", arc: "nodes",
   chord: "matrix",
   sunburst: "root", pack: "root", treemap: "root", icicle: "root",

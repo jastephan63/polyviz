@@ -249,6 +249,21 @@ render_charts <- list(
     pv_hexmap(nights24, id = "canton_id", value = "nights",
               title = "Where Switzerland's guests sleep")
   },
+  # No bundled travel-time dataset exists, so the isochrone's canonical
+  # chart carries a small inline one: hand-set demo times from Lucerne
+  # across the country - demo geometry, not a timetable claim.
+  isochrone = function() {
+    reach <- data.frame(
+      lat = c(47.05, 47.17, 47.38, 46.95, 47.56, 46.52, 46.20, 47.42,
+              46.85, 46.00, 47.35, 46.90, 46.23, 47.50),
+      lon = c(8.31, 8.52, 8.54, 7.45, 7.59, 6.63, 6.14, 9.37,
+              9.53, 8.95, 7.90, 8.25, 7.36, 8.72),
+      minutes = c(0, 21, 41, 62, 61, 122, 158, 105, 120, 115, 33, 26,
+                  150, 68))
+    pv_isochrone(reach, lat = "lat", lon = "lon", minutes = "minutes",
+                 origin = c(47.05, 8.31),
+                 title = "How far Lucerne reaches")
+  },
   race = function() {
     pv_race(pv_city_population, time = "year", id = "city",
             value = "population", top_n = 12,

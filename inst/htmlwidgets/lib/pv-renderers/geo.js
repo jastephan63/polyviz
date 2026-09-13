@@ -1,10 +1,11 @@
 /*
  * Geographic renderers: the choropleth, the hex cartogram, the bubble
- * map, and the flow map. See basic.js for the ctx contract. Projection
- * and path drawing come from the d3-geo functions bundled with d3 v7;
- * the map itself travels in the payload as a GeoJSON FeatureCollection
- * (the hex cartogram instead carries its hand-curated grid of axial
- * coordinates).
+ * map, the flow map, and the isochrone map. See basic.js for the ctx
+ * contract. Projection and path drawing come from the d3-geo functions
+ * bundled with d3 v7; the map itself travels in the payload as a
+ * GeoJSON FeatureCollection (the hex cartogram instead carries its
+ * hand-curated grid of axial coordinates, and the isochrone adds a
+ * flat travel-time raster that d3-contour turns into band polygons).
  */
 (function () {
 
@@ -94,8 +95,10 @@
      symmetric diverging domain can reach far beyond the observed
      values, and labelling those phantom endpoints would put numbers on
      the legend that exist nowhere on the map. Steals its own height
-     from ctx.height, like every header row. */
-  function scaleLegend(ctx, colorOf, diverging, center) {
+     from ctx.height, like every header row. The optional unit string
+     rides on the high label ("120 min") so a scale in real-world units
+     can say so - the region charts pass none and read as before. */
+  function scaleLegend(ctx, colorOf, diverging, center, unit) {
     var scaleRow = document.createElement("div");
     scaleRow.style.cssText =
       "display:flex;align-items:flex-start;gap:7px;margin-top:7px;" +
@@ -133,7 +136,7 @@
     var lo = document.createElement("span");
     lo.textContent = legFmt(leg[0]);
     var hi = document.createElement("span");
-    hi.textContent = legFmt(leg[1]);
+    hi.textContent = legFmt(leg[1]) + (unit || "");
     scaleRow.appendChild(lo);
     scaleRow.appendChild(barWrap);
     scaleRow.appendChild(hi);
@@ -935,6 +938,223 @@
         .transition().delay(fade / 2).duration(fade)
         .attr("opacity", 1);
     }
+  };
+
+  /* ---------- isochrone map ---------- */
+
+  pvRenderers.isochrone = function (ctx) {
+    var geo = rewind(ctx.x.map);
+    /* htmlwidgets auto-unboxes length-1 vectors, so a single break
+       arrives as a bare number; concat makes both shapes an array. */
+    var breaks = [].concat(ctx.x.breaks || []);
+    var nx = ctx.x.nx, ny = ctx.x.ny, bb = ctx.x.bbox;
+    /* The raster, with the R side's NA cells (beyond the walk cutoff)
+       pushed far below every threshold. NaN would be the natural
+       sentinel, but marching squares interpolates its band edges from
+       neighbouring values, and a finite floor keeps that arithmetic
+       defined right up to the last reached cell. */
+    var FLOOR = -1e9;
+    var values = (ctx.x.grid || []).map(function (v) {
+      return typeof v === "number" ? v : FLOOR;
+    });
+
+    /* One colour per band, stepped off the theme's sequential ramp:
+       band 0 (near the origin) sits at the pale end, the open-ended
+       band past the last break at the deep end - dark mode's ramp runs
+       the other way, so "near recedes toward the surface" holds there
+       too. */
+    var ramp = d3.interpolateRgbBasis(ctx.theme.sequential);
+    var nBands = breaks.length + 1;
+    var bandColour = [];
+    for (var bi = 0; bi < nBands; bi++) {
+      bandColour.push(ramp(nBands > 1 ? bi / (nBands - 1) : 0.6));
+    }
+
+    /* A band's spoken range. Integer minute edges read as timetable
+       ranges - the band above 30 starts at 31 - while fractional edges
+       keep their exact value; the band past the last break is open. */
+    function bandLabel(i) {
+      if (i >= breaks.length) {
+        return "over " + legFmt(breaks[breaks.length - 1]) + " min";
+      }
+      var hi = breaks[i];
+      if (i === 0) return "0–" + legFmt(hi) + " min";
+      var lo = breaks[i - 1];
+      var loShown = (lo % 1 === 0 && hi % 1 === 0) ? lo + 1 : lo;
+      return legFmt(loShown) + "–" + legFmt(hi) + " min";
+    }
+
+    /* The header legend is the choropleth's gradient bar wearing the
+       stepped band scale over 0 to the last break, its high end
+       labelled in minutes. The open-ended band only exists on the map
+       (and in its tooltip) - stretching the bar past the last break
+       would put a number on the legend that means nothing. */
+    function colorOfMinutes(v) {
+      var i = 0;
+      while (i < breaks.length && v > breaks[i]) i++;
+      return bandColour[Math.min(i, nBands - 1)];
+    }
+    ctx.x.obs = [0, breaks[breaks.length - 1]];
+    scaleLegend(ctx, colorOfMinutes, false, null, " min");
+
+    /* No axes - the margins are breathing room, as on the map siblings. */
+    var m = { top: 8, right: 16, bottom: 10, left: 16 };
+    var iw = Math.max(50, ctx.width - m.left - m.right),
+        ih = Math.max(80, ctx.height - m.top - m.bottom);
+    var svg = pv.baseSvg(ctx);
+    var g = svg.append("g").attr("transform",
+      "translate(" + m.left + "," + m.top + ")");
+
+    var projection = d3.geoMercator().fitSize([iw, ih], geo);
+    var path = d3.geoPath(projection);
+
+    /* The base country wears the plain chart surface: unreached ground
+       is an absence, not a value, so it looks like the page rather
+       than like data. The country's shape comes from the bands, the
+       lakes, and the canton hairlines drawn further down. */
+    g.append("g").attr("pointer-events", "none")
+      .selectAll("path.region").data(geo.features).enter()
+      .append("path")
+      .attr("class", "region")
+      .attr("d", path)
+      .attr("fill", ctx.theme.ink.surface)
+      .attr("stroke", "none");
+
+    /* d3-contour works in grid coordinates, where the value at index
+       i + j*nx sits at (i + 0.5, j + 0.5). This planar transform walks
+       each band vertex back to lon/lat (row 0 is the raster's northern
+       edge) and through the map's own projection - no spherical
+       resampling, no winding-order questions. */
+    var lonSpan = bb[1] - bb[0], latSpan = bb[3] - bb[2];
+    var gridPath = d3.geoPath(d3.geoTransform({
+      point: function (gx, gy) {
+        var p = projection([bb[0] + gx / nx * lonSpan,
+                            bb[3] - gy / ny * latSpan]);
+        this.stream.point(p[0], p[1]);
+      }
+    }));
+
+    /* The filled bands: one polygon per threshold, each the region at
+       or beyond that many minutes, painted near-to-far so every darker
+       band sits on the lighter ones - the value under the cursor is
+       always the topmost paint, which makes hover exact. The raster
+       reaches past the border (a station near Basel serves German
+       soil), so the whole stack is clipped to the country: the union
+       of the canton shapes, which is what a clipPath's children form. */
+    var clipId = "pv-iso-clip-" + Math.floor(Math.random() * 1e9);
+    var clip = svg.append("clipPath").attr("id", clipId);
+    geo.features.forEach(function (f) {
+      clip.append("path").attr("d", path(f));
+    });
+
+    var gen = d3.contours().size([nx, ny]);
+    var bandData = [];
+    for (var ti = 0; ti < nBands; ti++) {
+      bandData.push({
+        i: ti,
+        label: bandLabel(ti),
+        geom: gen.contour(values, ti === 0 ? 0 : breaks[ti - 1])
+      });
+    }
+    /* A band no cell reaches (nothing beyond the last break, say) has
+       no geometry; binding it would only put empty <path>s in the way
+       of the keyboard walk - rewind's rule, applied to bands. */
+    bandData = bandData.filter(function (d) {
+      return d.geom.coordinates.length > 0;
+    });
+
+    var bands = g.append("g")
+      .attr("clip-path", "url(#" + clipId + ")")
+      .selectAll("path.band").data(bandData).enter()
+      .append("path")
+      .attr("class", "band")
+      .attr("d", function (d) { return gridPath(d.geom); })
+      .attr("fill", function (d) { return bandColour[d.i]; })
+      .attr("stroke", ctx.theme.ink.surface)
+      .attr("stroke-width", 0.75)
+      .attr("stroke-linejoin", "round");
+
+    /* The Swiss lakes over the bands - the ThemaKart convention every
+       country-wide map here follows - then the canton borders as
+       hairlines over the water, so the political geography stays
+       legible across band fills and lake alike. */
+    drawLakes(ctx, svg, g, path, iw, ih);
+    g.append("g").attr("pointer-events", "none")
+      .selectAll("path.border").data(geo.features).enter()
+      .append("path")
+      .attr("class", "border")
+      .attr("d", path)
+      .attr("fill", "none")
+      .attr("stroke", ctx.theme.ink.baseline)
+      .attr("stroke-width", 0.5)
+      .attr("stroke-linejoin", "round");
+
+    /* The origin as a ringed marker in primary ink - readable on the
+       pale near band in light mode and the dark near band in dark
+       mode, where the accent blue would sink into the ramp. */
+    if (ctx.x.origin && typeof ctx.x.origin.lon === "number") {
+      var op = projection([ctx.x.origin.lon, ctx.x.origin.lat]);
+      var om = g.append("g").attr("pointer-events", "none");
+      om.append("circle")
+        .attr("cx", op[0]).attr("cy", op[1]).attr("r", 8)
+        .attr("fill", "none")
+        .attr("stroke", ctx.theme.ink.primary)
+        .attr("stroke-width", 1.5);
+      om.append("circle")
+        .attr("cx", op[0]).attr("cy", op[1]).attr("r", 3.5)
+        .attr("fill", ctx.theme.ink.primary)
+        .attr("stroke", ctx.theme.ink.surface)
+        .attr("stroke-width", 2);
+    }
+
+    /* Entrance: bands fade in near-to-far, the journey playing outward
+       from the origin. Skipped entirely at duration 0, where the final
+       state must exist synchronously. */
+    if (ctx.duration > 0) {
+      var fade = Math.min(200, ctx.duration);
+      var sweep = Math.min(400, Math.max(0, ctx.duration - fade));
+      bands.attr("opacity", 0)
+        .transition().duration(fade)
+        .delay(function (d) {
+          return d.i / Math.max(1, nBands - 1) * sweep;
+        })
+        .ease(d3.easeCubicOut)
+        .attr("opacity", 1);
+    }
+
+    /* Hovering a band outlines its rim in primary ink (never raised -
+       lifting the near band would bury every farther one) and the
+       tooltip reads the band's range; unreached ground has no band to
+       hover and stays silent. */
+    bands
+      .on("pointerenter pointermove", function (event, d) {
+        d3.select(this)
+          .attr("stroke", ctx.theme.ink.primary)
+          .attr("stroke-width", 1.25);
+        if (event.type === "pointerenter") {
+          ctx.emit("hover", {
+            band: d.i, label: d.label,
+            from: d.i === 0 ? 0 : breaks[d.i - 1],
+            to: d.i >= breaks.length ? null : breaks[d.i]
+          });
+        }
+        pv.showTip(ctx, event,
+          "<b>" + pv.esc(d.label) + "</b><br>travel time (" +
+          pv.esc(ctx.x.vlab || "minutes") + ")");
+      })
+      .on("pointerleave", function () {
+        d3.select(this)
+          .attr("stroke", ctx.theme.ink.surface)
+          .attr("stroke-width", 0.75);
+        pv.hideTip(ctx);
+      })
+      .on("click", function (event, d) {
+        ctx.emit("click", {
+          band: d.i, label: d.label,
+          from: d.i === 0 ? 0 : breaks[d.i - 1],
+          to: d.i >= breaks.length ? null : breaks[d.i]
+        });
+      });
   };
 
 })();

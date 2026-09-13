@@ -949,6 +949,40 @@ alt_flowmap <- function(x) {
   out
 }
 
+# The isochrone map: how many points feed the bands, where the origin
+# marker sits, and how the reached area splits between the nearest band
+# and the ground beyond the last break - the two ends a reader would
+# ask about first.
+alt_isochrone <- function(x) {
+  out <- alt_lead(x, "An isochrone map of Switzerland",
+                  sprintf("banding the country by %s from %s",
+                          alt_lab(x$vlab, "travel time"),
+                          alt_count(x$n_stations, "point", "points")))
+  g <- x$grid[!is.na(x$grid)]
+  br <- x$breaks
+  if (length(g)) {
+    near <- mean(g <= br[1])
+    far <- mean(g > br[length(br)])
+    cover <- sprintf(
+      "Of the reached area, %s lies within %s minutes",
+      alt_pct(near), alt_pos(br[1]))
+    cover <- if (far > 0) {
+      paste0(cover, sprintf(" and %s beyond %s minutes.",
+                            alt_pct(far), alt_pos(br[length(br)])))
+    } else {
+      paste0(cover, sprintf("; nothing reached lies beyond %s minutes.",
+                            alt_pos(br[length(br)])))
+    }
+    out <- paste(out, cover)
+  }
+  if (!is.null(x$origin)) {
+    out <- paste(out, sprintf(
+      "The origin marker sits at %.2f\u00b0N, %.2f\u00b0E.",
+      x$origin$lat, x$origin$lon))
+  }
+  out
+}
+
 # The facet payload. A plain facet keeps the honest generic sentence the
 # fallback always gave it - the panel machinery adds its own note at
 # build time (R/facets.R), and a fresh description could not know what
@@ -1030,6 +1064,7 @@ alt_describe <- function(x) {
     icicle = alt_icicle(x),
     horizon = alt_horizon(x),
     flowmap = alt_flowmap(x),
+    isochrone = alt_isochrone(x),
     alt_lead(x, sprintf("An interactive %s chart", type))
   )
 }

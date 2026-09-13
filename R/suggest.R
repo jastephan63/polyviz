@@ -420,6 +420,40 @@ suggest_bubble_map <- function(p, nm) {
        score = 94)
 }
 
+# Swiss coordinates plus a column that says "travel time in minutes" by
+# name: pv_isochrone's home ground, and a more specific read than the
+# bubble map's, so it scores just above it. The name test is
+# deliberately narrow - a bare "min" or the word minute/travel (or its
+# German timetable cousins), never a "temp_min"-style suffix - and the
+# values must be non-negative minutes on a within-a-day scale, so a
+# seconds column or a signed measure never qualifies.
+suggest_isochrone <- function(p, nm) {
+  if (is.null(p$coords) || !isTRUE(p$coords$swiss)) {
+    return(NULL)
+  }
+  minutes <- NULL
+  for (m in p$measures) {
+    if (m$kind != "numeric" || m$min < 0 || m$max > 1440) next
+    low <- tolower(m$name)
+    if (grepl("^min(s|utes)?$", low) ||
+        grepl("minute|travel|fahrzeit|reisezeit", low)) {
+      minutes <- m
+      break
+    }
+  }
+  if (is.null(minutes)) {
+    return(NULL)
+  }
+  list(chart = "pv_isochrone",
+       code = sprintf("pv_isochrone(%s, lat = %s, lon = %s, minutes = %s)",
+                      nm, suggest_q(p$coords$lat), suggest_q(p$coords$lon),
+                      suggest_q(minutes$name)),
+       reason = sprintf(
+         "`%s`/`%s` are Swiss coordinates and `%s` reads as travel time in minutes, so the points can melt into isochrone bands over the map",
+         p$coords$lat, p$coords$lon, minutes$name),
+       score = 96)
+}
+
 # Two category columns whose every value is a feature name on one
 # bundled layer, plus a non-negative measure: the origin-destination
 # shape, and pv_flow_map's home ground. The bar mirrors pv_flow_map's
@@ -1526,8 +1560,10 @@ suggest_runs <- function(code, nm, data) {
 #' pyramid when exactly two are non-negative and named as opposing
 #' flows - in and out, male and female, imports and exports),
 #' many numeric columns (a pairs matrix), longitude/latitude pairs (a
-#' bubble map), id columns matching the bundled Swiss map layers (a
-#' choropleth), a column of two-letter canton codes with one row per
+#' bubble map — or, when a travel-time-in-minutes column sits beside
+#' them, an isochrone map), id columns matching the bundled Swiss map
+#' layers (a choropleth), a column of two-letter canton codes with one
+#' row per
 #' canton (a hex cartogram), two place-name columns whose values are
 #' feature names on
 #' one bundled layer plus a non-negative measure (a flow map), grouped
@@ -1596,8 +1632,8 @@ pv_suggest <- function(data, n = 4) {
 
   p <- suggest_profile(data)
   builders <- list(
-    suggest_choropleth, suggest_hexmap, suggest_bubble_map,
-    suggest_flow_map,
+    suggest_choropleth, suggest_hexmap, suggest_isochrone,
+    suggest_bubble_map, suggest_flow_map,
     suggest_calendar, suggest_slope, suggest_horizon, suggest_line,
     suggest_pairs, suggest_heatmap, suggest_pyramid, suggest_dumbbell,
     suggest_scatter,

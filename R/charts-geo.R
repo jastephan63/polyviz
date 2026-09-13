@@ -1,6 +1,7 @@
 # Geographic charts: the choropleth, the hex cartogram, the bubble map,
-# and the flow map. Like every chart file, this one only shapes the
-# payload - the drawing lives in inst/htmlwidgets/lib/pv-renderers/geo.js.
+# the flow map, and the isochrone map. Like every chart file, this one
+# only shapes the payload - the drawing lives in
+# inst/htmlwidgets/lib/pv-renderers/geo.js.
 
 # ---- map plumbing shared by the geo charts ---------------------------------
 
@@ -992,6 +993,252 @@ pv_hexmap <- function(data, id, value,
     palette = palette, domain = domain, obs = range(df$value),
     center = if (palette == "diverging") center,
     labels = labels, vlab = value
+  ), chart_opts(title, subtitle, mode, duration, source)),
+  width, height, elementId)
+}
+
+# ---- isochrone -------------------------------------------------------------
+
+# The interpolation's two fixed legs: the walking pace that turns the
+# distance from a grid cell to a station into minutes, and the walk
+# beyond which a cell counts as out of reach entirely - without the
+# cutoff the map would paint smooth travel times across roadless terrain
+# no station serves.
+pv_isochrone_walk_kmh <- 5
+pv_isochrone_walk_cutoff <- 30
+
+# The isochrone's raster: a fixed lon/lat grid over the Swiss bounding
+# box, wide enough that d3-contour draws smooth bands and small enough
+# that the payload stays light. 160 x 100 tracks the country's own
+# aspect ratio (about 1.56 east-west to north-south at these latitudes).
+pv_isochrone_nx <- 160L
+pv_isochrone_ny <- 100L
+
+# Great-circle distance in km from one point to a vector of points, by
+# the haversine formula - stable at the short distances a walk covers,
+# where the plain spherical law of cosines loses precision.
+pv_haversine_km <- function(lat1, lon1, lat2, lon2) {
+  rad <- pi / 180
+  a <- sin((lat2 - lat1) * rad / 2)^2 +
+    cos(lat1 * rad) * cos(lat2 * rad) * sin((lon2 - lon1) * rad / 2)^2
+  2 * 6371 * asin(pmin(1, sqrt(a)))
+}
+
+#' Interactive D3 isochrone map of Switzerland
+#'
+#' Travel-time bands over the Swiss map — the chart for "how far can I
+#' get" questions. Each row of `data` is one point with coordinates and
+#' a travel time in minutes: the station travel times `pv_transit_times()`
+#' fetches are the natural input, but any point measure in minutes works
+#' — drive times, delivery times, response times. The country is banded
+#' at the `breaks` on the theme's stepped sequential ramp, light where
+#' the origin is near and dark where it is far, with the Swiss lakes
+#' drawn over the bands and the canton borders as hairlines on top.
+#' Hovering a band reads its range ("31–60 min"), and `origin` puts a
+#' ringed marker where the journey starts.
+#'
+#' The surface between the points is a principled nearest-service
+#' interpolation, not a guess: the country is rasterised to a 160×100
+#' grid, and each cell's time is the minimum over all points of that
+#' point's minutes plus the walk from the cell centre to the point at
+#' 5 km/h along the great circle — the fastest "ride there, walk the
+#' rest" combination the points allow. Cells farther than a 30-minute
+#' walk from every point stay empty, so the map never paints service
+#' onto terrain no point serves; those unreached areas keep the plain
+#' chart surface. Points with a missing travel time count as unreached
+#' — exactly how `pv_transit_times()` marks stations the network never
+#' gets to — and simply sit out the interpolation.
+#'
+#' @param data A data frame with one row per point. Rows with a missing
+#'   coordinate are dropped with a warning, as are points falling
+#'   outside Switzerland; rows whose travel time is `NA` are unreached
+#'   and take no part in the interpolation.
+#' @param lat,lon Names of the numeric coordinate columns, in WGS84
+#'   degrees (latitude north, longitude east — [pv_city_coords] is the
+#'   bundled template).
+#' @param minutes Name of the numeric column holding each point's travel
+#'   time in minutes. Must be non-negative; `NA` means unreached.
+#' @param origin Optional journey start, drawn as a ringed marker: a
+#'   numeric length-2 vector, `c(lat, lon)` in the order of the `lat`
+#'   and `lon` arguments (or named, `c(lat = ..., lon = ...)`). Must
+#'   fall on the map. `NULL` (default) draws no marker.
+#' @param breaks The band edges in minutes, strictly increasing and
+#'   positive. The default `c(30, 60, 90, 120)` yields five bands:
+#'   0–30, 31–60, 61–90, 91–120, and over 120 minutes.
+#' @param palette Only `"sequential"`: travel time is a magnitude with
+#'   no reference point to diverge around, so the single-hue ramp is
+#'   the one honest scale. The argument exists so the isochrone reads
+#'   like its geo siblings.
+#' @inheritParams pv_bar
+#' @return An htmlwidget.
+#' @examples
+#' # Hand-set demo times from Lucerne - illustrative geometry, not a
+#' # timetable claim.
+#' reach <- data.frame(
+#'   lat = c(47.05, 47.17, 47.38, 46.95, 47.56),
+#'   lon = c(8.31, 8.52, 8.54, 7.45, 7.59),
+#'   minutes = c(0, 21, 41, 62, 61))
+#' pv_isochrone(reach, lat = "lat", lon = "lon", minutes = "minutes",
+#'              origin = c(47.05, 8.31),
+#'              title = "How far Lucerne reaches")
+#' @export
+pv_isochrone <- function(data, lat, lon, minutes, origin = NULL,
+                         breaks = c(30, 60, 90, 120),
+                         palette = "sequential", title = NULL,
+                         subtitle = NULL, mode = "auto", duration = 500,
+                         source = NULL, width = NULL, height = NULL,
+                         elementId = NULL) {
+  check_columns(data, list(lat, lon, minutes))
+  check_nonempty(data)
+  check_value_column(data, lat)
+  check_value_column(data, lon)
+  check_value_column(data, minutes)
+  # Travel time is a magnitude: there is no meaningful centre for a
+  # diverging ramp to pivot on, so only the sequential scale is honest.
+  if (!identical(palette, "sequential")) {
+    rlang::abort(paste(
+      '`palette` must be "sequential" - travel times are magnitudes',
+      "with no reference point for a diverging scale to pivot on."))
+  }
+  if (!is.numeric(breaks) || !length(breaks) || anyNA(breaks) ||
+      !all(is.finite(breaks))) {
+    rlang::abort("`breaks` must be finite numeric minutes.")
+  }
+  breaks <- as.numeric(breaks)
+  if (breaks[1] <= 0 || any(diff(breaks) <= 0)) {
+    rlang::abort(paste(
+      "`breaks` must be positive and strictly increasing -",
+      "each band edge past the one before it."))
+  }
+
+  df <- data.frame(lat = as.numeric(data[[lat]]),
+                   lon = as.numeric(data[[lon]]),
+                   min = as.numeric(data[[minutes]]))
+  df <- drop_missing(df, is.na(df$lat), lat)
+  df <- drop_missing(df, is.na(df$lon), lon)
+
+  # A travel time cannot be negative; refuse it rather than let the
+  # interpolation quietly fold it into the minimum.
+  if (any(df$min < 0, na.rm = TRUE)) {
+    rlang::abort(sprintf(
+      "`%s` has negative values; a travel time cannot be negative.",
+      minutes))
+  }
+  # Coordinates outside the physically possible range almost always mean
+  # the two columns are swapped - the bubble map's check, word for word.
+  if (any(abs(df$lat) > 90) || any(abs(df$lon) > 180)) {
+    rlang::abort(sprintf(paste(
+      "`%s`/`%s` hold values outside the possible latitude/longitude",
+      "ranges. Are the two columns swapped?"), lat, lon))
+  }
+
+  # The raster covers the Swiss bounding box, so points beyond it can
+  # never colour a cell the map draws - drop them loudly, with a sample,
+  # because a systematic miss usually means the data is not WGS84.
+  bb <- pv_map_bbox(pv_swiss_cantons)
+  tol <- 0.25
+  out <- df$lon < bb[1] - tol | df$lon > bb[2] + tol |
+    df$lat < bb[3] - tol | df$lat > bb[4] + tol
+  if (all(out)) {
+    # Swiss latitudes and longitudes both stay inside the world's legal
+    # ranges when swapped, so the possible-range check above never sees
+    # that mistake - but swapped points all land off the map, and the
+    # reversed fit gives the mistake away.
+    swapped_in <- df$lat >= bb[1] - tol & df$lat <= bb[2] + tol &
+      df$lon >= bb[3] - tol & df$lon <= bb[4] + tol
+    hint <- if (all(swapped_in)) {
+      "The points fit the map the other way around - are the two columns swapped?"
+    } else {
+      "Are `lat` and `lon` WGS84 degrees?"
+    }
+    rlang::abort(paste("No point falls on the Swiss map.", hint))
+  }
+  if (any(out)) {
+    shown <- utils::head(sprintf("(%g, %g)", df$lat[out], df$lon[out]), 5)
+    extra <- sum(out) - length(shown)
+    rlang::warn(sprintf(
+      "%d point(s) fall outside the Swiss map and will not be used: %s%s.",
+      sum(out), paste(shown, collapse = ", "),
+      if (extra > 0) sprintf(" and %d more", extra) else ""))
+    df <- df[!out, , drop = FALSE]
+    rownames(df) <- NULL
+  }
+
+  # NA minutes mean unreached - a legitimate value, not dirty data, so
+  # those points sit out the interpolation without a warning. All of
+  # them unreached leaves nothing to interpolate at all.
+  reached <- df[!is.na(df$min), , drop = FALSE]
+  if (!nrow(reached)) {
+    rlang::abort(sprintf(paste(
+      "`%s` is missing for every point - every point is unreached, so",
+      "there is no travel time to interpolate."), minutes))
+  }
+
+  # The origin marker, validated against the same map box the points
+  # get. Unnamed pairs follow the order of the function's own `lat` and
+  # `lon` arguments; names win when both are there.
+  origin_pt <- NULL
+  if (!is.null(origin)) {
+    if (!is.numeric(origin) || length(origin) != 2 ||
+        !all(is.finite(origin))) {
+      rlang::abort(paste(
+        "`origin` must be NULL or a numeric length-2 vector: c(lat, lon)",
+        "in the order of the `lat` and `lon` arguments, or named",
+        "c(lat = ..., lon = ...)."))
+    }
+    if (!is.null(names(origin)) && all(c("lat", "lon") %in% names(origin))) {
+      o_lat <- unname(origin[["lat"]])
+      o_lon <- unname(origin[["lon"]])
+    } else {
+      o_lat <- unname(origin[[1]])
+      o_lon <- unname(origin[[2]])
+    }
+    off <- function(la, lo) {
+      lo < bb[1] - tol || lo > bb[2] + tol ||
+        la < bb[3] - tol || la > bb[4] + tol
+    }
+    if (off(o_lat, o_lon)) {
+      hint <- if (!off(o_lon, o_lat)) {
+        " The pair fits the map the other way around - are the two values swapped?"
+      } else {
+        ""
+      }
+      rlang::abort(sprintf(
+        "`origin` (%g, %g) falls outside the Swiss map.%s",
+        o_lat, o_lon, hint))
+    }
+    origin_pt <- list(lon = o_lon, lat = o_lat)
+  }
+
+  # Rasterise: each cell's travel time is the minimum over the reached
+  # points of (point minutes + walk from the cell centre to the point),
+  # tracked alongside the bare walk to the nearest reached point so the
+  # cutoff can blank cells beyond a sane walk. Rows run north to south
+  # and columns west to east, flattened row-major - the layout
+  # d3-contour indexes.
+  nx <- pv_isochrone_nx
+  ny <- pv_isochrone_ny
+  lon_c <- bb[1] + (seq_len(nx) - 0.5) * (bb[2] - bb[1]) / nx
+  lat_c <- bb[4] - (seq_len(ny) - 0.5) * (bb[4] - bb[3]) / ny
+  cell_lon <- rep(lon_c, times = ny)
+  cell_lat <- rep(lat_c, each = nx)
+  best <- rep(Inf, nx * ny)
+  walk_near <- rep(Inf, nx * ny)
+  per_km <- 60 / pv_isochrone_walk_kmh
+  for (i in seq_len(nrow(reached))) {
+    walk <- per_km * pv_haversine_km(reached$lat[i], reached$lon[i],
+                                     cell_lat, cell_lon)
+    walk_near <- pmin(walk_near, walk)
+    best <- pmin(best, reached$min[i] + walk)
+  }
+  best[walk_near > pv_isochrone_walk_cutoff] <- NA_real_
+  grid <- round(best, 1)
+
+  pv_widget("isochrone", c(list(
+    grid = grid, nx = nx, ny = ny, bbox = bb, breaks = breaks,
+    origin = origin_pt, map = pv_swiss_cantons, lakes = pv_swiss_lakes,
+    n_stations = nrow(reached), walk_cutoff = pv_isochrone_walk_cutoff,
+    palette = palette, vlab = minutes
   ), chart_opts(title, subtitle, mode, duration, source)),
   width, height, elementId)
 }

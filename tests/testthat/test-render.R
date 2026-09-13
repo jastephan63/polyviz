@@ -19,7 +19,8 @@ test_that("every chart type has a render check", {
     "area", "heatmap", "calendar", "horizon",
     "sankey", "parallel",
     "pack", "dendrogram",
-    "choropleth", "hexmap", "bubblemap", "flowmap", "race", "bump",
+    "choropleth", "hexmap", "bubblemap", "flowmap", "isochrone",
+    "race", "bump",
     "beeswarm", "pairs", "table"))
   for (id in names(render_charts)) {
     w <- render_charts[[id]]()
@@ -158,6 +159,10 @@ test_that("bubblemap renders without JavaScript errors", {
 
 test_that("flowmap renders without JavaScript errors", {
   expect_chart_renders("flowmap")
+})
+
+test_that("isochrone renders without JavaScript errors", {
+  expect_chart_renders("isochrone")
 })
 
 test_that("race renders without JavaScript errors", {

@@ -147,3 +147,46 @@ local({
             subtitle = "Foreign share of hotel nights by canton, 2024 – Switzerland overall: 51%",
             source = "Source: Bundesamt für Statistik – HESTA")
 })
+
+## isochrone
+# explain: The isochrone map answers "how far can I get" on the map
+#   itself: hand pv_isochrone() one row per point - coordinates and a
+#   travel time in minutes, the shape pv_transit_times() returns - and it
+#   melts the points into travel-time bands over Switzerland, light near
+#   the origin and darker with every break, lakes over the bands, canton
+#   borders as hairlines on top, and a ringed marker at the journey's
+#   start. The surface between the points is a principled
+#   nearest-service interpolation: every spot's time is the fastest
+#   "ride there, walk the rest" combination the points allow, at a
+#   5 km/h walking pace, and ground more than a 30-minute walk from
+#   every point stays blank rather than pretending to be served - which
+#   is why each city here wears a small walkable halo, and why the map
+#   fills in as the points densify to real station tables. Hover any
+#   band for its range. The travel times below are hand-set illustrative
+#   numbers for the demo - plausible rail journeys from Lucerne, not a
+#   timetable claim.
+local({
+  # Twenty-five cities, with illustrative travel times from Lucerne.
+  reach <- data.frame(
+    city = c("Luzern", "Zug", "Zürich", "Olten", "Bern", "Aarau",
+             "Basel", "Thun", "Interlaken", "Sarnen", "Engelberg",
+             "Altdorf", "Schwyz", "Winterthur", "St. Gallen", "Chur",
+             "Fribourg", "Lausanne", "Genève", "Sion",
+             "Neuchâtel", "Solothurn", "Biel", "Lugano",
+             "Bellinzona"),
+    lat = c(47.05, 47.17, 47.38, 47.35, 46.95, 47.39, 47.56, 46.76,
+            46.69, 46.90, 46.82, 46.88, 47.02, 47.50, 47.42, 46.85,
+            46.80, 46.52, 46.20, 46.23, 46.99, 47.21, 47.14, 46.00,
+            46.19),
+    lon = c(8.31, 8.52, 8.54, 7.90, 7.45, 8.05, 7.59, 7.63, 7.87,
+            8.25, 8.40, 8.64, 8.65, 8.72, 9.37, 9.53, 7.15, 6.63,
+            6.14, 7.36, 6.93, 7.53, 7.25, 8.95, 9.02),
+    minutes = c(0, 21, 41, 33, 62, 45, 61, 82, 105, 26, 43, 38, 40,
+                68, 105, 120, 87, 122, 158, 150, 95, 65, 80, 115,
+                100))
+  pv_isochrone(reach, lat = "lat", lon = "lon", minutes = "minutes",
+               origin = c(47.05, 8.31),
+               title = "How far Lucerne reaches",
+               subtitle = "Illustrative rail travel times from Lucerne, banded in minutes",
+               source = "Illustrative demo times; boundaries © BFS, ThemaKart")
+})

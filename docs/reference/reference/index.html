@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -273,6 +273,12 @@
         <dd>Interactive D3 hex cartogram of Switzerland</dd>
       </dl><dl><dt>
 
+          <code><a href="pv_isochrone.html">pv_isochrone()</a></code>
+
+        </dt>
+        <dd>Interactive D3 isochrone map of Switzerland</dd>
+      </dl><dl><dt>
+
           <code><a href="pv_race.html">pv_race()</a></code>
 
         </dt>
@@ -521,7 +527,7 @@
       </dl></div><div class="section level2">
       <h2 id="swiss-and-european-open-data">Swiss and European open data<a class="anchor" aria-label="anchor" href="#swiss-and-european-open-data"></a></h2>
 
-      <div class="section-desc"><p>Live access to the open-data portals - search the opendata.swiss catalogue, fetch from the BFS, LUSTAT, and Eurostat, pull the country-wide boundary layers, and manage the shared download cache. Every fetch states its source and licence terms.</p></div>
+      <div class="section-desc"><p>Live access to the open-data portals - search the opendata.swiss catalogue, fetch from the BFS, LUSTAT, and Eurostat, pull the country-wide boundary layers, open the national public-transport timetable and compute travel times over it, and manage the shared download cache. Every fetch states its source and licence terms.</p></div>
 
 
     </div><div class="section level2">
@@ -559,6 +565,24 @@
 
         </dt>
         <dd>Fetch a dataset from Eurostat</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_fetch_gtfs.html">pv_fetch_gtfs()</a></code>
+
+        </dt>
+        <dd>Fetch the Swiss national public-transport timetable (GTFS)</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_transit_times.html">pv_transit_times()</a></code>
+
+        </dt>
+        <dd>Earliest arrival at every Swiss station</dd>
+      </dl><dl><dt>
+
+          <code><a href="pv_gtfs_close.html">pv_gtfs_close()</a></code>
+
+        </dt>
+        <dd>Close a GTFS handle</dd>
       </dl><dl><dt>
 
           <code><a href="pv_fetch_map.html">pv_fetch_map()</a></code>

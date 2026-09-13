@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">polyviz</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,6 +45,18 @@
 
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.6.0" id="polyviz-160">polyviz 1.6.0<a class="anchor" aria-label="anchor" href="#polyviz-160"></a></h2>
+<p>The motion release: the national timetable becomes a dataset, travel time becomes a chart, and the package meets its first larger-than-memory data.</p>
+<ul><li>
+<code><a href="../reference/pv_fetch_gtfs.html">pv_fetch_gtfs()</a></code> — the complete Swiss public-transport timetable from opentransportdata.swiss (the ~236 MB weekly GTFS export, cached), opened as DuckDB views over its 35 million stop times: the DuckDB backend’s first headline act. Free use, source citation required; the fetcher states the terms like every other.</li>
+<li>
+<code><a href="../reference/pv_transit_times.html">pv_transit_times()</a></code> — earliest arrival at every Swiss station from any origin, on any service day, by a Connection Scan over the day’s ~3 million connections: built in DuckDB, cached as Parquet, swept in vectorised R. Around 25 seconds for a date’s first origin, seconds for every origin after. Honours real transfer minimums, platform-to- station grouping, and after-midnight departures.</li>
+<li>
+<code><a href="../reference/pv_isochrone.html">pv_isochrone()</a></code> — chart type 39: travel-time bands over Swiss geography. A principled nearest-service rasterisation in R, contoured by d3, clipped to the border, lakes on top, origin marked — how far one place reaches, drawn honestly (areas beyond a 30-minute walk from any measured point stay uncoloured).</li>
+<li>
+<strong>Sechzig Minuten</strong> — the third data story: Switzerland measured in travel time from Lucerne’s platforms, weekday against Sunday, morning against night, told as a scrollytelling pv_story() with every number computed from the timetable at build time.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.5.0" id="polyviz-150">polyviz 1.5.0<a class="anchor" aria-label="anchor" href="#polyviz-150"></a></h2>
 <p>The storytelling release: charts learn to narrate, the gallery learns to run R in your browser, and the backends grow up.</p>

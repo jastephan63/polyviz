@@ -1,5 +1,5 @@
 Package: polyviz
-Version: 1.5.0
+Version: 1.6.0
 Depends: R (>= 4.1)
 Imports: graphics, htmltools, htmlwidgets, jsonlite, rlang, stats,
         tools, utils
@@ -7,4 +7,4 @@ Suggests: base64enc, crosstalk, DBI, ggplot2, haven, RSQLite, chromote,
         curl, duckdb, gifski, officer, reticulate, sf, shiny, testthat
         (>= 3.0.0), withr, knitr, rmarkdown
 License: MIT + file LICENSE
-MD5sum: 367cf2984bfd1a6d56110dec8095407b
+MD5sum: 4c66137d20f9ea5bb959e2ebabb4eb7f
